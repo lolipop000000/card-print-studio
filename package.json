@@ -1,0 +1,19 @@
+{
+  "name": "card-print-studio",
+  "version": "1.1.2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test --test-concurrency=1 tests/*.test.mjs tests/*.spec.mjs",
+    "test:unit": "node --test tests/*.test.mjs",
+    "test:browser": "node scripts/build-harness.mjs && node --test --test-concurrency=1 tests/*.spec.mjs",
+    "build": "node scripts/build.mjs"
+  },
+  "dependencies": {
+    "jspdf": "4.2.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "playwright": "1.62.1"
+  }
+}

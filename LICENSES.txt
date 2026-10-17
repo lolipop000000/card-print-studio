@@ -1,0 +1,9 @@
+Third-party components included in the offline HTML:
+
+Pretendard Variable 1.3.9 — Copyright 2021 Kil Hyung-jin (https://github.com/orioncactus/pretendard).
+SIL Open Font License 1.1. Full license: vendor/pretendard/LICENSE.
+
+jsPDF 4.2.1 — MIT License. Copyright (c) 2010-2025 James Hall and contributors.
+Full license is bundled from node_modules/jspdf/LICENSE by the build script.
+
+esbuild is a development-only MIT licensed build tool.

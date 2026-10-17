@@ -1,0 +1,10 @@
+node_modules/
+artifacts/
+.superpowers/
+
+# Local card projects and personal workspace data
+작업실 데이터/
+*.card-project.json
+*.card.json
+.env
+.env.*

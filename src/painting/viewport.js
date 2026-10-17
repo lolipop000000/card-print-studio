@@ -1,0 +1,2 @@
+export function screenToPixel(point,rect,viewport){return {x:(point.x-rect.left-viewport.panX)/viewport.scale,y:(point.y-rect.top-viewport.panY)/viewport.scale};}
+export function zoomAt(viewport,anchor,nextScale){const scale=Math.max(.125,Math.min(16,nextScale)),x=(anchor.x-viewport.panX)/viewport.scale,y=(anchor.y-viewport.panY)/viewport.scale;return {scale,panX:anchor.x-x*scale,panY:anchor.y-y*scale};}
