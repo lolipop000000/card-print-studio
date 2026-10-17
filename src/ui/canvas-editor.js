@@ -5,10 +5,12 @@ import {getEffectFrameSec} from '../model/visual-effects.js';
 import {createEffectCache} from '../render/effects/composite.js';
 import {createEffectTimeline,syncEffectTimeInput} from './effect-timeline.js';
 import {setElementSelection,selectedElements,selectionBounds,groupDelta,marqueeElements} from './element-selection.js';
+import {effectPreviewDpi} from './effect-preview.js';
+import {CSS_MM,wheelZoomFactor,captureViewAnchor,restoreViewAnchor} from './view-zoom.js';
 export function mountCardCanvas(host,ctx){
  const stage=el('div',{class:'card-stage',tabIndex:0,role:'group','aria-label':'카드 요소 선택 영역'}),canvas=el('canvas',{id:'card-canvas'}),members=el('div',{class:'selection-members'}),selection=el('div',{id:'selection-box',hidden:true}),marquee=el('div',{id:'selection-marquee',hidden:true});stage.append(canvas,members,selection,marquee);host.append(stage);
  const area=host.closest('.canvas-scroll')||host;
- let gesture=null,preview=null,report={problems:[]},projectRef=ctx.store.getProject();
+ let gesture=null,preview=null,report={problems:[]},projectRef=ctx.store.getProject(),lastRatio=window.devicePixelRatio||1;
  const effectCache=createEffectCache(),timeline=createEffectTimeline({initialSec:getEffectFrameSec(projectRef),onFrame:()=>{drawCanvas();updateTransport();}});
  const transport=document.getElementById('card-effect-play'),timeInput=document.getElementById('card-effect-time');
  function updateTransport(){
@@ -16,7 +18,13 @@ export function mountCardCanvas(host,ctx){
   syncEffectTimeInput(timeInput,timeline.getTime());document.getElementById('card-effect-seconds').textContent=timeline.getTime().toFixed(2)+'초';
   document.getElementById('card-effect-print-frame').textContent='인쇄 장면 '+getEffectFrameSec(ctx.store.getProject()).toFixed(2)+'초 보기';
  }
- function drawCanvas(){const p=ctx.store.getProject(),target=preview||ctx.target();if(target)report=renderCard(canvas.getContext('2d',{willReadFrequently:true}),p,target,ctx.assets,200,{timeSec:timeline.getTime(),effectCache});}
+ function drawCanvas(){
+  const p=ctx.store.getProject(),target=preview||ctx.target();if(!target)return;
+  const width=stage.getBoundingClientRect().width;lastRatio=window.devicePixelRatio||1;
+  const dpi=effectPreviewDpi({widthMm:p.settings.cardWidthMm,heightMm:p.settings.cardHeightMm,displayWidth:width,pixelRatio:lastRatio});
+  report=renderCard(canvas.getContext('2d',{willReadFrequently:true}),p,target,ctx.assets,dpi,{timeSec:timeline.getTime(),effectCache});
+  canvas.dataset.previewDpi=String(dpi);canvas.style.imageRendering=canvas.width+.5<width*lastRatio?'pixelated':'auto';
+ }
  function setActive(value){timeline.setActive(value&&!document.hidden);updateTransport();}
  function visibility(){setActive(ctx.state.mode==='card'&&!ctx.state.paintOpen&&!ctx.state.effectOpen&&!document.querySelector('dialog[open]'));}
  transport.addEventListener('click',()=>{timeline.isPlaying()?timeline.pause():timeline.play();updateTransport();});
@@ -39,6 +47,7 @@ export function mountCardCanvas(host,ctx){
   const p=ctx.store.getProject();if(gesture&&(gesture.project!==p||gesture.targetId!==ctx.target()?.id)){release(gesture);gesture=null;preview=null;}
   const target=preview||ctx.target();if(!target){canvas.hidden=true;selection.hidden=true;members.replaceChildren();marquee.hidden=true;return;}canvas.hidden=false;
   const scale=ctx.state.cardScale;stage.style.width=p.settings.cardWidthMm*scale+'px';stage.style.height=p.settings.cardHeightMm*scale+'px';
+  document.getElementById('card-zoom').value=scale;document.getElementById('card-zoom-value').textContent=Math.round(scale/CSS_MM*100)+'%';
   if(projectRef!==p){timeline.pause();effectCache.clear();projectRef=p;}drawCanvas();updateTransport();refreshSelection();
   const warnings=document.getElementById('card-warnings');warnings.replaceChildren();warnings.hidden=!!ctx.state.ignoreOutputWarnings;if(!warnings.hidden)for(const p of report.problems.slice(0,3))warnings.append(el('div',{},'⚠ '+p.message));
   document.getElementById('canvas-size').textContent=p.settings.cardWidthMm+' × '+p.settings.cardHeightMm+' mm';
@@ -95,7 +104,23 @@ export function mountCardCanvas(host,ctx){
   if(previous.project===ctx.store.getProject()&&previous.targetId===ctx.target()?.id)select(previous.initialIds);
   refresh();ctx.renderInspector();return true;
  }
+ function setZoom(value,point){
+  if(gesture||!ctx.target()||!Number.isFinite(value))return false;
+  const next=Math.max(CSS_MM*.25,Math.min(CSS_MM*8,value));if(next===ctx.state.cardScale)return false;
+  const anchor=captureViewAnchor(area,stage,point);ctx.state.cardScale=next;refresh();restoreViewAnchor(area,stage,anchor);return true;
+ }
+ function fit(){
+  const s=ctx.store.getProject().settings,padding=getComputedStyle(area);
+  const width=area.clientWidth-parseFloat(padding.paddingLeft)-parseFloat(padding.paddingRight)-2,height=area.clientHeight-parseFloat(padding.paddingTop)-parseFloat(padding.paddingBottom)-2;
+  setZoom(Math.min(width/s.cardWidthMm,height/s.cardHeightMm));
+ }
+ function wheel(event){
+  if(!event.ctrlKey&&!event.metaKey||ctx.state.mode!=='card'||document.querySelector('dialog[open]'))return;
+  event.preventDefault();if(!Number.isFinite(event.deltaY))return;
+  setZoom(ctx.state.cardScale*wheelZoomFactor(event,area),{x:event.clientX,y:event.clientY});
+ }
+ function resized(){if(lastRatio!==(window.devicePixelRatio||1))drawCanvas();}
  const down=event=>{if([canvas,stage,host,area].includes(event.target))begin(event,null);};
- area.addEventListener('pointerdown',down);stage.addEventListener('pointermove',move);stage.addEventListener('pointerup',end);stage.addEventListener('pointercancel',cancelGesture);
- return {refresh,setActive,cancelGesture,resetTime(){timeline.pause();effectCache.clear();timeline.seek(getEffectFrameSec(ctx.store.getProject()));updateTransport();},report:()=>report,destroy(){if(gesture)release(gesture);timeline.destroy();effectCache.clear();dialogs.disconnect();document.removeEventListener('visibilitychange',visibility);area.removeEventListener('pointerdown',down);host.replaceChildren();}};
+ area.addEventListener('pointerdown',down);area.addEventListener('wheel',wheel,{passive:false});window.addEventListener('resize',resized);stage.addEventListener('pointermove',move);stage.addEventListener('pointerup',end);stage.addEventListener('pointercancel',cancelGesture);
+ return {refresh,setZoom,fit,setActive,cancelGesture,resetTime(){timeline.pause();effectCache.clear();timeline.seek(getEffectFrameSec(ctx.store.getProject()));updateTransport();},report:()=>report,destroy(){if(gesture)release(gesture);timeline.destroy();effectCache.clear();dialogs.disconnect();document.removeEventListener('visibilitychange',visibility);area.removeEventListener('pointerdown',down);area.removeEventListener('wheel',wheel);window.removeEventListener('resize',resized);host.replaceChildren();}};
 }

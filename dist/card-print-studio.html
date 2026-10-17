@@ -8,6 +8,7 @@
 @media(max-width:820px){.studio{height:auto;min-height:100dvh}.topbar{flex-wrap:wrap}.top-actions{width:100%;justify-content:flex-end}.workspace-grid{grid-template-columns:140px minmax(220px,1fr);min-height:calc(100dvh - 135px)}.inspector{grid-column:1/-1;border-left:0;border-top:1px solid var(--line);max-height:550px;display:block}.workspace{min-height:600px}.library-add{flex-direction:column}.card-meta strong{max-width:55px}.card-thumb{width:28px;height:39px}.card-qty{width:28px}.canvas-footer span:nth-child(2){display:none}.library-bottom{flex-direction:column}.library-note{display:none}.workspace-tabs{flex-wrap:wrap}.two-fields{grid-template-columns:1fr 1fr}}
 
 .paper-view{display:flex;flex-direction:column;overflow:hidden;background:#eef1ec}.print-controls{display:grid;grid-template-columns:repeat(4,minmax(90px,1fr));gap:8px 12px;padding:12px 18px;background:#fafbf7;border-bottom:1px solid var(--line)}.print-controls .field{margin:0}.print-controls .check{margin:0;align-self:end;min-height:34px}.print-controls input,.print-controls select{padding:6px;font-size:11px}.paper-summary{padding:10px 18px;color:var(--muted);font-size:11px}.paper-scroll{flex:1;min-height:100px;overflow:auto;padding:20px 35px}.paper-frame{margin:0 auto 40px;width:max-content}.paper-frame h3{margin:0 0 24px 24px;font-size:11px;color:var(--muted);font-weight:500}.paper-measured{position:relative;padding:0 0 0 23px}.paper-sheet{position:relative;background:white;box-shadow:0 3px 18px #233d3320;outline:1px solid #d0d7ce}.paper-cell{position:absolute}.paper-cell canvas,.paper-cell img{display:block;width:100%;height:100%}.paper-cell.blank{border:1px dashed #e4e8df;display:grid;place-items:center;color:#c0c9bf;font-size:9px}.crop-overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.mm-ruler{position:absolute;color:#8f9a8e;font-size:8px;pointer-events:none}.mm-ruler.horizontal{left:23px;right:0;top:-18px;height:15px;border-bottom:1px solid #c8d0c4}.mm-ruler.vertical{left:0;top:0;bottom:0;width:19px;border-right:1px solid #c8d0c4}.ruler-tick{position:absolute}.horizontal .ruler-tick{padding-bottom:3px;border-left:1px solid #c8d0c4;padding-left:2px}.vertical .ruler-tick{border-top:1px solid #c8d0c4;right:2px;padding-top:2px}.paper-footer{display:flex;align-items:center;gap:7px;flex-wrap:wrap;background:#fafbf7;padding:10px 18px;border-top:1px solid var(--line);font-size:10px}.paper-footer input{width:62px;padding:5px}.paper-footer button{font-size:10px;padding:5px 8px}.calibration-ruler{height:30px;margin:24px 0;border-left:1px solid var(--ink);border-right:1px solid var(--ink);border-bottom:2px solid var(--ink);max-width:none;text-align:center;position:relative}.confirm-dialog:has(.calibration-ruler){max-width:90vw;width:max-content;min-width:440px}
+.canvas-scroll,.paper-scroll{overflow-anchor:none}.view-zoom-controls{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:5px;margin-left:auto;max-width:100%}.view-zoom-controls input{width:80px;margin:0}.view-zoom-controls output{min-width:34px;text-align:center;font-variant-numeric:tabular-nums}
 @media(max-width:1150px){.print-controls{grid-template-columns:repeat(3,minmax(70px,1fr));padding:10px;gap:6px}.paper-scroll{padding:18px}.paper-footer{padding:10px}}
 @media(max-width:820px){.print-controls{grid-template-columns:repeat(2,minmax(70px,1fr))}.paper-view{min-height:650px}.paper-scroll{min-height:300px}}
 
@@ -41584,13 +41585,32 @@
     host.scrollTop = scroll;
   }
 
+  // src/ui/view-zoom.js
+  var CSS_MM = 96 / 25.4;
+  function wheelZoomFactor(event, viewport) {
+    const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewport.clientHeight : 1;
+    return Math.exp(-Math.max(-400, Math.min(400, event.deltaY * unit)) * 15e-4);
+  }
+  function captureViewAnchor(viewport, node2, point) {
+    const before = node2.getBoundingClientRect(), area = viewport.getBoundingClientRect();
+    if (!before.width || !before.height) return null;
+    point = point || { x: area.left + viewport.clientWidth / 2, y: area.top + viewport.clientHeight / 2 };
+    return { point, x: (point.x - before.left) / before.width, y: (point.y - before.top) / before.height };
+  }
+  function restoreViewAnchor(viewport, node2, anchor) {
+    if (!anchor) return;
+    const after = node2.getBoundingClientRect();
+    viewport.scrollLeft += after.left + anchor.x * after.width - anchor.point.x;
+    viewport.scrollTop += after.top + anchor.y * after.height - anchor.point.y;
+  }
+
   // src/ui/canvas-editor.js
   function mountCardCanvas(host, ctx) {
     const stage = el("div", { class: "card-stage", tabIndex: 0, role: "group", "aria-label": "\uCE74\uB4DC \uC694\uC18C \uC120\uD0DD \uC601\uC5ED" }), canvas2 = el("canvas", { id: "card-canvas" }), members = el("div", { class: "selection-members" }), selection = el("div", { id: "selection-box", hidden: true }), marquee = el("div", { id: "selection-marquee", hidden: true });
     stage.append(canvas2, members, selection, marquee);
     host.append(stage);
     const area = host.closest(".canvas-scroll") || host;
-    let gesture = null, preview = null, report = { problems: [] }, projectRef = ctx.store.getProject();
+    let gesture = null, preview = null, report = { problems: [] }, projectRef = ctx.store.getProject(), lastRatio = window.devicePixelRatio || 1;
     const effectCache = createEffectCache(), timeline = createEffectTimeline({ initialSec: getEffectFrameSec(projectRef), onFrame: () => {
       drawCanvas();
       updateTransport();
@@ -41605,7 +41625,13 @@
     }
     function drawCanvas() {
       const p3 = ctx.store.getProject(), target = preview || ctx.target();
-      if (target) report = renderCard(canvas2.getContext("2d", { willReadFrequently: true }), p3, target, ctx.assets, 200, { timeSec: timeline.getTime(), effectCache });
+      if (!target) return;
+      const width = stage.getBoundingClientRect().width;
+      lastRatio = window.devicePixelRatio || 1;
+      const dpi = effectPreviewDpi({ widthMm: p3.settings.cardWidthMm, heightMm: p3.settings.cardHeightMm, displayWidth: width, pixelRatio: lastRatio });
+      report = renderCard(canvas2.getContext("2d", { willReadFrequently: true }), p3, target, ctx.assets, dpi, { timeSec: timeline.getTime(), effectCache });
+      canvas2.dataset.previewDpi = String(dpi);
+      canvas2.style.imageRendering = canvas2.width + 0.5 < width * lastRatio ? "pixelated" : "auto";
     }
     function setActive(value) {
       timeline.setActive(value && !document.hidden);
@@ -41689,6 +41715,8 @@
       const scale = ctx.state.cardScale;
       stage.style.width = p3.settings.cardWidthMm * scale + "px";
       stage.style.height = p3.settings.cardHeightMm * scale + "px";
+      document.getElementById("card-zoom").value = scale;
+      document.getElementById("card-zoom-value").textContent = Math.round(scale / CSS_MM * 100) + "%";
       if (projectRef !== p3) {
         timeline.pause();
         effectCache.clear();
@@ -41819,14 +41847,40 @@
       ctx.renderInspector();
       return true;
     }
+    function setZoom(value, point2) {
+      if (gesture || !ctx.target() || !Number.isFinite(value)) return false;
+      const next = Math.max(CSS_MM * 0.25, Math.min(CSS_MM * 8, value));
+      if (next === ctx.state.cardScale) return false;
+      const anchor = captureViewAnchor(area, stage, point2);
+      ctx.state.cardScale = next;
+      refresh();
+      restoreViewAnchor(area, stage, anchor);
+      return true;
+    }
+    function fit() {
+      const s3 = ctx.store.getProject().settings, padding = getComputedStyle(area);
+      const width = area.clientWidth - parseFloat(padding.paddingLeft) - parseFloat(padding.paddingRight) - 2, height = area.clientHeight - parseFloat(padding.paddingTop) - parseFloat(padding.paddingBottom) - 2;
+      setZoom(Math.min(width / s3.cardWidthMm, height / s3.cardHeightMm));
+    }
+    function wheel(event) {
+      if (!event.ctrlKey && !event.metaKey || ctx.state.mode !== "card" || document.querySelector("dialog[open]")) return;
+      event.preventDefault();
+      if (!Number.isFinite(event.deltaY)) return;
+      setZoom(ctx.state.cardScale * wheelZoomFactor(event, area), { x: event.clientX, y: event.clientY });
+    }
+    function resized() {
+      if (lastRatio !== (window.devicePixelRatio || 1)) drawCanvas();
+    }
     const down = (event) => {
       if ([canvas2, stage, host, area].includes(event.target)) begin(event, null);
     };
     area.addEventListener("pointerdown", down);
+    area.addEventListener("wheel", wheel, { passive: false });
+    window.addEventListener("resize", resized);
     stage.addEventListener("pointermove", move);
     stage.addEventListener("pointerup", end);
     stage.addEventListener("pointercancel", cancelGesture);
-    return { refresh, setActive, cancelGesture, resetTime() {
+    return { refresh, setZoom, fit, setActive, cancelGesture, resetTime() {
       timeline.pause();
       effectCache.clear();
       timeline.seek(getEffectFrameSec(ctx.store.getProject()));
@@ -41838,32 +41892,26 @@
       dialogs.disconnect();
       document.removeEventListener("visibilitychange", visibility);
       area.removeEventListener("pointerdown", down);
+      area.removeEventListener("wheel", wheel);
+      window.removeEventListener("resize", resized);
       host.replaceChildren();
     } };
   }
 
   // src/ui/paper.js
-  var CSS_MM = 96 / 25.4;
   function mountPaperView(root, store) {
-    let zoom = 40, calibration = 1, tick = 0, destroyed = false;
+    let zoom = 40, calibration = 1, tick = 0, destroyed = false, lastRatio = window.devicePixelRatio || 1;
     const controls = el("div", { class: "print-controls" }), summary = el("div", { id: "paper-summary", class: "paper-summary" }), scroll = el("div", { class: "paper-scroll" });
-    const zoomInput = el("input", { id: "paper-zoom", type: "number", min: 10, max: 200, step: 5, value: zoom, "aria-label": "\uC6A9\uC9C0 \uBC30\uC728", onchange: (e2) => {
-      zoom = Math.max(10, Math.min(200, Number(e2.target.value) || 40));
-      refresh();
-    } });
+    const zoomInput = el("input", { id: "paper-zoom", type: "number", min: 10, max: 200, step: 0.1, value: zoom, "aria-label": "\uC6A9\uC9C0 \uBC30\uC728", onchange: (e2) => setZoom(Number(e2.target.value) || 40) });
     const label = el("span", { id: "paper-scale-label" });
     const footer = el("div", { class: "paper-footer" }, label, zoomInput, el("span", {}, "%"), button("\uC804\uCCB4 \uB9DE\uCDA4", () => {
       try {
         const p3 = planSheets(store.getProject());
-        zoom = Math.max(10, Math.min(100, Math.floor(100 * Math.min((scroll.clientWidth - 80) / (p3.widthMm * CSS_MM * calibration), (scroll.clientHeight - 65) / (p3.heightMm * CSS_MM * calibration)))));
-        refresh();
+        setZoom(Math.min(100, Math.floor(100 * Math.min((scroll.clientWidth - 80) / (p3.widthMm * CSS_MM * calibration), (scroll.clientHeight - 65) / (p3.heightMm * CSS_MM * calibration)))));
       } catch (e2) {
         showMessage(e2.message);
       }
-    }, { id: "paper-fit" }), button("\uC2E4\uC81C \uD06C\uAE30 100%", () => {
-      zoom = 100;
-      refresh();
-    }), button("\uD654\uBA74 \uC790 \uBCF4\uC815", calibrate, { id: "paper-calibration" }));
+    }, { id: "paper-fit" }), button("\uC2E4\uC81C \uD06C\uAE30 100%", () => setZoom(100)), button("\uD654\uBA74 \uC790 \uBCF4\uC815", calibrate, { id: "paper-calibration" }), el("span", {}, "Ctrl+\uD720 \uD655\uB300\xB7\uCD95\uC18C"));
     root.replaceChildren(controls, summary, scroll, footer);
     root.classList.add("paper-view");
     const edit = (key, value) => {
@@ -41920,7 +41968,31 @@
       }
       return svg2;
     }
-    async function refresh() {
+    function setZoom(value, point) {
+      if (destroyed || !Number.isFinite(value)) return;
+      const next = Math.round(Math.max(10, Math.min(200, value)) * 10) / 10;
+      if (next === zoom) {
+        zoomInput.value = zoom;
+        return;
+      }
+      const sheets = [...scroll.querySelectorAll(".paper-sheet")], sheet = sheets.find((node2) => {
+        const r2 = node2.getBoundingClientRect();
+        return point && point.y >= r2.top && point.y <= r2.bottom;
+      }) || sheets[0];
+      const anchor = sheet ? captureViewAnchor(scroll, sheet, point) : null, sheetIndex = sheets.indexOf(sheet);
+      zoom = next;
+      refresh({ anchor, sheetIndex });
+    }
+    function wheel(event) {
+      if (!event.ctrlKey && !event.metaKey || document.querySelector("dialog[open]")) return;
+      event.preventDefault();
+      if (!Number.isFinite(event.deltaY)) return;
+      setZoom(zoom * wheelZoomFactor(event, scroll), { x: event.clientX, y: event.clientY });
+    }
+    function resized() {
+      if (!root.hidden && lastRatio !== (window.devicePixelRatio || 1)) refresh();
+    }
+    async function refresh({ anchor = null, sheetIndex = 0 } = {}) {
       if (destroyed) return;
       const own = ++tick, p3 = store.getProject();
       settings();
@@ -41944,11 +42016,13 @@
       }
       if (own !== tick || destroyed) return;
       const scale = zoom / 100 * CSS_MM * calibration, cache2 = /* @__PURE__ */ new Map(), fragment = document.createDocumentFragment();
+      lastRatio = window.devicePixelRatio || 1;
+      const dpi = effectPreviewDpi({ widthMm: p3.settings.cardWidthMm, heightMm: p3.settings.cardHeightMm, displayWidth: p3.settings.cardWidthMm * scale, pixelRatio: lastRatio });
       for (const [index2, page] of plan.pages.entries()) {
         const frame = el("section", { class: "paper-frame" }, el("h3", {}, index2 + 1 + " / " + plan.pages.length + " \xB7 " + (page.side === "front" ? "\uC55E\uBA74" : "\uB4B7\uBA74") + " " + (page.pairIndex + 1) + " \xB7 " + plan.widthMm + " \xD7 " + plan.heightMm + " mm"));
-        const sheet = el("div", { class: "paper-sheet", "data-width-mm": plan.widthMm, "data-height-mm": plan.heightMm, "data-side": page.side });
-        sheet.style.width = plan.widthMm * scale + "px";
-        sheet.style.height = plan.heightMm * scale + "px";
+        const sheet2 = el("div", { class: "paper-sheet", "data-width-mm": plan.widthMm, "data-height-mm": plan.heightMm, "data-side": page.side });
+        sheet2.style.width = plan.widthMm * scale + "px";
+        sheet2.style.height = plan.heightMm * scale + "px";
         for (const c4 of page.cells) {
           const cell = el("div", { class: "paper-cell" + (c4.cardId ? "" : " blank"), ...c4.cardId ? { "data-card-id": c4.cardId } : {}, "data-x-mm": c4.xMm, "data-y-mm": c4.yMm });
           Object.assign(cell.style, { left: c4.xMm * scale + "px", top: c4.yMm * scale + "px", width: c4.widthMm * scale + "px", height: c4.heightMm * scale + "px" });
@@ -41956,18 +42030,22 @@
             const key = page.side === "back" ? "back" : c4.cardId;
             if (!cache2.has(key)) {
               const canvas2 = el("canvas");
-              renderCard(canvas2.getContext("2d", { willReadFrequently: true }), p3, page.side === "back" ? p3.back : p3.cards.find((card) => card.id === c4.cardId), assets, 105);
-              cache2.set(key, canvas2.toDataURL());
+              renderCard(canvas2.getContext("2d", { willReadFrequently: true }), p3, page.side === "back" ? p3.back : p3.cards.find((card) => card.id === c4.cardId), assets, dpi);
+              cache2.set(key, { src: canvas2.toDataURL(), width: canvas2.width });
             }
-            cell.append(el("img", { src: cache2.get(key), alt: page.side === "back" ? "\uACF5\uD1B5 \uB4B7\uBA74" : p3.cards.find((card) => card.id === c4.cardId).name, draggable: false }));
+            const image = cache2.get(key), img = el("img", { src: image.src, alt: page.side === "back" ? "\uACF5\uD1B5 \uB4B7\uBA74" : p3.cards.find((card) => card.id === c4.cardId).name, draggable: false, "data-preview-dpi": dpi });
+            img.style.imageRendering = image.width + 0.5 < c4.widthMm * scale * lastRatio ? "pixelated" : "auto";
+            cell.append(img);
           } else cell.append(el("span", {}, "\uBE48 \uCE78"));
-          sheet.append(cell);
+          sheet2.append(cell);
         }
-        if (p3.print.cropMarks) sheet.append(marksSvg(page, plan));
-        frame.append(el("div", { class: "paper-measured" }, ruler(plan.widthMm, true, scale), ruler(plan.heightMm, false, scale), sheet));
+        if (p3.print.cropMarks) sheet2.append(marksSvg(page, plan));
+        frame.append(el("div", { class: "paper-measured" }, ruler(plan.widthMm, true, scale), ruler(plan.heightMm, false, scale), sheet2));
         fragment.append(frame);
       }
       scroll.replaceChildren(fragment);
+      const sheet = scroll.querySelectorAll(".paper-sheet")[sheetIndex];
+      if (sheet) restoreViewAnchor(scroll, sheet, anchor);
     }
     async function calibrate() {
       const dialog = el("dialog", { class: "confirm-dialog" }, el("h2", {}, "\uD654\uBA74 \uC790 \uBCF4\uC815"), el("p", {}, "\uC544\uB798 \uC120\uC744 \uC2E4\uC81C \uC790\uB85C \uC7AC\uACE0 \uAE38\uC774\uB97C \uC785\uB825\uD558\uC138\uC694. \uBCF4\uC815\uC740 \uD654\uBA74\uC5D0\uB9CC \uC801\uC6A9\uB3FC\uC694. PDF\uB294 \uD56D\uC0C1 \uC124\uC815\uD55C mm \uCE58\uC218\uB97C \uC0AC\uC6A9\uD574\uC694."));
@@ -41989,12 +42067,16 @@
       dialog.addEventListener("close", () => dialog.remove(), { once: true });
       dialog.showModal();
     }
+    scroll.addEventListener("wheel", wheel, { passive: false });
+    window.addEventListener("resize", resized);
     const unsub = store.subscribe(refresh);
     refresh();
     return { refresh, destroy() {
       destroyed = true;
       tick++;
       unsub();
+      scroll.removeEventListener("wheel", wheel);
+      window.removeEventListener("resize", resized);
       root.replaceChildren();
     } };
   }
@@ -44333,12 +44415,12 @@
   // release.json
   var release_default = {
     format: "card-print-studio-update",
-    version: "1.1.3",
+    version: "1.1.4",
     releasedAt: "2026-10-17",
     notes: [
-      "\uC0C8 \uBC84\uC804 \uD655\uC778 \uC8FC\uC18C\uAC00 \uACF5\uAC1C GitHub \uC800\uC7A5\uC18C\uB85C \uBBF8\uB9AC \uCC44\uC6CC\uC838 \uC788\uC5B4\uC694.",
-      "\uC608\uC804 \uBC84\uC804\uC5D0\uC11C \uBE48 \uC8FC\uC18C\uAC00 \uC800\uC7A5\uB41C \uACBD\uC6B0\uC5D0\uB3C4 \uAE30\uBCF8 \uC8FC\uC18C\uB97C \uC790\uB3D9\uC73C\uB85C \uBCF5\uC6D0\uD574\uC694.",
-      "\uC9C1\uC811 \uC9C0\uC815\uD55C \uC8FC\uC18C\uC640 \uC774 \uBC84\uC804\uC5D0\uC11C \uC5F0\uACB0 \uD574\uC81C\uD55C \uC124\uC815\uC744 \uC720\uC9C0\uD558\uACE0, \uC790\uB3D9 \uD655\uC778\uC740 \uAE30\uBCF8 \uAEBC\uC9D0\uC774\uC5D0\uC694."
+      "\uC77C\uBC18 \uCE74\uB4DC \uD654\uBA74\uACFC A4 \uC6A9\uC9C0 \uBCF4\uAE30\uC5D0\uC11C\uB3C4 Ctrl+\uD720\uB85C \uB9C8\uC6B0\uC2A4 \uC704\uCE58\uB97C \uC911\uC2EC\uC73C\uB85C \uD655\uB300\xB7\uCD95\uC18C\uD574\uC694.",
+      "\uCE74\uB4DC \uD654\uBA74\uC5D0 \uCD95\uC18C\xB7\uD655\uB300\xB7100%\xB7\uB9DE\uCDA4 \uBC84\uD2BC\uACFC \uBC30\uC728 \uD45C\uC2DC\uB97C \uCD94\uAC00\uD588\uC5B4\uC694.",
+      "\uD654\uBA74 \uBC30\uC728\uACFC \uB514\uC2A4\uD50C\uB808\uC774 \uD574\uC0C1\uB3C4\uC5D0 \uB9DE\uCDB0 \uB2E4\uC2DC \uADF8\uB824 \uC120\uBA85\uD558\uAC8C \uBCF4\uC5EC \uC918\uC694. \uC800\uC7A5 \uB0B4\uC6A9\uACFC \uC2E4\uC81C \uC778\uC1C4 \uD06C\uAE30\uB294 \uADF8\uB300\uB85C\uC608\uC694."
     ],
     downloadUrl: "./card-print-studio.html",
     sourceUrl: "https://raw.githubusercontent.com/lolipop000000/card-print-studio/main/dist/update.json"
@@ -45037,10 +45119,17 @@
       setElementSelection(state, []);
       refresh();
     }, { id: "back-tab" });
-    const zoom = el("input", { id: "card-zoom", type: "range", min: 2, max: 12, step: 0.1, value: state.cardScale, "aria-label": "\uCE74\uB4DC \uD655\uB300 \uBC30\uC728", oninput: (event) => {
-      state.cardScale = Number(event.target.value);
-      cardCanvas.refresh();
-    } });
+    const zoom = el("input", { id: "card-zoom", type: "range", min: CSS_MM * 0.25, max: CSS_MM * 8, step: "any", value: state.cardScale, "aria-label": "\uCE74\uB4DC \uD655\uB300 \uBC30\uC728", oninput: (event) => cardCanvas.setZoom(Number(event.target.value)) });
+    const zoomControls = el(
+      "div",
+      { class: "view-zoom-controls" },
+      button("\u2212", () => cardCanvas.setZoom(state.cardScale / 1.2), { id: "card-zoom-out", "aria-label": "\uCE74\uB4DC \uCD95\uC18C" }),
+      zoom,
+      button("\uFF0B", () => cardCanvas.setZoom(state.cardScale * 1.2), { id: "card-zoom-in", "aria-label": "\uCE74\uB4DC \uD655\uB300" }),
+      el("output", { id: "card-zoom-value", htmlFor: "card-zoom" }, Math.round(state.cardScale / CSS_MM * 100) + "%"),
+      button("100%", () => cardCanvas.setZoom(CSS_MM), { id: "card-zoom-reset", "aria-label": "\uCE74\uB4DC \uBC30\uC728 100%" }),
+      button("\uB9DE\uCDA4", () => cardCanvas.fit(), { id: "card-zoom-fit" })
+    );
     const canvasHost = el("div", { id: "canvas-host", class: "canvas-host" });
     const cardArea = el(
       "div",
@@ -45059,11 +45148,7 @@
         button("\uC778\uC1C4 \uC7A5\uBA74 \uBCF4\uAE30", () => {
         }, { id: "card-effect-print-frame" })
       ),
-      el("footer", { class: "canvas-footer" }, el("span", { id: "canvas-size" }), el("span", {}, "\uBE48 \uACF3 \uB4DC\uB798\uADF8\uB85C \uB2E4\uC911 \uC120\uD0DD \xB7 Shift+\uD074\uB9AD\uC73C\uB85C \uCD94\uAC00/\uD574\uC81C"), zoom, button("\uB9DE\uCDA4", () => {
-        state.cardScale = Math.max(2, Math.min(6, (cardArea.clientHeight - 110) / store.getProject().settings.cardHeightMm));
-        zoom.value = state.cardScale;
-        cardCanvas.refresh();
-      }))
+      el("footer", { class: "canvas-footer" }, el("span", { id: "canvas-size" }), el("span", {}, "Ctrl+\uD720 \uD655\uB300\xB7\uCD95\uC18C \xB7 \uBE48 \uACF3 \uB4DC\uB798\uADF8 / Shift+\uD074\uB9AD \uB2E4\uC911 \uC120\uD0DD"), zoomControls)
     );
     const paperRoot = el("div", { id: "paper-view", hidden: true, class: "paper-view" }, el("p", { class: "empty-note" }, "\uC6A9\uC9C0 \uBBF8\uB9AC\uBCF4\uAE30\uB97C \uC900\uBE44\uD558\uACE0 \uC788\uC5B4\uC694."));
     const center = el("main", { class: "workspace" }, el("nav", { class: "workspace-tabs" }, el("div", { class: "tab-group" }, cardTab, paperTab), el("div", { class: "tab-group" }, frontTab, backTab)), cardArea, paperRoot);

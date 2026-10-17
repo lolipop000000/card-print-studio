@@ -17,6 +17,7 @@ import {renderCards} from './ui/cards.js';
 import {openKeywordManager} from './ui/keywords.js';
 import {renderInspector} from './ui/inspector.js';
 import {mountCardCanvas} from './ui/canvas-editor.js';
+import {CSS_MM} from './ui/view-zoom.js';
 import {mountPaperView} from './ui/paper.js';
 import {openPaintingEditor} from './ui/painting.js';
 import {saveProjectFile,loadProjectFile,confirmReplacement} from './ui/files.js';
@@ -113,7 +114,13 @@ export function mountEditor(root,store){
  const paperTab=button('A4 용지 보기',()=>{state.mode='paper';refresh();},{id:'paper-tab'});
  const frontTab=button('앞면',()=>{state.back=false;setElementSelection(state,[]);refresh();},{id:'front-tab'});
  const backTab=button('공통 뒷면',()=>{state.back=true;setElementSelection(state,[]);refresh();},{id:'back-tab'});
- const zoom=el('input',{id:'card-zoom',type:'range',min:2,max:12,step:.1,value:state.cardScale,'aria-label':'카드 확대 배율',oninput:event=>{state.cardScale=Number(event.target.value);cardCanvas.refresh();}});
+ const zoom=el('input',{id:'card-zoom',type:'range',min:CSS_MM*.25,max:CSS_MM*8,step:'any',value:state.cardScale,'aria-label':'카드 확대 배율',oninput:event=>cardCanvas.setZoom(Number(event.target.value))});
+ const zoomControls=el('div',{class:'view-zoom-controls'},
+  button('−',()=>cardCanvas.setZoom(state.cardScale/1.2),{id:'card-zoom-out','aria-label':'카드 축소'}),zoom,
+  button('＋',()=>cardCanvas.setZoom(state.cardScale*1.2),{id:'card-zoom-in','aria-label':'카드 확대'}),
+  el('output',{id:'card-zoom-value',htmlFor:'card-zoom'},Math.round(state.cardScale/CSS_MM*100)+'%'),
+  button('100%',()=>cardCanvas.setZoom(CSS_MM),{id:'card-zoom-reset','aria-label':'카드 배율 100%'}),
+  button('맞춤',()=>cardCanvas.fit(),{id:'card-zoom-fit'}));
  const canvasHost=el('div',{id:'canvas-host',class:'canvas-host'});
  const cardArea=el('div',{id:'card-area',class:'card-area'},el('div',{class:'canvas-scroll'},canvasHost),
   el('div',{id:'card-warnings',class:'card-warnings'}),
@@ -123,7 +130,7 @@ export function mountEditor(root,store){
    el('output',{id:'card-effect-seconds',htmlFor:'card-effect-time'},'1.20초'),
    button('현재 장면을 인쇄 프레임으로',()=>{},{id:'card-effect-freeze'}),
    button('인쇄 장면 보기',()=>{},{id:'card-effect-print-frame'})),
-  el('footer',{class:'canvas-footer'},el('span',{id:'canvas-size'}),el('span',{},'빈 곳 드래그로 다중 선택 · Shift+클릭으로 추가/해제'),zoom,button('맞춤',()=>{state.cardScale=Math.max(2,Math.min(6,(cardArea.clientHeight-110)/store.getProject().settings.cardHeightMm));zoom.value=state.cardScale;cardCanvas.refresh();})));
+  el('footer',{class:'canvas-footer'},el('span',{id:'canvas-size'}),el('span',{},'Ctrl+휠 확대·축소 · 빈 곳 드래그 / Shift+클릭 다중 선택'),zoomControls));
  const paperRoot=el('div',{id:'paper-view',hidden:true,class:'paper-view'},el('p',{class:'empty-note'},'용지 미리보기를 준비하고 있어요.'));
  const center=el('main',{class:'workspace'},el('nav',{class:'workspace-tabs'},el('div',{class:'tab-group'},cardTab,paperTab),el('div',{class:'tab-group'},frontTab,backTab)),cardArea,paperRoot);
  const inspector=el('aside',{id:'inspector',class:'inspector'});
