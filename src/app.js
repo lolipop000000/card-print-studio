@@ -73,7 +73,7 @@ export function mountEditor(root,store){
  ctx.openKeywords=()=>{ctx.closeKeywords=openKeywordManager(ctx);};
  ctx.pickImage=elementId=>{ctx.pendingImage={elementId,cardId:state.activeCardId,back:state.back};artFile.click();};
  const deckName=el('input',{id:'deck-name',value:store.getProject().name,'aria-label':'덱 이름',onchange:event=>ctx.edit('덱 이름',d=>d.name=event.target.value)});
- const workspaceFiles=createWorkspaceControls(store,()=>{ctx.closeVisualEffects?.({force:true});cardCanvas.resetTime();state.activeCardId=store.getProject().cards[0]?.id;state.back=false;setElementSelection(state,[]);refresh();});
+ const workspaceFiles=createWorkspaceControls(store,()=>{ctx.closeVisualEffects?.({force:true});cardCanvas.resetTime();state.activeCardId=store.getProject().cards[0]?.id;state.back=false;setElementSelection(state,[]);refresh();},()=>projectFile.click());
  const cardFiles=createCardFileControls({store,workspaceFiles,card:()=>ctx.card(),onAdded:id=>ctx.selectCard(id)});
  const updates=createUpdateControls({store,onOpen:()=>cardCanvas.setActive(false),onClose:()=>refresh()});
  const save=()=>workspaceFiles.save();

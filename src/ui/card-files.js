@@ -55,21 +55,29 @@ export function createCardFileControls({store,workspaceFiles,card,onAdded}){
   try{download(exportCardFile(store.getProject(),current.id),(current.name||'카드').replace(/[<>:"/\\|?*\x00-\x1f]/g,'_')+'.card.json','application/json');}catch(error){showMessage(error.message);}
  }
  async function open(){
-  if(library)return;
-  // File import remains available when native folder access is unsupported or cancelled.
-  let folderFeedback='';
-  try{if(storage.getState().supported&&!await connected())folderFeedback='폴더 선택을 취소했어요. 카드 파일을 직접 가져올 수 있어요.';}catch(error){folderFeedback=error.message+' 카드 파일을 직접 가져올 수 있어요.';}
-  if(disposed)return;
+  if(library||disposed)return;
   const dialog=el('dialog',{id:'card-library',class:'workspace-library','aria-labelledby':'card-library-title'}),list=el('div',{class:'workspace-files'}),feedback=el('p',{role:'status'});library=dialog;
+  let listRevision=0;
   const active=()=>!disposed&&library===dialog&&dialog.isConnected&&dialog.open;
   const close=()=>{if(dialog.open)dialog.close();dialog.remove();if(library===dialog)library=null;};
-  dialog.append(el('h2',{id:'card-library-title'},'카드만 불러오기'),el('p',{class:'hint'},'작업실 데이터 / 카드의 파일을 가져와요. 같은 이름은 덮어쓰기·추가를 고르며 Variant도 독립 카드로 가져와요.'),list,feedback,
-   el('div',{class:'two-fields'},button('카드 파일 가져오기',()=>{close();input.click();},{id:'card-import-file'}),button('선택 카드 파일 내보내기',()=>exportFile(),{id:'card-export-file'})),button('닫기',close));
+  const folder=button('저장 폴더 선택',async()=>{
+   folder.disabled=true;listRevision++;list.replaceChildren();feedback.textContent='저장 폴더를 선택해 주세요.';
+   try{
+    if(await storage.connect()){if(active())await showFiles();}
+    else if(active())feedback.textContent='폴더 선택을 취소했어요. 카드 파일 가져오기로 JSON 파일을 직접 열 수 있어요.';
+   }catch(error){if(active())feedback.textContent=error.message+' 카드 파일 가져오기로 JSON 파일을 직접 열 수 있어요.';}
+   finally{if(active())folder.disabled=!storage.getState().supported;}
+  },{id:'card-import-folder',disabled:!storage.getState().supported});
+  dialog.append(el('h2',{id:'card-library-title'},'카드만 불러오기'),el('p',{class:'hint'},'카드 JSON 파일을 직접 선택하거나, 저장 폴더의 작업실 데이터 / 카드에서 가져오세요. 같은 이름은 덮어쓰기·추가를 고르며 Variant도 독립 카드로 가져와요.'),
+   el('div',{class:'two-fields'},button('카드 파일 가져오기',()=>{close();input.click();},{id:'card-import-file',class:'primary'}),folder),list,feedback,
+   el('div',{class:'dialog-actions'},button('선택 카드 파일 내보내기',()=>exportFile(),{id:'card-export-file'}),button('닫기',close)));
   dialog.addEventListener('cancel',event=>{event.preventDefault();close();});document.body.append(dialog);dialog.showModal();
-  if(!storage.getState().connected){feedback.textContent=folderFeedback||'폴더 연결을 지원하지 않는 브라우저예요. 카드 파일 가져오기를 이용하세요.';return;}
-  feedback.textContent='카드 목록을 읽고 있어요…';
+  if(storage.getState().connected)await showFiles();
+  else feedback.textContent=storage.getState().supported?'카드 파일 가져오기는 파일을, 저장 폴더 선택은 폴더를 여는 기능이에요.':'폴더 연결을 지원하지 않는 브라우저예요. 카드 파일 가져오기를 이용하세요.';
+  async function showFiles(){
+   const revision=++listRevision;list.replaceChildren();feedback.textContent='카드 목록을 읽고 있어요…';
   try{
-   const entries=await storage.listCards();if(!active())return;feedback.textContent=entries.length?'':'저장한 카드가 없어요. 카드만 저장을 눌러 보관하세요.';
+   const entries=await storage.listCards();if(!active()||revision!==listRevision)return;feedback.textContent=entries.length?'':'저장한 카드가 없어요. 카드만 저장을 눌러 보관하세요.';
    for(const entry of entries)list.append(button(el('span',{},el('strong',{},entry.name),el('small',{},entry.error?entry.error.message:entry.fileName)),async()=>{
     for(const node of list.querySelectorAll('button'))node.disabled=true;
     const expectedProject=store.getProject();
@@ -77,7 +85,8 @@ export function createCardFileControls({store,workspaceFiles,card,onAdded}){
     catch(error){feedback.textContent=error.message;}
     finally{for(const node of list.querySelectorAll('button'))node.disabled=node.dataset.invalid==='true';}
    },{class:'workspace-file',disabled:!!entry.error,'data-invalid':String(!!entry.error)}));
-  }catch(error){feedback.textContent=error.message;}
+  }catch(error){if(active()&&revision===listRevision)feedback.textContent=error.message;}
+  }
  }
  return {input,save,open,exportFile,importFile:async(file,isCurrent=()=>true)=>{const expectedProject=store.getProject();return add(await file.text(),()=>!disposed&&isCurrent(),expectedProject);},destroy(){disposed=true;pendingPrompt?.dispatchEvent(new Event('cancel',{cancelable:true}));if(library){library.close();library.remove();library=null;}}};
 }

@@ -19,6 +19,27 @@ async function diskProjects(page){return page.evaluate(async()=>{
  const root=await window.__workspaceRoot,folder=await (await root.getDirectoryHandle('작업실 데이터')).getDirectoryHandle('프로젝트'),results=[];
  for await(const [name,handle] of folder.entries())if(handle.kind==='file')results.push({name,text:await (await handle.getFile()).text()});return results;
 });}
+test('explicit folder selection lists existing deck and card JSON without changing the current work',async()=>{
+ const {browser,page,pageErrors}=await openApp();try{
+  page.setDefaultTimeout(10_000);await withFolder(page);
+  const original=await saveProject(page,'folder-choice-before.json'),incoming=structuredClone(original);incoming.name='폴더의 덱';incoming.cards[0].name='폴더의 카드';
+  const {exportCardFile}=await import('../src/model/card-file.js');
+  await page.evaluate(async({project,card})=>{
+   const root=await window.__workspaceRoot,data=await root.getDirectoryHandle('작업실 데이터',{create:true});
+   for(const [folder,name,text] of [['프로젝트','폴더의 덱.card-project.json',project],['카드','폴더의 카드.card.json',card]]){
+    const dir=await data.getDirectoryHandle(folder,{create:true}),file=await dir.getFileHandle(name,{create:true}),writer=await file.createWritable();await writer.write(text);await writer.close();
+   }
+  },{project:JSON.stringify(incoming),card:exportCardFile(incoming,incoming.cards[0].id)});
+  await page.getByRole('button',{name:'프로젝트 불러오기',exact:true}).click();await page.locator('#project-import-folder').click();
+  await page.locator('#workspace-library .workspace-file').waitFor();assert.equal(await page.evaluate(()=>window.__pickerCalls),1);
+  await page.locator('#workspace-library').getByRole('button',{name:'닫기',exact:true}).click();assert.deepEqual(await saveProject(page,'folder-choice-unchanged.json'),original);
+  await page.locator('#load-card').click();await page.locator('#card-library .workspace-file').waitFor();await page.locator('#card-import-folder').click();
+  await page.locator('#card-library .workspace-file').waitFor();assert.equal(await page.evaluate(()=>window.__pickerCalls),2);
+  await page.locator('#card-library .workspace-file').click();await page.waitForFunction(()=>document.querySelectorAll('.card-row').length===2,null,{timeout:10_000});
+  assert.equal(await page.locator('#card-name').inputValue(),'폴더의 카드');await page.locator('#undo').click();assert.deepEqual(await saveProject(page,'folder-choice-card-undo.json'),original);assert.deepEqual(pageErrors,[]);
+ }finally{await browser.close();}
+});
+
 test('folder save, Ctrl+S in an input, new deck isolation, and native-folder load roundtrip',async()=>{
  const {browser,page,pageErrors,httpRequests}=await openApp();try{
   await withFolder(page);

@@ -2,7 +2,7 @@ import {createWorkspaceStorage} from '../storage/workspace.js';
 import {el,button,showMessage,typing} from './dom.js';
 import {confirmReplacement,prepareProjectFile} from './files.js';
 
-export function createWorkspaceControls(store,onLoaded){
+export function createWorkspaceControls(store,onLoaded,onImportFile){
  const storage=createWorkspaceStorage(),status=el('small',{id:'workspace-status',class:'workspace-status',role:'status'});
  let disposed=false,pendingSave=null,library=null;
  const unsubscribe=storage.subscribe(refresh);
@@ -36,17 +36,30 @@ export function createWorkspaceControls(store,onLoaded){
   })();return pendingSave;
  }
  async function load(){
-  if(library)return;
-  try{if(!await ensureConnected())return;}catch(error){showMessage(error.message);return;}
-  if(disposed)return;
+  if(library||disposed)return;
   const dialog=el('dialog',{id:'workspace-library',class:'workspace-library','aria-labelledby':'workspace-library-title'});
   library=dialog;
-  const list=el('div',{class:'workspace-files'}),feedback=el('p',{role:'status'},'파일 목록을 읽고 있어요…');
+  const list=el('div',{class:'workspace-files'}),feedback=el('p',{role:'status'});
+  let listRevision=0;
+  const active=()=>!disposed&&library===dialog&&dialog.isConnected&&dialog.open;
   const close=()=>{if(dialog.open)dialog.close();dialog.remove();if(library===dialog)library=null;};
-  dialog.append(el('h2',{id:'workspace-library-title'},'저장 폴더에서 불러오기'),el('p',{class:'hint'},'작업실 데이터 / 프로젝트 안의 덱을 선택하세요.'),list,feedback,button('닫기',close));
+  const folder=button('저장 폴더 선택',async()=>{
+   folder.disabled=true;listRevision++;list.replaceChildren();feedback.textContent='저장 폴더를 선택해 주세요.';
+   try{
+    if(await storage.connect()){if(active())await showFiles();}
+    else if(active())feedback.textContent='폴더 선택을 취소했어요. JSON 파일 선택으로 덱을 직접 열 수 있어요.';
+   }catch(error){if(active())feedback.textContent=error.message+' JSON 파일 선택으로 덱을 직접 열 수 있어요.';}
+   finally{if(active())folder.disabled=!storage.getState().supported;}
+  },{id:'project-import-folder',disabled:!storage.getState().supported});
+  dialog.append(el('h2',{id:'workspace-library-title'},'덱 불러오기'),el('p',{class:'hint'},'덱 전체 JSON 파일을 직접 선택하거나, 저장 폴더의 작업실 데이터 / 프로젝트에서 불러오세요.'),
+   el('div',{class:'two-fields'},button('JSON 파일 선택',()=>{close();onImportFile();},{id:'project-import-file',class:'primary'}),folder),list,feedback,button('닫기',close));
   dialog.addEventListener('cancel',event=>{event.preventDefault();close();});document.body.append(dialog);dialog.showModal();
+  if(storage.getState().connected)await showFiles();
+  else feedback.textContent=storage.getState().supported?'JSON 파일 선택은 파일을, 저장 폴더 선택은 폴더를 여는 기능이에요.':'폴더 연결을 지원하지 않는 브라우저예요. JSON 파일 선택으로 덱을 열어 주세요.';
+  async function showFiles(){
+   const revision=++listRevision;list.replaceChildren();feedback.textContent='파일 목록을 읽고 있어요…';
   try{
-   const entries=await storage.list();if(!dialog.isConnected)return;
+   const entries=await storage.list();if(!active()||revision!==listRevision)return;
    feedback.textContent=entries.length?'':'저장된 덱이 없어요. 현재 덱에서 저장을 눌러 보관하세요.';
    for(const entry of entries){
     const action=button(el('span',{},el('strong',{},entry.name),el('small',{},entry.error?entry.error.message:entry.cardCount+'장 · '+entry.fileName)),async()=>{
@@ -67,7 +80,8 @@ export function createWorkspaceControls(store,onLoaded){
     },{class:'workspace-file',disabled:!!entry.error,'data-invalid':String(!!entry.error)});
     list.append(action);
    }
-  }catch(error){feedback.textContent=error.message;}
+  }catch(error){if(active()&&revision===listRevision)feedback.textContent=error.message;}
+  }
  }
  refresh();storage.restore().catch(error=>{if(!disposed)showMessage(error.message);});
  return {storage,status,save,load,connect,destroy(){disposed=true;unsubscribe();if(library){library.close();library.remove();library=null;}}};

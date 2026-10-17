@@ -44021,7 +44021,7 @@
   }
 
   // src/ui/workspace.js
-  function createWorkspaceControls(store, onLoaded) {
+  function createWorkspaceControls(store, onLoaded, onImportFile) {
     const storage = createWorkspaceStorage(), status = el("small", { id: "workspace-status", class: "workspace-status", role: "status" });
     let disposed = false, pendingSave = null, library = null;
     const unsubscribe = storage.subscribe(refresh);
@@ -44063,62 +44063,89 @@
       return pendingSave;
     }
     async function load() {
-      if (library) return;
-      try {
-        if (!await ensureConnected()) return;
-      } catch (error) {
-        showMessage(error.message);
-        return;
-      }
-      if (disposed) return;
+      if (library || disposed) return;
       const dialog = el("dialog", { id: "workspace-library", class: "workspace-library", "aria-labelledby": "workspace-library-title" });
       library = dialog;
-      const list2 = el("div", { class: "workspace-files" }), feedback = el("p", { role: "status" }, "\uD30C\uC77C \uBAA9\uB85D\uC744 \uC77D\uACE0 \uC788\uC5B4\uC694\u2026");
+      const list2 = el("div", { class: "workspace-files" }), feedback = el("p", { role: "status" });
+      let listRevision = 0;
+      const active = () => !disposed && library === dialog && dialog.isConnected && dialog.open;
       const close = () => {
         if (dialog.open) dialog.close();
         dialog.remove();
         if (library === dialog) library = null;
       };
-      dialog.append(el("h2", { id: "workspace-library-title" }, "\uC800\uC7A5 \uD3F4\uB354\uC5D0\uC11C \uBD88\uB7EC\uC624\uAE30"), el("p", { class: "hint" }, "\uC791\uC5C5\uC2E4 \uB370\uC774\uD130 / \uD504\uB85C\uC81D\uD2B8 \uC548\uC758 \uB371\uC744 \uC120\uD0DD\uD558\uC138\uC694."), list2, feedback, button("\uB2EB\uAE30", close));
+      const folder = button("\uC800\uC7A5 \uD3F4\uB354 \uC120\uD0DD", async () => {
+        folder.disabled = true;
+        listRevision++;
+        list2.replaceChildren();
+        feedback.textContent = "\uC800\uC7A5 \uD3F4\uB354\uB97C \uC120\uD0DD\uD574 \uC8FC\uC138\uC694.";
+        try {
+          if (await storage.connect()) {
+            if (active()) await showFiles();
+          } else if (active()) feedback.textContent = "\uD3F4\uB354 \uC120\uD0DD\uC744 \uCDE8\uC18C\uD588\uC5B4\uC694. JSON \uD30C\uC77C \uC120\uD0DD\uC73C\uB85C \uB371\uC744 \uC9C1\uC811 \uC5F4 \uC218 \uC788\uC5B4\uC694.";
+        } catch (error) {
+          if (active()) feedback.textContent = error.message + " JSON \uD30C\uC77C \uC120\uD0DD\uC73C\uB85C \uB371\uC744 \uC9C1\uC811 \uC5F4 \uC218 \uC788\uC5B4\uC694.";
+        } finally {
+          if (active()) folder.disabled = !storage.getState().supported;
+        }
+      }, { id: "project-import-folder", disabled: !storage.getState().supported });
+      dialog.append(
+        el("h2", { id: "workspace-library-title" }, "\uB371 \uBD88\uB7EC\uC624\uAE30"),
+        el("p", { class: "hint" }, "\uB371 \uC804\uCCB4 JSON \uD30C\uC77C\uC744 \uC9C1\uC811 \uC120\uD0DD\uD558\uAC70\uB098, \uC800\uC7A5 \uD3F4\uB354\uC758 \uC791\uC5C5\uC2E4 \uB370\uC774\uD130 / \uD504\uB85C\uC81D\uD2B8\uC5D0\uC11C \uBD88\uB7EC\uC624\uC138\uC694."),
+        el("div", { class: "two-fields" }, button("JSON \uD30C\uC77C \uC120\uD0DD", () => {
+          close();
+          onImportFile();
+        }, { id: "project-import-file", class: "primary" }), folder),
+        list2,
+        feedback,
+        button("\uB2EB\uAE30", close)
+      );
       dialog.addEventListener("cancel", (event) => {
         event.preventDefault();
         close();
       });
       document.body.append(dialog);
       dialog.showModal();
-      try {
-        const entries2 = await storage.list();
-        if (!dialog.isConnected) return;
-        feedback.textContent = entries2.length ? "" : "\uC800\uC7A5\uB41C \uB371\uC774 \uC5C6\uC5B4\uC694. \uD604\uC7AC \uB371\uC5D0\uC11C \uC800\uC7A5\uC744 \uB20C\uB7EC \uBCF4\uAD00\uD558\uC138\uC694.";
-        for (const entry of entries2) {
-          const action = button(el("span", {}, el("strong", {}, entry.name), el("small", {}, entry.error ? entry.error.message : entry.cardCount + "\uC7A5 \xB7 " + entry.fileName)), async () => {
-            for (const b2 of list2.querySelectorAll("button")) b2.disabled = true;
-            try {
-              let loaded = await storage.read(entry);
-              await prepareProjectFile({ text: async () => loaded.text });
-              if (disposed || library !== dialog || !dialog.open) return;
-              if (!await confirmReplacement(store, { save })) return;
-              const current = store.getProject();
-              if (disposed || library !== dialog || !dialog.open) return;
-              loaded = await storage.read(entry);
-              const next = await prepareProjectFile({ text: async () => loaded.text });
-              if (disposed || library !== dialog || !dialog.open) return;
-              if (store.getProject() !== current) throw Error("\uBD88\uB7EC\uC624\uB294 \uB3D9\uC548 \uD604\uC7AC \uB371\uC774 \uBC14\uB00C\uC5C8\uC5B4\uC694. \uB2E4\uC2DC \uC120\uD0DD\uD558\uC138\uC694.");
-              store.load(next);
-              storage.bindLoaded(loaded);
-              onLoaded();
-              close();
-              showMessage("\uD3F4\uB354\uC5D0\uC11C \uB371\uC744 \uBD88\uB7EC\uC654\uC5B4\uC694.", "success");
-            } catch (error) {
-              feedback.textContent = error.message;
-            } finally {
-              for (const b2 of list2.querySelectorAll("button")) b2.disabled = b2.dataset.invalid === "true";
-            }
-          }, { class: "workspace-file", disabled: !!entry.error, "data-invalid": String(!!entry.error) });
-          list2.append(action);
+      if (storage.getState().connected) await showFiles();
+      else feedback.textContent = storage.getState().supported ? "JSON \uD30C\uC77C \uC120\uD0DD\uC740 \uD30C\uC77C\uC744, \uC800\uC7A5 \uD3F4\uB354 \uC120\uD0DD\uC740 \uD3F4\uB354\uB97C \uC5EC\uB294 \uAE30\uB2A5\uC774\uC5D0\uC694." : "\uD3F4\uB354 \uC5F0\uACB0\uC744 \uC9C0\uC6D0\uD558\uC9C0 \uC54A\uB294 \uBE0C\uB77C\uC6B0\uC800\uC608\uC694. JSON \uD30C\uC77C \uC120\uD0DD\uC73C\uB85C \uB371\uC744 \uC5F4\uC5B4 \uC8FC\uC138\uC694.";
+      async function showFiles() {
+        const revision = ++listRevision;
+        list2.replaceChildren();
+        feedback.textContent = "\uD30C\uC77C \uBAA9\uB85D\uC744 \uC77D\uACE0 \uC788\uC5B4\uC694\u2026";
+        try {
+          const entries2 = await storage.list();
+          if (!active() || revision !== listRevision) return;
+          feedback.textContent = entries2.length ? "" : "\uC800\uC7A5\uB41C \uB371\uC774 \uC5C6\uC5B4\uC694. \uD604\uC7AC \uB371\uC5D0\uC11C \uC800\uC7A5\uC744 \uB20C\uB7EC \uBCF4\uAD00\uD558\uC138\uC694.";
+          for (const entry of entries2) {
+            const action = button(el("span", {}, el("strong", {}, entry.name), el("small", {}, entry.error ? entry.error.message : entry.cardCount + "\uC7A5 \xB7 " + entry.fileName)), async () => {
+              for (const b2 of list2.querySelectorAll("button")) b2.disabled = true;
+              try {
+                let loaded = await storage.read(entry);
+                await prepareProjectFile({ text: async () => loaded.text });
+                if (disposed || library !== dialog || !dialog.open) return;
+                if (!await confirmReplacement(store, { save })) return;
+                const current = store.getProject();
+                if (disposed || library !== dialog || !dialog.open) return;
+                loaded = await storage.read(entry);
+                const next = await prepareProjectFile({ text: async () => loaded.text });
+                if (disposed || library !== dialog || !dialog.open) return;
+                if (store.getProject() !== current) throw Error("\uBD88\uB7EC\uC624\uB294 \uB3D9\uC548 \uD604\uC7AC \uB371\uC774 \uBC14\uB00C\uC5C8\uC5B4\uC694. \uB2E4\uC2DC \uC120\uD0DD\uD558\uC138\uC694.");
+                store.load(next);
+                storage.bindLoaded(loaded);
+                onLoaded();
+                close();
+                showMessage("\uD3F4\uB354\uC5D0\uC11C \uB371\uC744 \uBD88\uB7EC\uC654\uC5B4\uC694.", "success");
+              } catch (error) {
+                feedback.textContent = error.message;
+              } finally {
+                for (const b2 of list2.querySelectorAll("button")) b2.disabled = b2.dataset.invalid === "true";
+              }
+            }, { class: "workspace-file", disabled: !!entry.error, "data-invalid": String(!!entry.error) });
+            list2.append(action);
+          }
+        } catch (error) {
+          if (active() && revision === listRevision) feedback.textContent = error.message;
         }
-      } catch (error) {
-        feedback.textContent = error.message;
       }
     }
     refresh();
@@ -44229,32 +44256,41 @@
       }
     }
     async function open2() {
-      if (library) return;
-      let folderFeedback = "";
-      try {
-        if (storage.getState().supported && !await connected()) folderFeedback = "\uD3F4\uB354 \uC120\uD0DD\uC744 \uCDE8\uC18C\uD588\uC5B4\uC694. \uCE74\uB4DC \uD30C\uC77C\uC744 \uC9C1\uC811 \uAC00\uC838\uC62C \uC218 \uC788\uC5B4\uC694.";
-      } catch (error) {
-        folderFeedback = error.message + " \uCE74\uB4DC \uD30C\uC77C\uC744 \uC9C1\uC811 \uAC00\uC838\uC62C \uC218 \uC788\uC5B4\uC694.";
-      }
-      if (disposed) return;
+      if (library || disposed) return;
       const dialog = el("dialog", { id: "card-library", class: "workspace-library", "aria-labelledby": "card-library-title" }), list2 = el("div", { class: "workspace-files" }), feedback = el("p", { role: "status" });
       library = dialog;
+      let listRevision = 0;
       const active = () => !disposed && library === dialog && dialog.isConnected && dialog.open;
       const close = () => {
         if (dialog.open) dialog.close();
         dialog.remove();
         if (library === dialog) library = null;
       };
+      const folder = button("\uC800\uC7A5 \uD3F4\uB354 \uC120\uD0DD", async () => {
+        folder.disabled = true;
+        listRevision++;
+        list2.replaceChildren();
+        feedback.textContent = "\uC800\uC7A5 \uD3F4\uB354\uB97C \uC120\uD0DD\uD574 \uC8FC\uC138\uC694.";
+        try {
+          if (await storage.connect()) {
+            if (active()) await showFiles();
+          } else if (active()) feedback.textContent = "\uD3F4\uB354 \uC120\uD0DD\uC744 \uCDE8\uC18C\uD588\uC5B4\uC694. \uCE74\uB4DC \uD30C\uC77C \uAC00\uC838\uC624\uAE30\uB85C JSON \uD30C\uC77C\uC744 \uC9C1\uC811 \uC5F4 \uC218 \uC788\uC5B4\uC694.";
+        } catch (error) {
+          if (active()) feedback.textContent = error.message + " \uCE74\uB4DC \uD30C\uC77C \uAC00\uC838\uC624\uAE30\uB85C JSON \uD30C\uC77C\uC744 \uC9C1\uC811 \uC5F4 \uC218 \uC788\uC5B4\uC694.";
+        } finally {
+          if (active()) folder.disabled = !storage.getState().supported;
+        }
+      }, { id: "card-import-folder", disabled: !storage.getState().supported });
       dialog.append(
         el("h2", { id: "card-library-title" }, "\uCE74\uB4DC\uB9CC \uBD88\uB7EC\uC624\uAE30"),
-        el("p", { class: "hint" }, "\uC791\uC5C5\uC2E4 \uB370\uC774\uD130 / \uCE74\uB4DC\uC758 \uD30C\uC77C\uC744 \uAC00\uC838\uC640\uC694. \uAC19\uC740 \uC774\uB984\uC740 \uB36E\uC5B4\uC4F0\uAE30\xB7\uCD94\uAC00\uB97C \uACE0\uB974\uBA70 Variant\uB3C4 \uB3C5\uB9BD \uCE74\uB4DC\uB85C \uAC00\uC838\uC640\uC694."),
-        list2,
-        feedback,
+        el("p", { class: "hint" }, "\uCE74\uB4DC JSON \uD30C\uC77C\uC744 \uC9C1\uC811 \uC120\uD0DD\uD558\uAC70\uB098, \uC800\uC7A5 \uD3F4\uB354\uC758 \uC791\uC5C5\uC2E4 \uB370\uC774\uD130 / \uCE74\uB4DC\uC5D0\uC11C \uAC00\uC838\uC624\uC138\uC694. \uAC19\uC740 \uC774\uB984\uC740 \uB36E\uC5B4\uC4F0\uAE30\xB7\uCD94\uAC00\uB97C \uACE0\uB974\uBA70 Variant\uB3C4 \uB3C5\uB9BD \uCE74\uB4DC\uB85C \uAC00\uC838\uC640\uC694."),
         el("div", { class: "two-fields" }, button("\uCE74\uB4DC \uD30C\uC77C \uAC00\uC838\uC624\uAE30", () => {
           close();
           input.click();
-        }, { id: "card-import-file" }), button("\uC120\uD0DD \uCE74\uB4DC \uD30C\uC77C \uB0B4\uBCF4\uB0B4\uAE30", () => exportFile(), { id: "card-export-file" })),
-        button("\uB2EB\uAE30", close)
+        }, { id: "card-import-file", class: "primary" }), folder),
+        list2,
+        feedback,
+        el("div", { class: "dialog-actions" }, button("\uC120\uD0DD \uCE74\uB4DC \uD30C\uC77C \uB0B4\uBCF4\uB0B4\uAE30", () => exportFile(), { id: "card-export-file" }), button("\uB2EB\uAE30", close))
       );
       dialog.addEventListener("cancel", (event) => {
         event.preventDefault();
@@ -44262,29 +44298,31 @@
       });
       document.body.append(dialog);
       dialog.showModal();
-      if (!storage.getState().connected) {
-        feedback.textContent = folderFeedback || "\uD3F4\uB354 \uC5F0\uACB0\uC744 \uC9C0\uC6D0\uD558\uC9C0 \uC54A\uB294 \uBE0C\uB77C\uC6B0\uC800\uC608\uC694. \uCE74\uB4DC \uD30C\uC77C \uAC00\uC838\uC624\uAE30\uB97C \uC774\uC6A9\uD558\uC138\uC694.";
-        return;
-      }
-      feedback.textContent = "\uCE74\uB4DC \uBAA9\uB85D\uC744 \uC77D\uACE0 \uC788\uC5B4\uC694\u2026";
-      try {
-        const entries2 = await storage.listCards();
-        if (!active()) return;
-        feedback.textContent = entries2.length ? "" : "\uC800\uC7A5\uD55C \uCE74\uB4DC\uAC00 \uC5C6\uC5B4\uC694. \uCE74\uB4DC\uB9CC \uC800\uC7A5\uC744 \uB20C\uB7EC \uBCF4\uAD00\uD558\uC138\uC694.";
-        for (const entry of entries2) list2.append(button(el("span", {}, el("strong", {}, entry.name), el("small", {}, entry.error ? entry.error.message : entry.fileName)), async () => {
-          for (const node2 of list2.querySelectorAll("button")) node2.disabled = true;
-          const expectedProject = store.getProject();
-          try {
-            const loaded = await storage.readCard(entry);
-            if (active() && await add(loaded.text, active, expectedProject)) close();
-          } catch (error) {
-            feedback.textContent = error.message;
-          } finally {
-            for (const node2 of list2.querySelectorAll("button")) node2.disabled = node2.dataset.invalid === "true";
-          }
-        }, { class: "workspace-file", disabled: !!entry.error, "data-invalid": String(!!entry.error) }));
-      } catch (error) {
-        feedback.textContent = error.message;
+      if (storage.getState().connected) await showFiles();
+      else feedback.textContent = storage.getState().supported ? "\uCE74\uB4DC \uD30C\uC77C \uAC00\uC838\uC624\uAE30\uB294 \uD30C\uC77C\uC744, \uC800\uC7A5 \uD3F4\uB354 \uC120\uD0DD\uC740 \uD3F4\uB354\uB97C \uC5EC\uB294 \uAE30\uB2A5\uC774\uC5D0\uC694." : "\uD3F4\uB354 \uC5F0\uACB0\uC744 \uC9C0\uC6D0\uD558\uC9C0 \uC54A\uB294 \uBE0C\uB77C\uC6B0\uC800\uC608\uC694. \uCE74\uB4DC \uD30C\uC77C \uAC00\uC838\uC624\uAE30\uB97C \uC774\uC6A9\uD558\uC138\uC694.";
+      async function showFiles() {
+        const revision = ++listRevision;
+        list2.replaceChildren();
+        feedback.textContent = "\uCE74\uB4DC \uBAA9\uB85D\uC744 \uC77D\uACE0 \uC788\uC5B4\uC694\u2026";
+        try {
+          const entries2 = await storage.listCards();
+          if (!active() || revision !== listRevision) return;
+          feedback.textContent = entries2.length ? "" : "\uC800\uC7A5\uD55C \uCE74\uB4DC\uAC00 \uC5C6\uC5B4\uC694. \uCE74\uB4DC\uB9CC \uC800\uC7A5\uC744 \uB20C\uB7EC \uBCF4\uAD00\uD558\uC138\uC694.";
+          for (const entry of entries2) list2.append(button(el("span", {}, el("strong", {}, entry.name), el("small", {}, entry.error ? entry.error.message : entry.fileName)), async () => {
+            for (const node2 of list2.querySelectorAll("button")) node2.disabled = true;
+            const expectedProject = store.getProject();
+            try {
+              const loaded = await storage.readCard(entry);
+              if (active() && await add(loaded.text, active, expectedProject)) close();
+            } catch (error) {
+              feedback.textContent = error.message;
+            } finally {
+              for (const node2 of list2.querySelectorAll("button")) node2.disabled = node2.dataset.invalid === "true";
+            }
+          }, { class: "workspace-file", disabled: !!entry.error, "data-invalid": String(!!entry.error) }));
+        } catch (error) {
+          if (active() && revision === listRevision) feedback.textContent = error.message;
+        }
       }
     }
     return { input, save, open: open2, exportFile, importFile: async (file, isCurrent = () => true) => {
@@ -44415,12 +44453,12 @@
   // release.json
   var release_default = {
     format: "card-print-studio-update",
-    version: "1.1.4",
+    version: "1.1.5",
     releasedAt: "2026-10-17",
     notes: [
-      "\uC77C\uBC18 \uCE74\uB4DC \uD654\uBA74\uACFC A4 \uC6A9\uC9C0 \uBCF4\uAE30\uC5D0\uC11C\uB3C4 Ctrl+\uD720\uB85C \uB9C8\uC6B0\uC2A4 \uC704\uCE58\uB97C \uC911\uC2EC\uC73C\uB85C \uD655\uB300\xB7\uCD95\uC18C\uD574\uC694.",
-      "\uCE74\uB4DC \uD654\uBA74\uC5D0 \uCD95\uC18C\xB7\uD655\uB300\xB7100%\xB7\uB9DE\uCDA4 \uBC84\uD2BC\uACFC \uBC30\uC728 \uD45C\uC2DC\uB97C \uCD94\uAC00\uD588\uC5B4\uC694.",
-      "\uD654\uBA74 \uBC30\uC728\uACFC \uB514\uC2A4\uD50C\uB808\uC774 \uD574\uC0C1\uB3C4\uC5D0 \uB9DE\uCDB0 \uB2E4\uC2DC \uADF8\uB824 \uC120\uBA85\uD558\uAC8C \uBCF4\uC5EC \uC918\uC694. \uC800\uC7A5 \uB0B4\uC6A9\uACFC \uC2E4\uC81C \uC778\uC1C4 \uD06C\uAE30\uB294 \uADF8\uB300\uB85C\uC608\uC694."
+      "\uBD88\uB7EC\uC624\uAE30\uC5D0\uC11C JSON \uD30C\uC77C\uC744 \uC9C1\uC811 \uC120\uD0DD\uD560 \uC218 \uC788\uC5B4\uC694. \uD30C\uC77C\uC774 \uC548 \uBCF4\uC774\uB294 \uD3F4\uB354 \uC120\uD0DD\uCC3D\uC774 \uBA3C\uC800 \uB728\uC9C0 \uC54A\uC544\uC694.",
+      "\uCE74\uB4DC \uBD88\uB7EC\uC624\uAE30\uB3C4 \uD30C\uC77C \uAC00\uC838\uC624\uAE30\uC640 \uC800\uC7A5 \uD3F4\uB354 \uC120\uD0DD\uC744 \uB098\uB220 \uD45C\uC2DC\uD574\uC694.",
+      "\uD3F4\uB354 \uC5F0\uACB0\uC744 \uC9C0\uC6D0\uD558\uC9C0 \uC54A\uAC70\uB098 \uC120\uD0DD\uC744 \uCDE8\uC18C\xB7\uAC70\uBD80\uD574\uB3C4 JSON \uD30C\uC77C\uC744 \uBD88\uB7EC\uC62C \uC218 \uC788\uC5B4\uC694."
     ],
     downloadUrl: "./card-print-studio.html",
     sourceUrl: "https://raw.githubusercontent.com/lolipop000000/card-print-studio/main/dist/update.json"
@@ -44999,7 +45037,7 @@
       state.back = false;
       setElementSelection(state, []);
       refresh();
-    });
+    }, () => projectFile.click());
     const cardFiles2 = createCardFileControls({ store, workspaceFiles, card: () => ctx.card(), onAdded: (id4) => ctx.selectCard(id4) });
     const updates = createUpdateControls({ store, onOpen: () => cardCanvas.setActive(false), onClose: () => refresh() });
     const save = () => workspaceFiles.save();
