@@ -56,3 +56,45 @@
 .ignore-output-warnings{display:flex;align-items:center;gap:5px;flex-shrink:0;white-space:nowrap;font-size:11px;margin-left:4px;cursor:pointer}
 
 .effect-preview-scroll{overflow-anchor:none}.effect-zoom-hint{font-size:10px;color:var(--muted);white-space:nowrap}
+
+/* Workspace convenience 1.2 */
+.topbar{flex-wrap:wrap;gap:10px 22px}.deck-heading{min-width:220px}.deck-heading input{max-width:240px;width:240px}.top-actions{flex-basis:100%;justify-content:flex-end}
+.card-library-controls{padding:0 12px 12px;display:flex;flex-direction:column;gap:7px;flex:none;border-bottom:1px solid var(--line)}
+.card-library-controls input[type=search]{width:100%;min-width:0;font-size:12px;padding:8px}
+.card-library-filters{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.card-library-controls .field{margin:0;gap:4px;min-width:0}
+.card-library-controls .field>span{font-size:10px}
+.card-library-controls select{width:100%;min-width:0;padding:5px;font-size:11px}
+.card-library-filter-actions{display:flex;justify-content:flex-end}
+.card-library-controls button{font-size:10px;padding:5px 6px;min-width:0}
+.card-library-status{margin:0;color:var(--muted);font-size:10px}
+.card-library-selection-actions{display:flex;gap:5px}
+.card-library-selection-actions button{flex:1}
+.card-library-bulk{display:grid;grid-template-columns:1fr 44px auto;align-items:center;gap:4px}
+.card-library-bulk label{font-size:10px;line-height:1.4}
+.card-library-bulk input{width:44px;min-width:0;padding:5px 3px;text-align:center;font-size:11px}
+.card-library-message{margin:0;color:#a23930;font-size:10px;line-height:1.5}
+.card-batch-select{width:14px;height:14px;flex:none;margin:0 3px 0 0;accent-color:var(--ink)}
+.card-row.batch-selected{box-shadow:inset 3px 0 0 #548463}
+.card-library-empty{padding:16px 5px;color:var(--muted);font-size:11px;line-height:1.7}
+@media(max-width:1150px){.card-library-controls{padding-inline:9px}.card-library-bulk{grid-template-columns:1fr 39px}.card-library-bulk input{width:39px}.card-library-bulk button{grid-column:1/-1}}
+@media(max-width:820px){.card-library-controls{padding-inline:7px}.card-library-filters{grid-template-columns:1fr}.card-library-selection-actions{flex-direction:column}.card-row{gap:3px;padding-inline:2px}.card-batch-select{width:12px;height:12px;margin-right:1px}.card-meta strong{max-width:34px}}
+
+.card-template-dialog{width:min(700px,calc(100vw - 32px));max-height:calc(100vh - 48px);overflow:auto;border:1px solid var(--line);border-radius:14px;padding:22px;background:var(--paper);color:var(--ink);box-shadow:0 20px 70px #17322533}
+.card-template-dialog::backdrop{background:#12251b66}
+.card-template-target{margin-top:8px;font-weight:650}
+.card-template-save{display:flex;gap:10px;align-items:end;margin:18px 0}
+.card-template-save .field{flex:1;margin:0}
+.card-template-save>button{margin-bottom:1px}
+.card-template-list{display:grid;gap:9px;max-height:45vh;overflow:auto}
+.card-template-row{display:flex;align-items:center;justify-content:space-between;gap:14px;border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff}
+.card-template-summary{display:grid;gap:4px;min-width:0;overflow-wrap:anywhere}
+.card-template-summary strong{white-space:pre-wrap}
+.card-template-actions{display:flex;gap:6px;flex-shrink:0}
+.card-template-feedback{min-height:1.6em;margin-top:12px;line-height:1.6}
+.card-template-feedback[data-kind=error]{color:#a03b35}
+.card-template-feedback[data-kind=success]{color:var(--accent)}
+#card-template-duplicate-dialog .field,#card-template-rename-dialog .field{margin:14px 0}
+@media(max-width:620px){.card-template-save,.card-template-row{align-items:stretch;flex-direction:column}.card-template-actions{flex-wrap:wrap}.card-template-actions>button{flex:1}.card-template-list{max-height:40vh}}
+
+.recovery-status{font-size:10px;color:var(--muted);white-space:nowrap}.recovery-status[data-state=error]{color:#a63b29}.deck-heading{flex-wrap:wrap}.workspace-status,.recovery-status{flex-basis:100%}.recovery-notice{display:flex;gap:12px;align-items:center;padding:8px 18px;background:#edf4e5;border-bottom:1px solid var(--line);font-size:12px;flex-shrink:0}.recovery-notice[hidden]{display:none}.recovery-notice button{font-size:11px;padding:5px 8px}.recovery-notice button:last-child{margin-left:auto}.recovery-entry{display:flex;align-items:center;gap:8px}.recovery-file{flex:1;min-width:0}.recovery-delete{flex:none}.library{overflow:auto}.card-list{min-height:100px;flex:1 0 160px}.library-bottom,.library-add,.library-note,.library-title{flex-shrink:0}

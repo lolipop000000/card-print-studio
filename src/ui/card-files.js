@@ -39,7 +39,7 @@ export function createCardFileControls({store,workspaceFiles,card,onAdded}){
    showMessage((replaceCardId?'선택한 카드를 덮어썼어요.':'카드를 현재 덱에 추가했어요.')+(different?' 크기는 현재 덱에 맞춰 조정했어요.':''),'success');return true;
   }finally{adding=false;}
  }
- async function connected(){return storage.getState().connected||storage.connect();}
+ async function connected(){return workspaceFiles.ensureConnected();}
  async function save(){
   if(typing(document.activeElement))document.activeElement.blur();
   const current=card();if(!current){showMessage('저장할 카드를 선택하세요.');return;}
@@ -69,7 +69,8 @@ export function createCardFileControls({store,workspaceFiles,card,onAdded}){
    finally{if(active())folder.disabled=!storage.getState().supported;}
   },{id:'card-import-folder',disabled:!storage.getState().supported});
   dialog.append(el('h2',{id:'card-library-title'},'카드만 불러오기'),el('p',{class:'hint'},'카드 JSON 파일을 직접 선택하거나, 저장 폴더의 작업실 데이터 / 카드에서 가져오세요. 같은 이름은 덮어쓰기·추가를 고르며 Variant도 독립 카드로 가져와요.'),
-   el('div',{class:'two-fields'},button('카드 파일 가져오기',()=>{close();input.click();},{id:'card-import-file',class:'primary'}),folder),list,feedback,
+   el('div',{class:'two-fields'},button('카드 파일 가져오기',()=>{close();input.click();},{id:'card-import-file',class:'primary'}),folder),
+   storage.getState().folderName&&!storage.getState().connected?button('기억한 폴더 다시 연결',async()=>{try{if(await storage.resume()&&active())await showFiles();}catch(error){if(active())feedback.textContent=error.message;}},{id:'card-resume-folder'}):null,list,feedback,
    el('div',{class:'dialog-actions'},button('선택 카드 파일 내보내기',()=>exportFile(),{id:'card-export-file'}),button('닫기',close)));
   dialog.addEventListener('cancel',event=>{event.preventDefault();close();});document.body.append(dialog);dialog.showModal();
   if(storage.getState().connected)await showFiles();

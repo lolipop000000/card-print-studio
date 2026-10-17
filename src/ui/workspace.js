@@ -4,18 +4,27 @@ import {confirmReplacement,prepareProjectFile} from './files.js';
 
 export function createWorkspaceControls(store,onLoaded,onImportFile){
  const storage=createWorkspaceStorage(),status=el('small',{id:'workspace-status',class:'workspace-status',role:'status'});
- let disposed=false,pendingSave=null,library=null;
+ let disposed=false,pendingSave=null,library=null,folderDialog=null;
  const unsubscribe=storage.subscribe(refresh);
  function refresh(){
   const s=storage.getState();
-  status.textContent=s.connected?(s.fileName||'새 덱')+' · '+s.folderName+'/작업실 데이터/프로젝트':s.folderName?'저장 폴더 권한을 다시 허용해 주세요':s.supported?'저장 폴더를 연결해 주세요':'폴더 저장 미지원 · JSON 내보내기 가능';
-  status.title=s.error?.message||s.warning||'HTML이 있는 폴더를 선택하면 그 안의 작업실 데이터 폴더에 저장해요.';
+  status.textContent=s.connected?(s.fileName||'새 덱')+' · '+(s.projectsPath||s.cardsPath):s.folderName?'기억한 폴더: '+s.folderName+' · 다시 연결 가능':s.supported?'저장 폴더를 연결해 주세요':'폴더 저장 미지원 · JSON 내보내기 가능';
+  status.title=s.error?.message||s.warning||'HTML 폴더에는 작업실 데이터 폴더를 만들고, 데이터 폴더나 그 안쪽을 고르면 중첩 생성하지 않아요.';
  }
  async function ensureConnected(){
   if(storage.getState().connected)return true;
-  return storage.connect();
+  return storage.getState().folderName?storage.resume():storage.connect();
  }
  async function connect(){
+  if(storage.getState().folderName){
+   if(folderDialog)return;
+   const dialog=el('dialog',{id:'workspace-folder-dialog',class:'workspace-library'});folderDialog=dialog;
+   const feedback=el('p',{role:'status'}),close=()=>{if(dialog.open)dialog.close();dialog.remove();if(folderDialog===dialog)folderDialog=null;};
+   const run=async action=>{try{if(await action()){close();showMessage('저장 폴더를 연결했어요.','success');}}catch(error){feedback.textContent=error.message;}};
+   dialog.append(el('h2',{},'저장 폴더'),el('p',{},'기억한 위치: '+(storage.getState().projectsPath||storage.getState().cardsPath||storage.getState().folderName)),
+    button('기억한 폴더 다시 연결',()=>run(()=>storage.resume()),{id:'workspace-resume',class:'primary'}),button('다른 폴더 선택',()=>run(()=>storage.connect()),{id:'workspace-choose-other'}),feedback,button('닫기',close));
+   dialog.addEventListener('cancel',event=>{event.preventDefault();close();});document.body.append(dialog);dialog.showModal();return;
+  }
   try{if(await storage.connect())showMessage('저장 폴더를 연결했어요. 저장을 누르면 현재 덱을 보관해요.','success');}
   catch(error){showMessage(error.message);}
  }
@@ -52,7 +61,8 @@ export function createWorkspaceControls(store,onLoaded,onImportFile){
    finally{if(active())folder.disabled=!storage.getState().supported;}
   },{id:'project-import-folder',disabled:!storage.getState().supported});
   dialog.append(el('h2',{id:'workspace-library-title'},'덱 불러오기'),el('p',{class:'hint'},'덱 전체 JSON 파일을 직접 선택하거나, 저장 폴더의 작업실 데이터 / 프로젝트에서 불러오세요.'),
-   el('div',{class:'two-fields'},button('JSON 파일 선택',()=>{close();onImportFile();},{id:'project-import-file',class:'primary'}),folder),list,feedback,button('닫기',close));
+   el('div',{class:'two-fields'},button('JSON 파일 선택',()=>{close();onImportFile();},{id:'project-import-file',class:'primary'}),folder),
+   storage.getState().folderName&&!storage.getState().connected?button('기억한 폴더 다시 연결',async()=>{try{if(await storage.resume()&&active())await showFiles();}catch(error){if(active())feedback.textContent=error.message;}},{id:'project-resume-folder'}):null,list,feedback,button('닫기',close));
   dialog.addEventListener('cancel',event=>{event.preventDefault();close();});document.body.append(dialog);dialog.showModal();
   if(storage.getState().connected)await showFiles();
   else feedback.textContent=storage.getState().supported?'JSON 파일 선택은 파일을, 저장 폴더 선택은 폴더를 여는 기능이에요.':'폴더 연결을 지원하지 않는 브라우저예요. JSON 파일 선택으로 덱을 열어 주세요.';
@@ -84,5 +94,5 @@ export function createWorkspaceControls(store,onLoaded,onImportFile){
   }
  }
  refresh();storage.restore().catch(error=>{if(!disposed)showMessage(error.message);});
- return {storage,status,save,load,connect,destroy(){disposed=true;unsubscribe();if(library){library.close();library.remove();library=null;}}};
+ return {storage,status,save,load,connect,ensureConnected,destroy(){disposed=true;unsubscribe();if(folderDialog){folderDialog.close();folderDialog.remove();folderDialog=null;}if(library){library.close();library.remove();library=null;}}};
 }

@@ -5,10 +5,11 @@ import {validateVisualEffects,upgradeProjectVisualEffects} from './visual-effect
 import {valueLabel,cardProblemLabel} from './problem-details.js';
 import {isBlendMode} from './blend-modes.js';
 import {textStyleProblems} from './text-style.js';
+import {validateCardTemplates} from './card-templates.js';
 export function createProject(){
   const p={format:'card-print-studio',version:1,name:'나의 카드 덱',
     settings:{cardWidthMm:63,cardHeightMm:88,maxWidthMm:63,maxHeightMm:88,minFontPt:7,rankRules:Object.fromEntries(RANKS.map((r,i)=>[r,{baseHp:[100,220,340,460][i],hpCap:null}]))},
-    keywords:[],visualEffectPresets:[],cards:[],back:{elements:[]},assets:{},paintings:{},
+    keywords:[],visualEffectPresets:[],cardTemplates:[],cards:[],back:{elements:[]},assets:{},paintings:{},
     print:{effectFrameSec:1.2,paper:'A4',orientation:'portrait',marginMm:6,gapMm:4,duplex:false,flip:'long',backOffsetXmm:0,backOffsetYmm:0,cropMarks:true}};
   p.cards.push(createCard('monster',p));return p;
 }
@@ -94,6 +95,8 @@ export function validateProject(p){
     }
     effectRecipe(preset.recipe,undefined,{},context);
   }
+  errors.push(...validateCardTemplates(p.cardTemplates));
+  for(const [index,saved] of (Array.isArray(p.cardTemplates)?p.cardTemplates:[]).entries())if(object(saved))checkId(saved.id,'내 카드 서식 '+(index+1)+'번');
   const dice=(value,extra,context)=>{
     if(value===null||value===undefined)return;
     if(!object(value)){invalid('dice',context,'주사위 조건',value,'눈 목록, 문구, 색을 가진 객체여야 합니다',extra);return;}
@@ -276,7 +279,7 @@ export function validateProject(p){
 export function parseProject(text){
   let value;try{value=JSON.parse(text);}catch{throw new Error('JSON 파일을 읽을 수 없습니다. 카드 프로젝트 파일을 선택하세요.');}
   const problems=validateProject(value);if(problems.length){const e=new Error(problems[0].message);e.problems=problems;throw e;}
-  const result=clone(value);result.keywords??=[];result.visualEffectPresets??=[];result.print.effectFrameSec??=1.2;
+  const result=clone(value);result.keywords??=[];result.visualEffectPresets??=[];result.cardTemplates??=[];result.print.effectFrameSec??=1.2;
   for(const card of result.cards){card.autoSkillLayout??=card.template!=='custom';if(card.kind==='monster')for(const sk of [...card.passives,...card.actives])sk.keywords??=[];else card.keywords??=[];}
   syncVariants(result);const inherited=validateProject(result);if(inherited.length)throw Object.assign(new Error(inherited[0].message),{problems:inherited});
   upgradeProjectVisualEffects(result);syncVariants(result);const resolved=validateProject(result);if(resolved.length)throw Object.assign(new Error(resolved[0].message),{problems:resolved});

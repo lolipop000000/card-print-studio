@@ -49,10 +49,13 @@ class MemoryDirectory {
   const file=new MemoryFile(name);this.onCreateFile?.(file);this.children.set(name,file);return file;
  }
  async *entries(){for(const entry of this.children)yield entry;}
+ async resolve(target){if(this===target)return [];for(const [name,child] of this.children){if(child.kind!=='directory')continue;const path=await child.resolve(target);if(path)return [name,...path];}return null;}
 }
 function memoryPersistence(){const map=new Map();return {map,get:async key=>map.get(key),set:async(key,value)=>{map.set(key,value);}};}
+function htmlFolder(root){if(!['작업실 데이터','프로젝트','카드','그림'].includes(root.name))root.children.set('card-print-studio.html',new MemoryFile('card-print-studio.html','<!doctype html>'));return root;}
 function harness({root=new MemoryDirectory(),picker,persistence=memoryPersistence()}={}){
- const storage=storageModule.createWorkspaceStorage({picker:picker??(async()=>root),persistence,key:'file:///local/card-print-studio.html'});
+ htmlFolder(root);
+ const storage=storageModule.createWorkspaceStorage({picker:options=>Promise.resolve((picker??(()=>root))(options)).then(htmlFolder),persistence,key:'file:///local/card-print-studio.html'});
  return {storage,root,persistence};
 }
 async function projects(root){return (await root.getDirectoryHandle('작업실 데이터')).getDirectoryHandle('프로젝트');}
@@ -231,8 +234,8 @@ storageTest('entries and prepared loads from a previous folder cannot bind a pro
 
 storageTest('restoring a remembered empty folder never creates a data directory until explicit Save',async()=>{
  const root=new MemoryDirectory(),persistence=memoryPersistence();persistence.map.set('file:///local/card-print-studio.html',root);
- const {storage}=harness({root,persistence});assert.equal(await storage.restore(),true);assert.equal(root.children.size,0);
- assert.deepEqual(await storage.list(),[]);assert.equal(root.children.size,0);
+ const {storage}=harness({root,persistence});assert.equal(await storage.restore(),true);assert.equal(root.children.size,1);
+ assert.deepEqual(await storage.list(),[]);assert.equal(root.children.size,1);
  await storage.save(completeProject());assert.equal((await projects(root)).children.size,1);
 });
 
@@ -246,7 +249,7 @@ storageTest('a canceled folder picker leaves the previous connection and binding
 storageTest('denied permissions expose an actionable error without creating data files',async()=>{
  const root=new MemoryDirectory('거절한 폴더',{value:'prompt',requestResult:'denied',requests:0,queries:0});
  const {storage,persistence}=harness({root});await assert.rejects(storage.connect(),{code:'permission-denied'});
- assert.equal(root.children.size,0);assert.equal(persistence.map.size,0);assert.equal(storage.getState().connected,false);
+ assert.equal(root.children.has('작업실 데이터'),false);assert.equal(persistence.map.size,0);assert.equal(storage.getState().connected,false);
 });
 
 storageTest('remembered handles restore with queryPermission only and never choose or overwrite a deck',async()=>{
@@ -379,7 +382,7 @@ storageTest('a file changed while duplicate confirmation is open is never overwr
 });
 
 storageTest('duplicate choices cannot select an unrelated file or a previous folder',async()=>{
- let selectedRoot=new MemoryDirectory('첫 폴더');const storage=storageModule.createWorkspaceStorage({picker:async()=>selectedRoot,persistence:memoryPersistence()});await storage.connect();
+ let selectedRoot=new MemoryDirectory('첫 폴더');const storage=storageModule.createWorkspaceStorage({picker:async()=>htmlFolder(selectedRoot),persistence:memoryPersistence()});await storage.connect();
  await storage.saveCard(cardBundle('중복'));await assert.rejects(storage.saveCard(cardBundle('중복'),'중복',{onDuplicate:async()=>({action:'overwrite',entry:{fileName:'../other.card.json'}})}),{code:'stale-binding'});
  await assert.rejects(storage.saveCard(cardBundle('중복'),'중복',{onDuplicate:async entries=>{selectedRoot=new MemoryDirectory('다른 폴더');await storage.connect();return {action:'overwrite',entry:entries[0]};}}),{code:'stale-binding'});
 });

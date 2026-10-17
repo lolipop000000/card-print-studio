@@ -9,8 +9,8 @@ const readHtml=await readFile(new URL('../dist/card-print-studio.html',import.me
 async function withFolder(page){
  await page.addInitScript(()=>{
   window.__pickerCalls=0;
-  window.__workspaceRoot=navigator.storage.getDirectory().then(root=>root.getDirectoryHandle('card-studio-ui-test',{create:true}));
-  window.showDirectoryPicker=async()=>{window.__pickerCalls++;return window.__workspaceRoot;};
+  window.__workspaceRoot=navigator.storage.getDirectory().then(root=>root.getDirectoryHandle('card-studio-ui-test',{create:true})).then(async root=>{await root.getFileHandle('card-print-studio.html',{create:true});return root;});
+  window.showDirectoryPicker=async()=>{window.__pickerCalls++;return window.__selectedFolder||window.__workspaceRoot;};
  });
  await page.route('http://localhost/card-studio-test',route=>route.fulfill({contentType:'text/html',body:readHtml}));
  await page.goto('http://localhost/card-studio-test');await page.waitForSelector('[data-ready="true"]');
@@ -19,6 +19,18 @@ async function diskProjects(page){return page.evaluate(async()=>{
  const root=await window.__workspaceRoot,folder=await (await root.getDirectoryHandle('작업실 데이터')).getDirectoryHandle('프로젝트'),results=[];
  for await(const [name,handle] of folder.entries())if(handle.kind==='file')results.push({name,text:await (await handle.getFile()).text()});return results;
 });}
+
+test('selecting the data folder persists its exact position across reload and reconnect never opens another picker',async()=>{
+ const {browser,page,pageErrors}=await openApp();try{page.setDefaultTimeout(12_000);await withFolder(page);
+  await page.evaluate(async()=>{window.__selectedFolder=await (await window.__workspaceRoot).getDirectoryHandle('작업실 데이터',{create:true});});
+  await page.locator('#workspace-folder').click();await page.waitForFunction(()=>document.getElementById('workspace-status').textContent.includes('작업실 데이터/프로젝트'),null,{timeout:12_000});
+  await page.locator('#card-name').fill('폴더 기억 확인');await page.locator('#card-name').press('Control+s');await page.waitForFunction(()=>document.getElementById('save-state').textContent==='저장됨',null,{timeout:12_000});
+  assert.equal((await diskProjects(page)).length,1);assert.equal(await page.evaluate(async()=>{const data=await (await window.__workspaceRoot).getDirectoryHandle('작업실 데이터');for await(const [name] of data.entries())if(name==='작업실 데이터')return true;return false;}),false);
+  await page.reload();await page.waitForSelector('[data-ready="true"]');await page.waitForFunction(()=>document.getElementById('workspace-status').textContent.includes('작업실 데이터/프로젝트'),null,{timeout:12_000});
+  assert.equal(await page.evaluate(()=>window.__pickerCalls),0);await page.locator('#workspace-folder').click();await page.locator('#workspace-resume').click();await page.locator('#workspace-folder-dialog').waitFor({state:'detached'});assert.equal(await page.evaluate(()=>window.__pickerCalls),0);
+  await page.getByRole('button',{name:'프로젝트 불러오기',exact:true}).click();await page.locator('#workspace-library .workspace-file').waitFor();assert.equal(await page.evaluate(()=>window.__pickerCalls),0);assert.deepEqual(pageErrors,[]);
+ }finally{await browser.close();}
+});
 test('explicit folder selection lists existing deck and card JSON without changing the current work',async()=>{
  const {browser,page,pageErrors}=await openApp();try{
   page.setDefaultTimeout(10_000);await withFolder(page);

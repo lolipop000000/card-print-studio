@@ -29,7 +29,7 @@ function fileStem(name){
  return stem;
 }
 
-// IndexedDB contains directory handles only; deck JSON and embedded assets stay in the selected folder.
+// This database remembers folder handles. Recovery snapshots use a separate database.
 export function createHandlePersistence({indexedDB=globalThis.indexedDB}={}){
  async function transact(mode,key,value){
   if(!indexedDB)throw problem('persistence-unavailable','이 브라우저에서는 연결한 폴더를 기억할 수 없어요.');
@@ -57,10 +57,10 @@ export function createHandlePersistence({indexedDB=globalThis.indexedDB}={}){
  */
 export function createWorkspaceStorage({
  picker=globalThis.showDirectoryPicker?.bind(globalThis),
- persistence=createHandlePersistence(),key=globalThis.location?.href||'card-print-studio'
+ persistence=createHandlePersistence(),key='card-print-studio:workspace:v2',legacyKey=globalThis.location?.href
 }={}){
  let connection=null,remembered=null,binding={fileName:null,text:null},queue=Promise.resolve(),selection=0;
- let state={supported:typeof picker==='function',connected:false,folderName:null,dataFolderName:DATA_FOLDER,projectsFolderName:PROJECTS_FOLDER,cardsFolderName:CARDS_FOLDER,permission:'prompt',error:null,warning:null};
+ let state={supported:typeof picker==='function',connected:false,folderName:null,projectsPath:null,cardsPath:null,dataFolderName:DATA_FOLDER,projectsFolderName:PROJECTS_FOLDER,cardsFolderName:CARDS_FOLDER,permission:'prompt',error:null,warning:null};
  const listeners=new Set(),origins=new WeakMap(),loads=new WeakMap();
  const getState=()=>({...state,fileName:binding.fileName});
  function publish(patch={}){state={...state,...patch};const snapshot=getState();for(const fn of listeners){try{fn(snapshot);}catch{/* A rendering listener cannot turn a completed disk write into a failed save. */}}}
@@ -68,11 +68,31 @@ export function createWorkspaceStorage({
  function fail(error,code,message){const next=normalizeError(error,code,message);publish({error:errorInfo(next)});return next;}
  function requireConnection(){if(!connection)throw problem('not-connected','HTML이 있는 폴더를 먼저 연결하세요.');return connection;}
  function verifyHandle(root){if(root?.kind!=='directory'||typeof root.getDirectoryHandle!=='function'||typeof root.queryPermission!=='function')throw problem('invalid-folder','연결할 폴더를 다시 선택하세요.');}
+ async function existingDirectory(root,name){try{return await root.getDirectoryHandle(name);}catch(error){if(error?.name==='NotFoundError'||error?.name==='TypeMismatchError')return null;throw error;}}
+ async function classify(root){
+  if([DATA_FOLDER,'제작소 데이터'].includes(root.name))return 'data';
+  if(root.name===PROJECTS_FOLDER)return 'projects';
+  if(root.name===CARDS_FOLDER)return 'cards';
+  // An ancestor handle can prove this selection is inside an existing data folder.
+  // Never infer a new parent from a child: the browser deliberately exposes no '..'.
+  if(remembered?.root?.resolve){const path=await remembered.root.resolve(root).catch(()=>null);if(path?.length&&(remembered.layout!=='parent'||path.some(part=>[DATA_FOLDER,'제작소 데이터'].includes(part))))return 'direct';}
+  if(await existingDirectory(root,DATA_FOLDER))return 'parent';
+  if(await existingDirectory(root,PROJECTS_FOLDER)||await existingDirectory(root,CARDS_FOLDER))return 'data';
+  // Only an identifiable HTML folder may create a new data directory. An unknown
+  // folder may itself be a data descendant, so save directly there instead.
+  try{if(await root.getFileHandle('card-print-studio.html'))return 'parent';}catch(error){if(!['NotFoundError','TypeMismatchError'].includes(error?.name))throw error;}
+  return 'direct';
+ }
+ async function targetFor(root){return {root,layout:await classify(root),projects:null,cards:null};}
+ function paths(target){const base=target.root.name;return {projectsPath:target.layout==='cards'?null:target.layout==='parent'?base+'/'+DATA_FOLDER+'/'+PROJECTS_FOLDER:target.layout==='data'?base+'/'+PROJECTS_FOLDER:base,cardsPath:target.layout==='projects'?null:target.layout==='parent'?base+'/'+DATA_FOLDER+'/'+CARDS_FOLDER:target.layout==='data'?base+'/'+CARDS_FOLDER:base};}
  async function directories(target,create,folderName=PROJECTS_FOLDER){
+  if(!target.layout)target.layout=await classify(target.root);
   const slot=folderName===CARDS_FOLDER?'cards':'projects';
   if(target[slot])return target[slot];
+  if(['projects','cards'].includes(target.layout)&&target.layout!==slot)throw problem('wrong-folder','현재 “'+target.root.name+'” 폴더에는 '+(slot==='cards'?'카드':'덱')+' 파일을 저장할 수 없어요. 상위 작업실 데이터 폴더를 선택하세요.');
+  if(['direct','projects','cards'].includes(target.layout))return target[slot]=target.root;
   try{
-   const data=await target.root.getDirectoryHandle(DATA_FOLDER,{create});
+   const data=target.layout==='data'?target.root:await target.root.getDirectoryHandle(DATA_FOLDER,{create});
    target[slot]=await data.getDirectoryHandle(folderName,{create});return target[slot];
   }catch(error){if(!create&&error?.name==='NotFoundError')return null;throw error;}
  }
@@ -81,7 +101,7 @@ export function createWorkspaceStorage({
   if(value!=='granted')throw problem('permission-denied','폴더 읽기·쓰기 권한을 허용해야 저장할 수 있어요.');
   return value;
  }
- function adopt(target){connection=target;remembered=target;binding={fileName:null,text:null};publish({connected:true,folderName:target.root.name,permission:'granted',error:null});}
+ function adopt(target){connection=target;remembered=target;binding={fileName:null,text:null};publish({connected:true,folderName:target.root.name,...paths(target),permission:'granted',error:null});}
  function descriptor(target,fileName,project,file={}){
   const entry={fileName,name:project?.name||fileName,cardCount:project?.cards?.length??null,lastModified:file.lastModified??null,size:file.size??null,error:null};
   origins.set(entry,target);return entry;
@@ -142,7 +162,7 @@ export function createWorkspaceStorage({
    await writer.close();writer=null;
   }catch(error){if(writer)try{await writer.abort();}catch{/* Preserve the original write/close failure. */}throw error;}
  }
- function activateRemembered(target){if(!connection&&remembered===target){connection=target;publish({connected:true,folderName:target.root.name,permission:'granted',error:null});}}
+ function activateRemembered(target){if(!connection&&remembered===target){connection=target;publish({connected:true,folderName:target.root.name,...paths(target),permission:'granted',error:null});}}
  function saveFailure(error,target){
   const next=normalizeError(error,'write-failed','폴더에 저장하지 못했어요. 공간과 파일 권한을 확인하고 다시 저장하세요.');
   if(connection===target||remembered===target)publish({error:errorInfo(next),...(next.code==='permission-denied'?{permission:'denied'}:{})});
@@ -160,26 +180,33 @@ export function createWorkspaceStorage({
   },
   async restore(){
    if(!state.supported)return false;
-   const attempt=++selection;let root;
-   try{root=await persistence?.get(key);}catch(error){if(attempt===selection)publish({warning:'폴더 연결을 복원하지 못했어요. 폴더를 다시 선택하세요.'});return false;}
+   const attempt=++selection;let root,migrated=false;
+   try{root=await persistence?.get(key);if(!root&&legacyKey&&legacyKey!==key){root=await persistence?.get(legacyKey);migrated=!!root;}}catch(error){if(attempt===selection)publish({warning:'폴더 연결을 복원하지 못했어요. 폴더를 다시 선택하세요.'});return false;}
    if(!root||attempt!==selection)return false;
    try{
-    verifyHandle(root);remembered={root,projects:null};
+    verifyHandle(root);remembered={root,projects:null,cards:null,layout:null};
+    if(migrated)try{await persistence?.set(key,root);}catch{if(attempt===selection)publish({warning:'기존 폴더 연결은 사용할 수 있지만 새 파일 이름에 연결 위치를 기억하지 못했어요.'});}
     const granted=await root.queryPermission(permissionOptions);if(attempt!==selection)return false;
     if(granted!=='granted'){connection=null;binding={fileName:null,text:null};publish({connected:false,folderName:root.name,permission:granted,error:null});return false;}
-    await directories(remembered,false);if(attempt!==selection)return false;
-    adopt(remembered);return true;
+    const target=await targetFor(root);if(attempt!==selection)return false;
+    adopt(target);return true;
    }catch(error){if(attempt===selection)publish({error:errorInfo(normalizeError(error,'read-failed','기억한 폴더를 열 수 없어요. 폴더를 다시 연결하세요.'))});return false;}
+  },
+  async resume(){
+   if(connection)return true;const target=remembered;if(!target)return api.connect();
+   const attempt=++selection;
+   try{await permission(target.root,true);if(attempt!==selection)return false;const next=await targetFor(target.root);if(attempt!==selection)return false;adopt(next);return true;}
+   catch(error){if(attempt===selection)throw fail(error,'connect-failed','기억한 폴더를 연결하지 못했어요. 폴더가 이동되었거나 접근 권한이 없어요.');return false;}
   },
   async connect(){
    if(!state.supported)throw fail(problem('unsupported','이 브라우저에서는 폴더 저장을 지원하지 않아요. Chrome 또는 Edge에서 열어 주세요.'));
    const attempt=++selection;let root;
    try{
     // Keep this picker ahead of every await so the initiating click grants user activation.
-    root=await picker({id:'card-studio-data',mode:'readwrite'});
+    root=await picker({id:'card-studio-data',mode:'readwrite',...(remembered?{startIn:remembered.root}:{})});
     if(attempt!==selection)return false;
     verifyHandle(root);await permission(root,true);if(attempt!==selection)return false;
-    const target={root,projects:null};await directories(target,true);if(attempt!==selection)return false;
+    const target=await targetFor(root);if(target.layout==='parent'||target.layout==='data')await directories(target,true);if(attempt!==selection)return false;
     adopt(target);publish({warning:null});
     try{await persistence?.set(key,root);}catch{if(connection===target)publish({warning:'폴더에는 저장할 수 있지만 연결을 기억하지 못했어요. 다음에 폴더를 다시 선택하세요.'});}
     return true;

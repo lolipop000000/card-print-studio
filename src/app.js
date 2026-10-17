@@ -25,6 +25,9 @@ import {createWorkspaceControls} from './ui/workspace.js';
 import {createCardFileControls} from './ui/card-files.js';
 import {mountJsonFileDrop} from './ui/json-file-drop.js';
 import {createUpdateControls} from './ui/updates.js';
+import {createCardLibraryControls} from './ui/card-library.js';
+import {createCardTemplateControls} from './ui/card-templates.js';
+import {createRecoveryControls} from './ui/recovery.js';
 
 export function mountEditor(root,store){
  let ignoreOutputWarnings=false;try{ignoreOutputWarnings=localStorage.getItem('card-print-studio:ignore-output-warnings:v1')==='true';}catch{}
@@ -45,7 +48,7 @@ export function mountEditor(root,store){
  async function importProjectFile(file,isCurrent=()=>true){
   // loadProjectFile checks staleness before committing; successful load changes the context.
   if(!await loadProjectFile(file,store,{save:()=>workspaceFiles.save(),isCurrent}))return false;
-  workspaceFiles.storage.unbind();ctx.closeVisualEffects?.({force:true});cardCanvas.resetTime();state.activeCardId=store.getProject().cards[0]?.id;state.back=false;setElementSelection(state,[]);refresh();showMessage('프로젝트를 불러왔어요.','success');return true;
+  workspaceFiles.storage.unbind();ctx.closeVisualEffects?.({force:true});cardCanvas.resetTime();state.activeCardId=store.getProject().cards[0]?.id;state.back=false;setElementSelection(state,[]);ctx.cardLibrary?.reset();refresh();showMessage('프로젝트를 불러왔어요.','success');return true;
  }
  const projectFile=el('input',{id:'project-file',type:'file',accept:'.json,.card-project.json',hidden:true,onchange:async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{await importProjectFile(file);}catch(error){showMessage(error.message);}}});
  const artFile=el('input',{id:'art-file',type:'file',accept:'image/png,image/jpeg,image/webp',hidden:true,onchange:async event=>{
@@ -73,18 +76,21 @@ export function mountEditor(root,store){
  ctx.openKeywords=()=>{ctx.closeKeywords=openKeywordManager(ctx);};
  ctx.pickImage=elementId=>{ctx.pendingImage={elementId,cardId:state.activeCardId,back:state.back};artFile.click();};
  const deckName=el('input',{id:'deck-name',value:store.getProject().name,'aria-label':'덱 이름',onchange:event=>ctx.edit('덱 이름',d=>d.name=event.target.value)});
- const workspaceFiles=createWorkspaceControls(store,()=>{ctx.closeVisualEffects?.({force:true});cardCanvas.resetTime();state.activeCardId=store.getProject().cards[0]?.id;state.back=false;setElementSelection(state,[]);refresh();},()=>projectFile.click());
+ const workspaceFiles=createWorkspaceControls(store,()=>{ctx.closeVisualEffects?.({force:true});cardCanvas.resetTime();state.activeCardId=store.getProject().cards[0]?.id;state.back=false;setElementSelection(state,[]);ctx.cardLibrary?.reset();refresh();},()=>projectFile.click());
  const cardFiles=createCardFileControls({store,workspaceFiles,card:()=>ctx.card(),onAdded:id=>ctx.selectCard(id)});
  const updates=createUpdateControls({store,onOpen:()=>cardCanvas.setActive(false),onClose:()=>refresh()});
  const save=()=>workspaceFiles.save();
+ const cardTemplates=createCardTemplateControls(ctx);
+ const recovery=createRecoveryControls({store,save,onRestored:()=>{workspaceFiles.storage.unbind();ctx.closeVisualEffects?.({force:true});cardCanvas.resetTime();state.activeCardId=store.getProject().cards[0]?.id;state.back=false;setElementSelection(state,[]);ctx.cardLibrary?.reset();refresh();}});
  const exportProject=()=>saveProjectFile(store,{markSaved:!workspaceFiles.storage.getState().folderName}).catch(e=>showMessage(e.message));
  const top=el('header',{class:'topbar'},
   el('div',{class:'brand'},el('span',{class:'brand-symbol'},'▤'),el('div',{},el('strong',{},'카드 작업실'),el('small',{},'내가 만든 카드, 내가 그린 그림'))),
-  el('div',{class:'deck-heading'},deckName,el('span',{id:'save-state',class:'save-state'},'저장됨'),workspaceFiles.status),
+  el('div',{class:'deck-heading'},deckName,el('span',{id:'save-state',class:'save-state'},'저장됨'),workspaceFiles.status,recovery.status),
   el('div',{class:'top-actions'},
    updates.button,
+   recovery.button,cardTemplates.button,
    button('키워드 관리',()=>ctx.openKeywords(),{id:'keyword-manager'}),
-   button('새 덱',async()=>{if(await confirmReplacement(store,{save})){workspaceFiles.storage.unbind();ctx.closeVisualEffects?.({force:true});const p=createProject();p.cards[0]=applyTemplate(p.cards[0],p.settings,'monster-standard');state.activeCardId=p.cards[0].id;setElementSelection(state,[]);state.back=false;store.load(p);cardCanvas.resetTime();}}, {'aria-label':'새 덱'}),
+   button('새 덱',async()=>{if(await confirmReplacement(store,{save})){workspaceFiles.storage.unbind();ctx.closeVisualEffects?.({force:true});const p=createProject();p.cards[0]=applyTemplate(p.cards[0],p.settings,'monster-standard');state.activeCardId=p.cards[0].id;setElementSelection(state,[]);state.back=false;store.load(p);ctx.cardLibrary?.reset();cardCanvas.resetTime();}}, {'aria-label':'새 덱'}),
    button('저장',save,{'aria-label':'프로젝트 저장'}),
    button('불러오기',()=>workspaceFiles.load(),{'aria-label':'프로젝트 불러오기'}),
    button('저장 폴더',()=>workspaceFiles.connect(),{id:'workspace-folder',title:'HTML이 있는 폴더를 선택하세요.'}),
@@ -97,10 +103,11 @@ export function mountEditor(root,store){
    button('바로 인쇄',()=>ctx.onPrint(),{id:'print-direct',class:'primary',title:'Ctrl+P'})
   ));
  const cardList=el('div',{id:'card-list',class:'card-list'});
+ const cardLibrary=createCardLibraryControls(ctx);
  const addCard=kind=>{const c=applyTemplate(createCard(kind,store.getProject()),store.getProject().settings,kind==='monster'?'monster-standard':'item',store.getProject().keywords||[]);state.activeCardId=c.id;state.back=false;setElementSelection(state,[]);ctx.edit('카드 추가',d=>d.cards.push(c));};
  ctx.addVariant=()=>{const old=ctx.card();if(!old)return;const c=createVariant(store.getProject(),old.id);state.activeCardId=c.id;state.back=false;setElementSelection(state,[]);ctx.edit('Variant 추가',d=>d.cards.push(c));};
  const sidebar=el('aside',{class:'library'},el('div',{class:'library-title'},el('h2',{},'카드 목록'),el('span',{id:'card-count'})),
-  el('div',{class:'library-add'},button('+ 몬스터',()=>addCard('monster'),{id:'add-monster'}),button('+ 아이템',()=>addCard('item'),{id:'add-item'})),cardList,
+  el('div',{class:'library-add'},button('+ 몬스터',()=>addCard('monster'),{id:'add-monster'}),button('+ 아이템',()=>addCard('item'),{id:'add-item'})),cardLibrary.node,cardList,
   el('div',{class:'library-bottom'},button('카드 복제',()=>{
    const old=ctx.card();if(!old)return;const c=clone(old),mapping=new Map();c.id=newId();delete c.variant;c.name+=' 복사';
    for(const sk of [...c.passives||[],...c.actives||[]]){const previous=sk.id;sk.id=newId();mapping.set(previous,sk.id);}
@@ -135,7 +142,7 @@ export function mountEditor(root,store){
  const center=el('main',{class:'workspace'},el('nav',{class:'workspace-tabs'},el('div',{class:'tab-group'},cardTab,paperTab),el('div',{class:'tab-group'},frontTab,backTab)),cardArea,paperRoot);
  const inspector=el('aside',{id:'inspector',class:'inspector'});
  const message=el('div',{id:'message',hidden:true,role:'alert',class:'message'},el('span',{}),button('×',()=>message.hidden=true,{'aria-label':'메시지 닫기'}));
- root.append(top,el('div',{class:'workspace-grid'},sidebar,center,inspector),message,projectFile,artFile,cardFiles.input);
+ root.append(top,recovery.notice,el('div',{class:'workspace-grid'},sidebar,center,inspector),message,projectFile,artFile,cardFiles.input);
  const cardCanvas=mountCardCanvas(canvasHost,ctx);ctx.cardCanvas=cardCanvas;ctx.paperRoot=paperRoot;
  const paperView=mountPaperView(paperRoot,store);ctx.onPaper=()=>{if(state.mode==='paper')paperView.refresh();};
  const fileDrop=mountJsonFileDrop(root,{getContext:()=>store.getProject(),onProject:importProjectFile,onCard:(file,isCurrent)=>cardFiles.importFile(file,isCurrent),onError:message=>showMessage(message)});
@@ -166,7 +173,7 @@ export function mountEditor(root,store){
   for(const [node,active] of [[cardTab,state.mode==='card'],[paperTab,state.mode==='paper'],[frontTab,!state.back],[backTab,state.back]]){node.classList.toggle('active',active);node.setAttribute('aria-pressed',active);}
   cardArea.hidden=state.mode!=='card';paperRoot.hidden=state.mode!=='paper';
   cardCanvas.setActive(state.mode==='card'&&!state.paintOpen&&!state.effectOpen&&!document.querySelector('dialog[open]'));
-  renderCards(cardList,ctx);ctx.renderInspector();cardCanvas.refresh();ctx.onPaper?.();
+  cardTemplates.refresh?.();cardLibrary.refresh();renderCards(cardList,ctx);ctx.renderInspector();cardCanvas.refresh();ctx.onPaper?.();
   const tick=++generation;loadAssets(p).then(cache=>{if(tick!==generation)return;ctx.assets=cache;ctx.refreshVisualEffects?.();renderCards(cardList,ctx);cardCanvas.refresh();ctx.onPaper?.();}).catch(e=>showMessage(e.message));
  }
  const unsubscribe=store.subscribe(refresh);ctx.refresh=refresh;
@@ -182,7 +189,7 @@ export function mountEditor(root,store){
  const unload=event=>{if(store.isDirty()||document.querySelector('[data-paint-dirty="true"],[data-effect-dirty="true"]')){event.preventDefault();event.returnValue='';}};
  window.addEventListener('keydown',key);window.addEventListener('beforeunload',unload);
  refresh();root.dataset.ready='true';updates.checkAtStartup();
- return Object.assign(ctx,{getActiveCardId:()=>state.activeCardId,destroy(){updates.destroy();fileDrop.destroy();cardFiles.destroy();workspaceFiles.destroy();ctx.closeVisualEffects?.({force:true});ctx.closeKeywords?.();unsubscribe();window.removeEventListener('keydown',key);window.removeEventListener('beforeunload',unload);cardCanvas.destroy();paperView.destroy();root.replaceChildren();}});
+ return Object.assign(ctx,{getActiveCardId:()=>state.activeCardId,destroy(){recovery.destroy();cardTemplates.destroy();cardLibrary.destroy();updates.destroy();fileDrop.destroy();cardFiles.destroy();workspaceFiles.destroy();ctx.closeVisualEffects?.({force:true});ctx.closeKeywords?.();unsubscribe();window.removeEventListener('keydown',key);window.removeEventListener('beforeunload',unload);cardCanvas.destroy();paperView.destroy();root.replaceChildren();}});
 }
 async function boot(){const root=document.getElementById('app');try{await ensureFont();const p=createProject();p.cards[0]=applyTemplate(p.cards[0],p.settings,'monster-standard');mountEditor(root,createStore(p,{prepare:d=>{d.cards=d.cards.map(c=>c.variant&&c.autoSkillLayout?syncSkillElements(c,d.settings,d.keywords||[]):c);}}));}catch(e){root.textContent='작업실을 열지 못했어요: '+e.message;}}
 boot();
