@@ -24,8 +24,12 @@
 - [x] Card library: model/card-library.js and ui/card-library.js expose createCardLibraryControls(ctx) -> node/refresh/destroy; ui/cards.js renders filtered cards and selection. Test IME/filter/attribute semantics and one-undo bulk quantity changes.
 - [x] Card templates: model/card-templates.js and ui/card-templates.js expose createCardTemplateControls(ctx) -> button/destroy. Validate optional cardTemplates in model/project.js; test visual-only application, skill/asset remapping, snapshot independence and JSON roundtrip.
 - [x] Integrate app lifecycle and CSS, document behavior, run relevant model/storage and browser suites, capture UI, request independent review and fix material findings.
-- [ ] Build version 1.2.0, publish existing GitHub distribution and verify downloaded bytes, update local delivery after backups and passing checks.
+- [x] Build version 1.2.0, publish existing GitHub distribution and verify downloaded bytes, update local delivery after backups and passing checks.
 
 ## Verification and review
 
 301 model/storage tests, 35 relevant Edge UI tests, and 4 offline/PDF/native-print regression tests passed. A fresh independent review reproduced fast-switch recovery loss and hidden prior slots; both were fixed with an observed failing regression, then all 7 recovery tests passed. A final post-await identity guard also prevents a stale recovery from replacing a newer import. The reviewer rechecked and reported no remaining concrete issue.
+
+## Delivery evidence
+
+v1.2.0 was published to the existing public repository. The five release asset digests and actual old-version-to-new-version download matched the tested HTML. Only the six delivery files were updated; personal decks/artwork and the open user tab were preserved.
