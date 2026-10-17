@@ -60,7 +60,7 @@ Files: `src/ui/asset-library.js`, `src/app.js`, `src/ui/inspector.js`, `src/ui/v
 
 - [x] Build offline HTML and run unit, targeted actual Edge crop/library/attribute/keyword/effect tests and existing output regression.
 - [x] Review the integrated diff, resolve concrete issues and inspect the cropped attachment locally without publishing it.
-- [ ] Update usage/version and publish a verified release; copy tested HTML into the user's existing studio only after backup guards.
+- [x] Update usage/version and publish a verified release; copy tested HTML into the user's existing studio only after backup guards.
 
 ## Additional authorized scope during implementation
 
@@ -88,3 +88,4 @@ Files: `src/ui/asset-library.js`, `src/app.js`, `src/ui/inspector.js`, `src/ui/v
 - Output regression passed 15/15 actual Edge cases: browser direct printing, offline deck/painting reload, PDF export and deterministic 300 DPI effect frames. Selected-playback regression passed 4/4 after the cache repair, including repeated skill-name effects inside frozen parent effects.
 - Final source verification: 345/345 units, 59/59 related actual Edge cases, then 14/14 library/app cases after final shared-completion and small-preview fixes. Independent final review approved storage/UI 33/33, cache/playback 8/8 and both additional 300 DPI stress comparisons.
 - Explicit reload review follow-up: closing/reopening after an external disk update used to adopt only the new storage baseline, allowing retry to overwrite it with an old visible list. Reproduced RED and unified shared read/save adoption before origin checks; obsolete imports/crops still cancel and external JSON now stays exact. Successful saves also clear the reopened manager's temporary-state display.
+- Delivery complete: published public v1.3.0 from `336ff4d8c0f6f856446de42f62d1c3ac5f73f15d`, verified all five release asset sizes/SHA256, live v1.2.0-to-v1.3.0 download with dirty deck/undo/redo retained, and unauthenticated latest download. Rechecked all six delivery-file backup hashes before copying; delivered HTML SHA256 `77ae01aa0c1a37a12b92ce5ecc5e53b3aad2e3b9ca11c453324855d67f9dc5c1`. Personal data and the active user tab were not changed.
