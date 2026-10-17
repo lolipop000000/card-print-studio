@@ -7,7 +7,7 @@ import {saveProject} from './helpers/flows.mjs';
 test('offline UI downloads a ten-card four-page duplex PDF with all skills and common back',async()=>{const {browser,page}=await openApp();try{
  const requests=[];page.on('request',r=>{if(/^https?:/.test(r.url()))requests.push(r.url());});
  for(const [sel,v] of [['#card-name','별빛 정령'],['#card-quantity','10'],['#hp-reduction','25']]){await page.locator(sel).fill(v);await page.locator(sel).press('Tab');}
- await page.locator('#attribute-light').check();await page.locator('#attribute-neutral').uncheck();await page.locator('#add-passive').click();await page.locator('#passives .skill-name').fill('별의 보호');await page.locator('#passives .skill-name').press('Tab');await page.locator('#passives .skill-effect').fill('매 턴 체력을 5 회복한다.');
+ await page.locator('#attribute-menu-toggle').click();await page.locator('#attribute-light').check();await page.locator('#attribute-neutral').uncheck();await page.locator('#add-passive').click();await page.locator('#passives .skill-name').fill('별의 보호');await page.locator('#passives .skill-name').press('Tab');await page.locator('#passives .skill-effect').fill('매 턴 체력을 5 회복한다.');
  await page.locator('#add-active').click();await page.locator('#actives .skill-name').fill('빛의 화살');await page.locator('#actives .skill-name').press('Tab');await page.locator('#actives .skill-effect').fill('대미지 30. 주사위 성공 시 추가 대미지 10.');
  await page.locator('#actives').getByLabel('6면 주사위 조건',{exact:true}).check();await page.getByRole('button',{name:'긴 효과 맞춤',exact:true}).click();
  await page.locator('#back-tab').click();await page.getByRole('button',{name:'텍스트 추가',exact:true}).click();await page.locator('#element-content').fill('우리의 카드게임');

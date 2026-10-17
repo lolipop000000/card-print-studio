@@ -1,11 +1,12 @@
 import {el,button,field} from './dom.js';
 import {clone,newId} from '../model/types.js';
-import {VISUAL_EFFECT_CATALOG,makeVisualEffectLayer} from '../model/visual-effects.js';
+import {VISUAL_EFFECT_CATALOG} from '../model/visual-effects.js';
+import {makeVisualEffectLayerForTarget} from '../model/effect-emission.js';
 import {BLEND_MODES,DEFAULT_BLEND_MODE} from '../model/blend-modes.js';
 import {isSpriteFieldVisible,SPRITE_CONTROL_HINT,SPRITE_SHEET_HINT} from '../model/sprite-controls.js';
 const placements=[['behind','대상 뒤'],['front','대상 앞']];
 const scopes=[['all','지금까지 쌓은 전체'],['inside','원본 모양 안쪽'],['outside','원본 모양 바깥']];
-export function renderVisualEffectFields(host,{recipe,selectedLayerId,targetType,onChange,onSelect,assetOptions=[],onImportImage,importing=false}){
+export function renderVisualEffectFields(host,{recipe,selectedLayerId,targetType,onChange,onSelect,assetOptions=[],onImportImage,onLibraryImage,importing=false}){
  const layer=recipe.layers.find(l=>l.id===selectedLayerId),index=recipe.layers.indexOf(layer),definition=layer&&VISUAL_EFFECT_CATALOG[layer.kind];
  const advancedOpen=host.querySelector('#effect-advanced')?.open||false;
  const spriteGroupState=new Map([...host.querySelectorAll('[data-sprite-group]')].map(group=>[group.dataset.spriteGroup,group.open]));
@@ -23,7 +24,7 @@ export function renderVisualEffectFields(host,{recipe,selectedLayerId,targetType
    button((d.generative?'✦ ':d.textOnly?'↝ ':'◇ ')+d.name,()=>onSelect(l.id),{class:'effect-layer-select','aria-pressed':l===layer}),
    el('small',{},l.kind==='textWarp'?'글자 원본':d.generative?placements.find(([v])=>v===l.placement)?.[1]:({all:'전체',inside:'안쪽',outside:'바깥'})[l.scope])));
  }
- const add=()=>{const kind=picker.value;onChange(r=>{const next=makeVisualEffectLayer(kind);kind==='textWarp'?r.layers.unshift(next):r.layers.push(next);return next.id;});};
+ const add=()=>{const kind=picker.value;onChange(r=>{const next=makeVisualEffectLayerForTarget(kind,targetType);kind==='textWarp'?r.layers.unshift(next):r.layers.push(next);return next.id;});};
  const header=[el('h3',{},'효과 레이어 · '+recipe.layers.length+' / 12')];
  if(targetType==='frame'){
   const frame=recipe.frame||{scope:'border',bandMm:4},change=fn=>onChange(r=>{r.frame??={scope:'border',bandMm:4};fn(r.frame);});
@@ -39,7 +40,7 @@ export function renderVisualEffectFields(host,{recipe,selectedLayerId,targetType
   button('↓',()=>reorder(1),{id:'effect-layer-down','aria-label':'적용 순서 아래로',disabled:!canMove(1)}),
   button('복제',()=>onChange(r=>{const l=clone(layer);l.id=newId();r.layers.splice(index+1,0,l);return l.id;}),{id:'effect-layer-duplicate',disabled:layer.kind==='textWarp'||recipe.layers.length>=12}),
   button('삭제',()=>onChange(r=>r.layers.splice(index,1)),{id:'effect-layer-delete',class:'danger'}),
-  button('초기화',()=>onChange(r=>r.layers[index]=makeVisualEffectLayer(layer.kind,{id:layer.id})),{id:'effect-layer-reset'}));
+  button('초기화',()=>onChange(r=>r.layers[index]=makeVisualEffectLayerForTarget(layer.kind,targetType,{id:layer.id})),{id:'effect-layer-reset'}));
  const panel=el('section',{class:'effect-layer-fields'},el('h3',{},definition.name),actions);
  if(layer.kind==='textWarp')panel.append(el('p',{class:'hint'},'글자 모양을 먼저 바꿔요. 뒤에 붙인 불꽃과 연기도 변형된 글자를 따라갑니다.'));
  else if(definition.generative)panel.append(field('앞뒤 배치','effect-placement',layer.placement,v=>mutate(l=>l.placement=v),{options:placements}));
@@ -62,7 +63,8 @@ export function renderVisualEffectFields(host,{recipe,selectedLayerId,targetType
    }fieldHost=groups.get(f.group);
   }
   if(f.type==='asset'){
-   fieldHost.append(field(f.label,'effect-param-'+key,layer.params[key]||'',v=>mutate(l=>l.params[key]=v||null),{options:[['','이미지 선택 안 함'],...assetOptions]}),button('입자 이미지 가져오기',()=>onImportImage?.(layer.id),{id:'effect-sprite-import',disabled:importing}));
+   fieldHost.append(field(f.label,'effect-param-'+key,layer.params[key]||'',v=>mutate(l=>l.params[key]=v||null),{options:[['','이미지 선택 안 함'],...assetOptions]}),
+    el('div',{class:'two-fields'},button('입자 이미지 가져오기',()=>onImportImage?.(layer.id),{id:'effect-sprite-import',disabled:importing}),button('보관함에서 선택',()=>onLibraryImage?.(layer.id),{id:'effect-sprite-library',disabled:importing||!onLibraryImage})));
   }else{
    const scale=f.displayScale??1,number=f.type==='number',label=layer.kind==='sprite'&&layer.params.renderMode==='single'?({sizeStart:'장식 크기',alphaStart:'그림 투명도',rotation:'회전'})[key]||f.label:f.label;
    fieldHost.append(field(label+(f.unit?' ('+f.unit+')':''),'effect-param-'+key,number?(layer.params[key]??f.value)*scale:layer.params[key]??f.value,v=>mutate(l=>l.params[key]=number?v/scale:v),{type:f.type,min:number?f.min*scale:f.min,max:number?f.max*scale:f.max,step:number?f.step*scale:f.step,options:f.options}));
@@ -71,9 +73,9 @@ export function renderVisualEffectFields(host,{recipe,selectedLayerId,targetType
 
  if(layer.kind!=='textWarp')panel.append(field('불투명도','effect-opacity',layer.opacity,v=>mutate(l=>l.opacity=v),{type:'number',min:0,max:1,step:.05}));
  if(definition.generative){
-  if(layer.kind!=='sprite'||layer.params.renderMode!=='single')panel.append(field('모양에서 피어나는 면','effect-face',layer.emit.face,v=>mutate(l=>l.emit.face=v),{options:[['up','윗면'],['down','아랫면'],['side','옆면'],['all','모든 가장자리'],['inside','모양 안쪽'],['area','직접 정한 영역']]}),
+  if(layer.kind!=='sprite'||layer.params.renderMode!=='single')panel.append(field(targetType==='effect'?'발생 위치':'모양에서 피어나는 면','effect-face',layer.emit.face,v=>mutate(l=>l.emit.face=v),{options:[['up','윗면'],['down','아랫면'],['side','옆면'],['all','모든 가장자리'],['inside','모양 안쪽'],['area',targetType==='effect'?'영역 전체':'직접 정한 영역']]}),
    el('label',{class:'check'},el('input',{id:'effect-open-only',type:'checkbox',checked:layer.emit.openOnly,onchange:event=>mutate(l=>l.emit.openOnly=event.target.checked)}),'바로 앞이 빈 곳만'),
-   el('p',{class:'hint'},'글자와 그림의 실제 모양에서 피어나요. 글자 구멍은 채운 덩어리로 계산합니다.'));
+   el('p',{class:'hint'},targetType==='effect'?'독립 장식은 영역 전체에서 시작해요. 고급 설정에서 발생 위치와 크기를 조절하세요.':'글자와 그림의 실제 모양에서 피어나요. 글자 구멍은 채운 덩어리로 계산합니다.'));
   const advanced=el('details',{id:'effect-advanced',open:advancedOpen},el('summary',{},'고급 · 발생 영역과 회전'),
    el('div',{class:'two-fields'},...Object.entries({x:'가로 위치',y:'세로 위치',w:'발생 폭',h:'발생 높이'}).map(([k,label])=>field(label+' (비율)','effect-origin-'+k,layer.origin[k],v=>mutate(l=>l.origin[k]=v),{type:'number',min:k==='w'?.05:k==='h'?.005:-1,max:k==='y'?5:['w','h'].includes(k)?3:2,step:.05}))),
    field('회전 (°)','effect-rotation',layer.rotationDeg,v=>mutate(l=>l.rotationDeg=v),{type:'number',min:-180,max:180,step:5}));

@@ -1,10 +1,12 @@
 import {parseProject,serializeProject} from '../model/project.js';
 import {parseCardFile,cardNameKey} from '../model/card-file.js';
+import {createAssetLibrary,parseAssetLibrary,serializeAssetLibrary} from '../model/asset-library.js';
 
 const DATA_FOLDER='작업실 데이터',PROJECTS_FOLDER='프로젝트',CARDS_FOLDER='카드',EXTENSION='.card-project.json',CARD_EXTENSION='.card.json';
 const projectFiles={folderName:PROJECTS_FOLDER,extension:EXTENSION,parse:parseProject,invalid:'invalid-project',label:'프로젝트'};
 const cardFiles={folderName:CARDS_FOLDER,extension:CARD_EXTENSION,parse:parseCardFile,invalid:'invalid-card',label:'카드 파일'};
 const permissionOptions={mode:'readwrite'};
+const ASSETS_FOLDER='에셋',ASSET_FILE='asset-library.json';
 const reserved=/^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i;
 
 export class WorkspaceStorageError extends Error {
@@ -62,7 +64,7 @@ export function createWorkspaceStorage({
  let connection=null,remembered=null,binding={fileName:null,text:null},queue=Promise.resolve(),selection=0;
  let state={supported:typeof picker==='function',connected:false,folderName:null,projectsPath:null,cardsPath:null,dataFolderName:DATA_FOLDER,projectsFolderName:PROJECTS_FOLDER,cardsFolderName:CARDS_FOLDER,permission:'prompt',error:null,warning:null};
  const listeners=new Set(),origins=new WeakMap(),loads=new WeakMap();
- const getState=()=>({...state,fileName:binding.fileName});
+ const getState=()=>({...state,fileName:binding.fileName,connectionId:selection});
  function publish(patch={}){state={...state,...patch};const snapshot=getState();for(const fn of listeners){try{fn(snapshot);}catch{/* A rendering listener cannot turn a completed disk write into a failed save. */}}}
  function enqueue(operation){const result=queue.then(operation);queue=result.catch(()=>{});return result;}
  function fail(error,code,message){const next=normalizeError(error,code,message);publish({error:errorInfo(next)});return next;}
@@ -83,8 +85,19 @@ export function createWorkspaceStorage({
   try{if(await root.getFileHandle('card-print-studio.html'))return 'parent';}catch(error){if(!['NotFoundError','TypeMismatchError'].includes(error?.name))throw error;}
   return 'direct';
  }
- async function targetFor(root){return {root,layout:await classify(root),projects:null,cards:null};}
- function paths(target){const base=target.root.name;return {projectsPath:target.layout==='cards'?null:target.layout==='parent'?base+'/'+DATA_FOLDER+'/'+PROJECTS_FOLDER:target.layout==='data'?base+'/'+PROJECTS_FOLDER:base,cardsPath:target.layout==='projects'?null:target.layout==='parent'?base+'/'+DATA_FOLDER+'/'+CARDS_FOLDER:target.layout==='data'?base+'/'+CARDS_FOLDER:base};}
+ async function targetFor(root){return {root,layout:await classify(root),projects:null,cards:null,assets:null};}
+ function assetLocation(target){const base=target.root.name;return ['projects','cards'].includes(target.layout)?null:base+'/'+(target.layout==='parent'?DATA_FOLDER+'/'+ASSETS_FOLDER+'/':target.layout==='data'?ASSETS_FOLDER+'/':'')+ASSET_FILE;}
+ function paths(target){const base=target.root.name;return {projectsPath:target.layout==='cards'?null:target.layout==='parent'?base+'/'+DATA_FOLDER+'/'+PROJECTS_FOLDER:target.layout==='data'?base+'/'+PROJECTS_FOLDER:base,cardsPath:target.layout==='projects'?null:target.layout==='parent'?base+'/'+DATA_FOLDER+'/'+CARDS_FOLDER:target.layout==='data'?base+'/'+CARDS_FOLDER:base,assetsPath:assetLocation(target)};}
+ function assertAssetTarget(target,attempt){if(connection!==target||selection!==attempt)throw problem('stale-binding','에셋 보관함을 읽거나 저장하는 동안 연결한 폴더가 바뀌었어요. 보관함을 다시 불러오세요.');}
+ function checkAssetFolder(target){if(['projects','cards'].includes(target.layout))throw problem('wrong-folder','에셋 보관함은 프로젝트/카드 전용 폴더에 저장할 수 없어요. 상위 작업실 데이터 폴더를 연결하세요.');}
+ async function assetDirectory(target,create,check){
+  check();checkAssetFolder(target);if(target.assets)return target.assets;
+  if(target.layout==='direct')return target.assets=target.root;
+  try{
+   const data=target.layout==='data'?target.root:await target.root.getDirectoryHandle(DATA_FOLDER,{create});check();
+   const folder=await data.getDirectoryHandle(ASSETS_FOLDER,{create});check();return target.assets=folder;
+  }catch(error){if(!create&&error?.name==='NotFoundError')return null;throw error;}
+ }
  async function directories(target,create,folderName=PROJECTS_FOLDER){
   if(!target.layout)target.layout=await classify(target.root);
   const slot=folderName===CARDS_FOLDER?'cards':'projects';
@@ -145,21 +158,21 @@ export function createWorkspaceStorage({
    }catch(error){throw fail(error,'read-failed',kind.label+' 내용을 읽지 못했어요. 파일 상태와 권한을 확인하세요.');}
   });
  }
- async function freshHandle(folder,fileName){
-  try{await folder.getFileHandle(fileName);throw problem('conflict','같은 이름의 파일이 이미 있어요. 기존 파일을 열거나 다른 이름으로 저장하세요.');}
+ async function freshHandle(folder,fileName,check=()=>{}){
+  check();try{await folder.getFileHandle(fileName);check();throw problem('conflict','같은 이름의 파일이 이미 있어요. 기존 파일을 열거나 다른 이름으로 저장하세요.');}
   catch(error){if(error?.name!=='NotFoundError')throw error;}
-  const handle=await folder.getFileHandle(fileName,{create:true});
+  check();const handle=await folder.getFileHandle(fileName,{create:true});check();
   if((await readText(handle)).text!=='')throw problem('conflict','저장할 이름에 다른 파일이 생겼어요. 다시 저장하세요.');
   return handle;
  }
- async function writeChecked(handle,text,expected){
+ async function writeChecked(handle,text,expected,check=()=>{}){
   let writer;
   try{
-   writer=await handle.createWritable({keepExistingData:false,mode:'exclusive'});
-   if((await readText(handle)).text!==expected)throw problem('conflict','저장 전에 파일이 바뀌었어요. 파일을 다시 열어 주세요.');
-   await writer.write(text);
-   if((await readText(handle)).text!==expected)throw problem('conflict','저장 중에 파일이 바뀌었어요. 파일을 다시 열어 주세요.');
-   await writer.close();writer=null;
+   check();writer=await handle.createWritable({keepExistingData:false,mode:'exclusive'});check();
+   const before=(await readText(handle)).text;check();if(before!==expected)throw problem('conflict','저장 전에 파일이 바뀌었어요. 파일을 다시 열어 주세요.');
+   await writer.write(text);check();
+   const during=(await readText(handle)).text;check();if(during!==expected)throw problem('conflict','저장 중에 파일이 바뀌었어요. 파일을 다시 열어 주세요.');
+   await writer.close();writer=null;check();
   }catch(error){if(writer)try{await writer.abort();}catch{/* Preserve the original write/close failure. */}throw error;}
  }
  function activateRemembered(target){if(!connection&&remembered===target){connection=target;publish({connected:true,folderName:target.root.name,...paths(target),permission:'granted',error:null});}}
@@ -171,6 +184,7 @@ export function createWorkspaceStorage({
 
  const api={
   getState,
+  getAssetLibraryRoot:()=>connection?.root??null,
   subscribe(fn){listeners.add(fn);return ()=>listeners.delete(fn);},
   unbind(){binding={fileName:null,text:null};publish({error:null});},
   bindLoaded(loaded){
@@ -193,7 +207,12 @@ export function createWorkspaceStorage({
    }catch(error){if(attempt===selection)publish({error:errorInfo(normalizeError(error,'read-failed','기억한 폴더를 열 수 없어요. 폴더를 다시 연결하세요.'))});return false;}
   },
   async resume(){
-   if(connection)return true;const target=remembered;if(!target)return api.connect();
+   if(connection){
+    const target=connection,attempt=selection;
+    try{await permission(target.root,true);if(connection!==target||attempt!==selection)return false;publish({permission:'granted',error:null});return true;}
+    catch(error){if(connection===target&&attempt===selection){const next=normalizeError(error,'connect-failed','기억한 폴더의 권한을 다시 허용하지 못했어요.');publish({permission:'denied',error:errorInfo(next)});throw next;}return false;}
+   }
+   const target=remembered;if(!target)return api.connect();
    const attempt=++selection;
    try{await permission(target.root,true);if(attempt!==selection)return false;const next=await targetFor(target.root);if(attempt!==selection)return false;adopt(next);return true;}
    catch(error){if(attempt===selection)throw fail(error,'connect-failed','기억한 폴더를 연결하지 못했어요. 폴더가 이동되었거나 접근 권한이 없어요.');return false;}
@@ -216,6 +235,32 @@ export function createWorkspaceStorage({
   read:entry=>readFile(entry,projectFiles),
   listCards:()=>listFiles(cardFiles),
   readCard:entry=>readFile(entry,cardFiles),
+  async readAssetLibrary(){
+   const target=requireConnection(),attempt=selection,check=()=>assertAssetTarget(target,attempt);
+   return enqueue(async()=>{
+    try{
+     check();checkAssetFolder(target);await permission(target.root);check();const folder=await assetDirectory(target,false,check);check();let text=null;
+     if(folder)try{const handle=await folder.getFileHandle(ASSET_FILE);check();text=(await readText(handle)).text;check();}catch(error){if(error?.name!=='NotFoundError')throw error;}
+     let library;try{library=text===null?createAssetLibrary():parseAssetLibrary(text);}catch(error){throw problem('invalid-asset-library','폴더의 에셋 보관함 내용이 올바르지 않아요: '+error.message,error);}
+     check();target.assetLibraryText=text;return {library,text,location:assetLocation(target)};
+    }catch(error){const next=normalizeError(error,'read-failed','에셋 보관함을 읽지 못했어요. 폴더 권한과 파일 상태를 확인하세요.');if(connection===target&&selection===attempt)publish({error:errorInfo(next),...(next.code==='permission-denied'?{permission:'denied'}:{})});throw next;}
+   });
+  },
+  async writeAssetLibrary(library,options={}){
+   let text;try{text=serializeAssetLibrary(library);}catch(error){throw problem('invalid-asset-library',error.message,error);}
+   const target=requireConnection(),attempt=selection,check=()=>assertAssetTarget(target,attempt);checkAssetFolder(target);
+   const expected=Object.hasOwn(options,'expectedText')?options.expectedText:target.assetLibraryText;
+   if(target.assetLibraryText===undefined||(expected!==null&&typeof expected!=='string'))throw problem('library-not-loaded','저장하기 전에 현재 폴더의 에셋 보관함을 다시 불러오세요.');
+   const permissionResult=permission(target.root,true).then(value=>({value}),error=>({error}));
+   return enqueue(async()=>{
+    try{
+     check();const result=await permissionResult;if(result.error)throw result.error;check();const folder=await assetDirectory(target,true,check);check();let handle;
+     try{handle=await folder.getFileHandle(ASSET_FILE);check();if(expected===null)throw problem('conflict','에셋 보관함을 읽은 뒤 같은 위치에 파일이 생겼어요. 보관함을 다시 불러오세요.');}catch(error){if(error?.name!=='NotFoundError')throw error;if(expected!==null)throw problem('conflict','에셋 보관함 파일이 이동되거나 삭제됐어요. 보관함을 다시 불러오세요.',error);check();handle=await freshHandle(folder,ASSET_FILE,check);check();}
+     const actual=(await readText(handle)).text;check();if(actual!==(expected??''))throw problem('conflict','다른 곳에서 에셋 보관함 파일이 바뀌었어요. 보관함을 다시 불러온 뒤 저장하세요.');
+     await writeChecked(handle,text,expected??'',check);check();target.assetLibraryText=text;publish({permission:'granted',error:null});return {library:parseAssetLibrary(text),text,location:assetLocation(target)};
+    }catch(error){if(connection!==target||selection!==attempt)throw normalizeError(error,'stale-binding','연결한 폴더가 바뀌었어요. 에셋 보관함을 다시 불러오세요.');throw saveFailure(error,target);}
+   });
+  },
   async saveCard(text,name,{onDuplicate}={}){
    let capturedText,stem,project;
    try{

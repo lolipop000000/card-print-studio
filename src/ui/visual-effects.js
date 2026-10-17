@@ -3,6 +3,7 @@ import {openDialog} from './dialogs.js';
 import {clone,newId} from '../model/types.js';
 import {importAsset,decodeImage} from '../model/assets.js';
 import {VISUAL_EFFECT_PRESETS,createVisualEffects,validateVisualEffects,readTargetEffects,writeTargetEffects,readTargetTextColor,writeTargetTextColor,saveVisualEffectPreset,removeVisualEffectPreset,getEffectFrameSec,upgradeVisualEffects} from '../model/visual-effects.js';
+import {createVisualEffectsForTarget} from '../model/effect-emission.js';
 import {renderCard} from '../render/card.js';
 import {createEffectCache,renderVisualEffects} from '../render/effects/composite.js';
 import {makeSurface} from '../render/effects/masks.js';
@@ -28,7 +29,7 @@ function targetLabel(card,e,index){
 }
 export function openVisualEffectsEditor(ctx,initialTarget){
  if(document.getElementById('effect-editor'))return ctx.closeVisualEffects;
- const p=ctx.store.getProject(),card=initialTarget.back?p.back:p.cards.find(c=>c.id===initialTarget.cardId);
+ const p=ctx.store.getProject(),documentId=ctx.store.getDocumentId(),card=initialTarget.back?p.back:p.cards.find(c=>c.id===initialTarget.cardId);
  const targets=[...(!initialTarget.back?[['','카드 프레임']]:[]),...card.elements.filter(e=>['text','image','effect'].includes(e.type)).map((e,i)=>[e.id,targetLabel(card,e,i)])];
  const definitions=new Map(targets.map(([value])=>[value,{cardId:initialTarget.cardId,back:!!initialTarget.back,elementId:value||null}]));
  if(!initialTarget.back)for(const skill of [...(card.passives||[]),...(card.actives||[])]){
@@ -46,6 +47,7 @@ export function openVisualEffectsEditor(ctx,initialTarget){
  const feedback=el('p',{id:'effect-feedback',class:'effect-feedback',role:'status',hidden:true});
  const status=el('span',{id:'effect-preview-status',role:'status','data-busy':'false'},'미리보기');
  const quality=el('input',{id:'effect-print-quality',type:'checkbox',onchange:()=>scheduleDraw()});
+ const selectedPlayback=el('input',{id:'effect-selected-playback',type:'checkbox',checked:true,onchange:()=>{cache.clear();draw();}});
  const sampleCache=new Map(),sampleObserver=new IntersectionObserver(entries=>{for(const entry of entries)if(entry.isIntersecting){sampleObserver.unobserve(entry.target);paintSample(entry.target);}},{root:library,rootMargin:'100px'});
  const time=el('input',{id:'effect-time',type:'range',min:0,max:6,step:.01,value:initialFrame,'aria-label':'미리보기 시간 (초)',oninput:event=>{timeline.pause();timeline.seek(Number(event.target.value));updateTransport();}});
  const timeLabel=el('output',{htmlFor:'effect-time'}),frameLabel=el('span',{id:'effect-frame-label'});
@@ -130,24 +132,42 @@ export function openVisualEffectsEditor(ctx,initialTarget){
   const d=drafts.get(value);textColor=d.color;textStyle=d.style;recipe=d.recipe;selected=d.selected;savedId=d.savedId;presetName=d.presetName;
  }
  function updateImportControls(){
-  for(const id of ['effect-apply','effect-save-preset','effect-sprite-import']){const control=dialog.querySelector('#'+id);if(control)control.disabled=pendingImports>0;}
+  for(const id of ['effect-apply','effect-save-preset','effect-sprite-import','effect-sprite-library']){const control=dialog.querySelector('#'+id);if(control)control.disabled=pendingImports>0;}
   const update=dialog.querySelector('#effect-update-preset');if(update)update.disabled=pendingImports>0||!savedId;
  }
- function chooseSpriteImage(layerId){if(pendingImports)return;pendingImage={key:currentKey,layerId};imageFile.value='';imageFile.click();}
+ function chooseSpriteImage(layerId){if(pendingImports)return;pendingImage={key:currentKey,layerId,documentId};imageFile.value='';imageFile.click();}
+ function stageSpriteImage(destination,asset,image,name){
+  if(disposed)return;
+  if(ctx.store.getDocumentId()!==destination.documentId)return message('덱이 바뀌어 이미지를 붙이지 않았어요. 사용할 덱에서 다시 선택하세요.');
+  const draft=drafts.get(destination.key),current=destination.key===currentKey,draftRecipe=current?recipe:draft?.recipe;
+  if(!draftRecipe?.layers.some(l=>l.id===destination.layerId&&l.kind==='sprite'))return message('그림을 고르는 동안 해당 입자 레이어가 삭제되어 이미지를 붙이지 않았어요. 사용할 레이어에서 다시 가져오세요.');
+  // A destination may disappear independently while the library dialog is open.
+  try{readTargetEffects(ctx.store.getProject(),draft.target);}catch{return message('그림을 고르는 동안 대상이 삭제되어 이미지를 붙이지 않았어요. 사용할 대상에서 다시 선택하세요.');}
+  if(image.naturalWidth!==asset.width||image.naturalHeight!==asset.height)throw new Error('선택한 그림의 크기가 맞지 않습니다. 보관함에 원본을 다시 가져오세요.');
+  stagedAssets.set(asset.id,asset);stagedImages.set(asset.id,image);assetNames.set(asset.id,name);
+  editDraft(()=>{
+   const next=clone(draftRecipe),layer=next.layers.find(l=>l.id===destination.layerId);layer.params.assetId=asset.id;layer.params.shape='image';
+   if(current){recipe=next;selected=layer.id;}else{draft.recipe=next;draft.selected=layer.id;}
+  });
+  prepare();renderFields();scheduleDraw();updateTransport();
+ }
+ async function chooseSpriteLibraryImage(layerId){
+  if(pendingImports||disposed||!ctx.openAssetLibrary)return;
+  const destination={key:currentKey,layerId,documentId};pendingImports++;updateImportControls();updateTransport();
+  try{
+   const picked=await ctx.openAssetLibrary({pick:true,title:'입자 이미지 선택'});if(!picked||disposed)return;
+   if(ctx.store.getDocumentId()!==documentId)return message('덱이 바뀌어 이미지를 붙이지 않았어요. 사용할 덱에서 다시 선택하세요.');
+   const asset={id:newId(),mime:picked.mime,dataUrl:picked.dataUrl,width:picked.width,height:picked.height,paintingId:null},image=await decodeImage(asset.dataUrl);
+   stageSpriteImage(destination,asset,image,'보관함 그림');
+  }catch(error){if(!disposed)message(error.message);}
+  finally{pendingImports--;if(!disposed){updateImportControls();updateTransport();}}
+ }
  async function importSpriteImage(){
   const file=imageFile.files[0],destination=pendingImage;pendingImage=null;if(!file||!destination)return;
   pendingImports++;updateImportControls();updateTransport();
   try{
    const asset=await importAsset(file),image=await decodeImage(asset.dataUrl);
-   if(disposed)return;
-   const draft=drafts.get(destination.key),current=destination.key===currentKey,draftRecipe=current?recipe:draft?.recipe;
-   if(!draftRecipe?.layers.some(l=>l.id===destination.layerId))return message('그림을 고르는 동안 해당 입자 레이어가 삭제되어 이미지를 붙이지 않았어요. 사용할 레이어에서 다시 가져오세요.');
-   stagedAssets.set(asset.id,asset);stagedImages.set(asset.id,image);assetNames.set(asset.id,file.name);
-   editDraft(()=>{
-    const next=clone(draftRecipe),layer=next.layers.find(l=>l.id===destination.layerId);layer.params.assetId=asset.id;layer.params.shape='image';
-    if(current){recipe=next;selected=layer.id;}else{draft.recipe=next;draft.selected=layer.id;}
-   });
-   prepare();renderFields();scheduleDraw();updateTransport();
+   stageSpriteImage(destination,asset,image,file.name);
   }catch(error){if(!disposed)message(error.message);}
   finally{pendingImports--;if(!disposed){updateImportControls();updateTransport();}}
  }
@@ -181,7 +201,7 @@ export function openVisualEffectsEditor(ctx,initialTarget){
   clearTimeout(timer);if(disposed||!previewTarget)return;
   const started=performance.now(),dpi=previewView?.dpi()||(quality.checked?300:200);
   if(dpi!==lastDpi){cache.clear();lastDpi=dpi;}
-  const report=renderCard(canvas.getContext('2d',{willReadFrequently:true}),comparing?comparisonProject:previewProject,comparing?comparisonTarget:previewTarget,previewAssets,dpi,{timeSec:timeline.getTime(),effectCache:cache,onEffectGeometry:entry=>{
+  const report=renderCard(canvas.getContext('2d',{willReadFrequently:true}),comparing?comparisonProject:previewProject,comparing?comparisonTarget:previewTarget,previewAssets,dpi,{timeSec:timeline.getTime(),playbackTarget:selectedPlayback.checked?target:null,frozenTimeSec:draftFrame,effectCache:cache,onEffectGeometry:entry=>{
    if(comparing)return;
    if(target.skillId){
     const title=previewTarget.elements.find(e=>e.binding?.field==='skill.name'&&e.binding.skillId===target.skillId);
@@ -195,7 +215,7 @@ export function openVisualEffectsEditor(ctx,initialTarget){
  }
  function scheduleDraw(){clearTimeout(timer);status.dataset.busy='true';status.textContent='계산 중…';timer=setTimeout(draw,150);}
  function renderFields(){
-  preserveFocus(()=>{renderVisualEffectFields(fields,{recipe,selectedLayerId:selected,targetType,importing:pendingImports>0,assetOptions:Object.values({...ctx.store.getProject().assets,...Object.fromEntries(stagedAssets)}).map((a,i)=>[a.id,(assetNames.get(a.id)||'저장 그림 '+(i+1))+' · '+a.width+'×'+a.height]),onImportImage:chooseSpriteImage,onSelect:id=>{selected=id;renderFields();transform?.refresh();},onChange:change=>{
+  preserveFocus(()=>{renderVisualEffectFields(fields,{recipe,selectedLayerId:selected,targetType,importing:pendingImports>0,assetOptions:Object.values({...ctx.store.getProject().assets,...Object.fromEntries(stagedAssets)}).map((a,i)=>[a.id,(assetNames.get(a.id)||'저장 그림 '+(i+1))+' · '+a.width+'×'+a.height]),onImportImage:chooseSpriteImage,onLibraryImage:ctx.openAssetLibrary?chooseSpriteLibraryImage:undefined,onSelect:id=>{selected=id;renderFields();transform?.refresh();},onChange:change=>{
    const next=clone(recipe),id=change(next),errors=validateVisualEffects(next,targetType);
    if(errors.length){message(errors[0].message);renderFields();return;}
    editDraft(()=>{recipe=next;if(typeof id==='string'&&next.layers.some(l=>l.id===id))selected=id;if(!recipe.layers.some(l=>l.id===selected))selected=recipe.layers[0]?.id;});
@@ -240,13 +260,13 @@ export function openVisualEffectsEditor(ctx,initialTarget){
     el('label',{class:'field',htmlFor:'effect-preset-search'},el('span',{},'이름 검색'),el('input',{id:'effect-preset-search',type:'search',value:librarySearch,placeholder:'금속, 불꽃, 글리치…',oncompositionstart:()=>{libraryComposing=true;},oncompositionend:event=>{libraryComposing=false;librarySearch=event.target.value;renderLibrary();},oninput:event=>{librarySearch=event.target.value;if(!libraryComposing&&!event.isComposing)renderLibrary();}})),
     field('분류','effect-preset-category',libraryCategory,value=>{libraryCategory=value;renderLibrary();},{options:[['all','모든 효과'],...[...new Set(Object.entries(VISUAL_EFFECT_PRESETS).map(([key,preset])=>category(key,preset)))].map(c=>[c,c])]}),
     el('p',{class:'hint',role:'status'},entries.length+'개 · 눌러서 시작, 아래에서 조합 조절'),
-    el('div',{class:'effect-preset-gallery'},...entries.map(([key,preset])=>button([el('canvas',{'data-sample-key':key,'aria-hidden':'true',width:120,height:50}),el('strong',{},preset.name),el('small',{},category(key,preset))],()=>useRecipe(createVisualEffects(key)),{'data-builtin-effect':key,class:'effect-preset-card',title:preset.name+' 조합으로 시작'}))),
+    el('div',{class:'effect-preset-gallery'},...entries.map(([key,preset])=>button([el('canvas',{'data-sample-key':key,'aria-hidden':'true',width:120,height:50}),el('strong',{},preset.name),el('small',{},category(key,preset))],()=>useRecipe(createVisualEffectsForTarget(key,targetType)),{'data-builtin-effect':key,class:'effect-preset-card',title:preset.name+' 조합으로 시작'}))),
     !entries.length?el('p',{class:'empty-note'},'찾은 프리셋이 없어요. 검색어나 분류를 바꿔보세요.'):null,
     el('h3',{class:'effect-library-heading'},'프리셋 조합'),
-    field('이 조합으로 시작','effect-start-preset','',v=>{if(v)useRecipe(createVisualEffects(v));},{options:[['','프리셋 선택'],['empty','빈 조합'],...Object.entries(VISUAL_EFFECT_PRESETS).map(([k,v])=>[k,v.name])]}),
+    field('이 조합으로 시작','effect-start-preset','',v=>{if(v)useRecipe(createVisualEffectsForTarget(v,targetType));},{options:[['','프리셋 선택'],['empty','빈 조합'],...Object.entries(VISUAL_EFFECT_PRESETS).map(([k,v])=>[k,v.name])]}),
     field('다른 프리셋 겹치기','effect-combine-preset','smoke',()=>{},{options:Object.entries(VISUAL_EFFECT_PRESETS).map(([k,v])=>[k,v.name])}),
     button('+ 선택 프리셋 겹치기',()=>{
-     const next=clone(recipe),added=createVisualEffects(document.getElementById('effect-combine-preset').value);
+     const next=clone(recipe),added=createVisualEffectsForTarget(document.getElementById('effect-combine-preset').value,targetType);
      for(const layer of added.layers){layer.id=newId();layer.kind==='textWarp'?next.layers.unshift(layer):next.layers.push(layer);}useRecipe(next);
     },{id:'effect-merge-preset',class:'wide'}),
     el('h3',{class:'effect-library-heading'},'내 이펙트'),
@@ -274,7 +294,7 @@ export function openVisualEffectsEditor(ctx,initialTarget){
   cleanup();return true;
  }
  function visibility(){timeline.setActive(!document.hidden&&dialog.open);updateTransport();}
- const transport=el('div',{class:'effect-transport'},play,time,timeLabel,
+ const transport=el('div',{class:'effect-transport'},play,el('label',{class:'check'},selectedPlayback,'선택 대상만 재생'),time,timeLabel,
   button('장면 고정',()=>{timeline.pause();editDraft(()=>draftFrame=Math.round(timeline.getTime()*100)/100);timeline.seek(draftFrame);updateTransport();},{id:'effect-freeze',title:'현재 장면을 인쇄 프레임으로'}),
   button('인쇄 장면',()=>{timeline.pause();timeline.seek(draftFrame);updateTransport();},{id:'effect-print-frame'}),frameLabel);
  dialog.append(imageFile,

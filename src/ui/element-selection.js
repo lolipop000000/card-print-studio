@@ -8,6 +8,8 @@ export function selectedElements(state,target){
  const ids=new Set(state.selectedElementIds??[state.selectedElementId]);
  return target?.elements.filter(e=>ids.has(e.id))??[];
 }
+/** Locks restrict canvas pointers; inspector and keyboard selection stays editable. */
+export const pointerElements=elements=>elements.filter(e=>e.locked!==true);
 export function selectionBounds(elements){
  if(!elements.length)return null;
  const x=Math.min(...elements.map(e=>e.rect.x)),y=Math.min(...elements.map(e=>e.rect.y));
@@ -19,5 +21,5 @@ export function groupDelta(elements,dx,dy,settings){
  return {dx:clamp(dx,-b.x,settings.cardWidthMm-b.x-b.w),dy:clamp(dy,-b.y,settings.cardHeightMm-b.y-b.h)};
 }
 export function marqueeElements(elements,rect){
- return elements.filter(e=>e.rect.x<rect.x+rect.w&&e.rect.x+e.rect.w>rect.x&&e.rect.y<rect.y+rect.h&&e.rect.y+e.rect.h>rect.y);
+ return pointerElements(elements).filter(e=>e.rect.x<rect.x+rect.w&&e.rect.x+e.rect.w>rect.x&&e.rect.y<rect.y+rect.h&&e.rect.y+e.rect.h>rect.y);
 }

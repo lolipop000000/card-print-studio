@@ -45,25 +45,26 @@ async function load(page,p){
  await page.locator('#project-file').setInputFiles({name:'effects-fixture.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(p))});
  await page.waitForFunction(name=>document.getElementById('deck-name').value===name&&document.getElementById('save-state').textContent==='저장됨',p.name);
 }
-async function references(p){
- const {browser,page}=await openHarness();try{return await page.evaluate(async p=>{
+async function references(p,paperDpi){
+ const {browser,page}=await openHarness();try{return await page.evaluate(async({p,paperDpi})=>{
   const a=window.testApi;await a.ensureFont();const assets=await a.loadAssets(p),plan=a.planSheets(p),refs={},paper={},reports=[];
   for(const [key,card] of [...p.cards.map(c=>[c.id,c]),['back',p.back]]){
    const c=document.createElement('canvas');reports.push(...a.renderCard(c.getContext('2d',{willReadFrequently:true}),p,card,assets,300).problems);refs[key]=c.toDataURL();
-   a.renderCard(c.getContext('2d',{willReadFrequently:true}),p,card,assets,105);paper[key]=c.toDataURL();
+   a.renderCard(c.getContext('2d',{willReadFrequently:true}),p,card,assets,paperDpi);paper[key]=c.toDataURL();
   }
   const art=assets.get('ink'),c=document.createElement('canvas');c.width=art.width;c.height=art.height;c.getContext('2d').drawImage(art,0,0);
   return {refs,paper,plan,reports,transparent:c.getContext('2d').getImageData(64,83,1,1).data[3]};
- },p);}finally{await browser.close();}
+ },{p,paperDpi});}finally{await browser.close();}
 }
 test('playing preview exports the identical saved frame into real A4 duplex PDF image pixels twice',async()=>{
  const p=await fixture(),{browser,page,pageErrors,httpRequests}=await openApp();page.setDefaultTimeout(60000);try{
   await load(page,p);const saved=await saveProject(page,'visual-effects-print-project.json');assert.deepEqual(saved.assets,p.assets);assert.deepEqual(saved.paintings,p.paintings);
-  const r=await references(saved);assert.equal(r.transparent,0);assert.ok(r.reports.some(p=>p.code==='effect-clipped'));assert.ok(!r.reports.some(p=>p.severity!=='warning'));
+  await page.locator('#paper-tab').click();await page.waitForFunction(()=>document.querySelectorAll('.paper-cell img').length===20);
+  const paperDpi=Number(await page.locator('.paper-cell img').first().getAttribute('data-preview-dpi'));assert.ok(paperDpi>=200,'paper preview matches its current display resolution');
+  const r=await references(saved,paperDpi);assert.equal(r.transparent,0);assert.ok(r.reports.some(p=>p.code==='effect-clipped'));assert.ok(!r.reports.some(p=>p.severity!=='warning'));
   for(const [key,data] of Object.entries(r.refs))await writeFile(path.join(qa,'effects-ref-'+key+'.png'),Buffer.from(data.split(',')[1],'base64'));
   const manifest={pages:r.plan.pages.map(page=>({...page,cells:page.cells.filter(c=>c.cardId).map(c=>({...c,reference:'effects-ref-'+(page.side==='back'?'back':c.cardId)+'.png'}))}))};
   await writeFile(path.join(qa,'effects-references.json'),JSON.stringify(manifest,null,2));
-  await page.locator('#paper-tab').click();await page.waitForFunction(()=>document.querySelectorAll('.paper-cell img').length===20);
   const cells=await page.locator('.paper-sheet').evaluateAll(sheets=>sheets.flatMap(sheet=>[...sheet.querySelectorAll('.paper-cell img')].map(img=>({key:sheet.dataset.side==='back'?'back':img.parentElement.dataset.cardId,src:img.src}))));
   assert.ok(cells.every(c=>c.src===r.paper[c.key]));await page.screenshot({path:path.join(qa,'visual-effects-a4.png'),fullPage:true});
   await page.locator('#card-tab').click();await page.locator('#card-effect-play').click();const time=await page.locator('#card-effect-time').inputValue();await page.waitForFunction(v=>document.getElementById('card-effect-time').value!==v,time);

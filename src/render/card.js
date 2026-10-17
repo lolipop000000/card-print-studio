@@ -11,6 +11,7 @@ import {resolveSkillEffect} from '../model/skill-references.js';
 import {skillNameSpans} from '../model/skill-name-styles.js';
 import {fitRichText,drawRichText,drawKeywordBadges,layoutSkillNameRuns,drawRichTextNameRun} from './keywords.js';
 import {drawAttributes,drawDice} from './icons.js';
+import {effectPlaybackTime,isEffectPlaybackTarget} from '../model/effect-playback.js';
 export function resolveElement(project,target,e){
  const b=e.binding;if(!b)return e.type==='image'?e.assetId:e.type==='dice'?e.dice:e.content||'';
  if(b.field==='name')return target.name;
@@ -40,7 +41,7 @@ export function renderCard(ctx,project,target,assets,dpi,options={}){
  ctx.putImageData(surface.ctx.getImageData(0,0,surface.canvas.width,surface.canvas.height),0,0);
  ctx.setTransform(surface.scale,0,0,surface.scale,0,0);return report;
 }
-function drawCard(ctx,project,target,assets,dpi,{timeSec=getEffectFrameSec(project),effectCache=createEffectCache(),onEffectGeometry}={}){
+function drawCard(ctx,project,target,assets,dpi,{timeSec=getEffectFrameSec(project),effectCache=createEffectCache(),onEffectGeometry,playbackTarget=null,frozenTimeSec=getEffectFrameSec(project)}={}){
  const s=project.settings,scale=dpi/25.4,w=s.cardWidthMm,h=s.cardHeightMm;
  ctx.canvas.width=Math.round(w*scale);ctx.canvas.height=Math.round(h*scale);ctx.setTransform(scale,0,0,scale,0,0);
  ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#fffdf8';ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);ctx.restore();
@@ -49,6 +50,7 @@ function drawCard(ctx,project,target,assets,dpi,{timeSec=getEffectFrameSec(proje
   problems.push({code,message:cardProblemLabel(target,e,skillId)+': '+message,cardId:target.id,elementId:e?.id,...(severity?{severity}:{}),...(skillId?{skillId}:{})});
  };
  effectCache.prepare(project,target,assets);
+ const timeOptions={timeSec,frozenTimeSec,playbackTarget},effectTime=(e,skillId=null)=>effectPlaybackTime(timeOptions,{elementId:e?.id??null,skillId});
  const visibleElements=target.elements;
  const attributes=cardAttributes(target);
  const textTypes=['text','rank','dice','keywords','attribute'],maskDpi=Math.min(dpi,150),work={x:-12,y:-12,w:w+24,h:h+24};
@@ -68,6 +70,7 @@ function drawCard(ctx,project,target,assets,dpi,{timeSec=getEffectFrameSec(proje
   return drawRichText(g,info.value,e.rect,e.style,s.minFontPt,info.keywords,assets,{skillReferences:info.reference.skillReferences,skillNameSpans:info.spans,layout:info.layout,...options});
  };
  const movingMask=visibleElements.some(e=>e.style.visualEffects?.layers.some(l=>l.kind==='textWarp'&&l.enabled&&l.opacity>0&&l.motion.enabled&&l.params.wave));
+ const maskTimeKey=movingMask?JSON.stringify(visibleElements.filter(e=>e.style.visualEffects?.layers.some(l=>l.kind==='textWarp'&&l.enabled&&l.opacity>0&&l.motion.enabled&&l.params.wave)).map(e=>[e.id,effectTime(e)])):0;
  const paintReadable=(g,e)=>{
   const value=resolveElement(project,target,e),r=e.rect,style=e.style;
   if(e.type==='text'){
@@ -84,24 +87,27 @@ function drawCard(ctx,project,target,assets,dpi,{timeSec=getEffectFrameSec(proje
   paintSurface(expanded.ctx,mask);
   const soft=makeSurface(work,maskDpi);soft.ctx.filter='blur('+(.4*soft.scale)+'px)';paintSurface(soft.ctx,expanded);soft.ctx.filter='none';paintSurface(soft.ctx,mask);return soft;
  };
- const protectionFor=ownerId=>effectCache.memo('readable:'+ownerId+':'+maskDpi+':'+(movingMask?timeSec:0)+':'+readableKey,()=>{
+ const protectionFor=ownerId=>{const key='readable:'+ownerId+':'+maskDpi+':'+maskTimeKey+':'+readableKey;return effectCache.memo(key,()=>{
   const mask=makeSurface(work,maskDpi);
   for(const e of visibleElements)if(e.id!==ownerId&&textTypes.includes(e.type)){
    const raw=effectCache.memo('readable-source:'+e.id+':'+maskDpi+':'+(textInfos.get(e.id)?.key||''),()=>{const surface=makeSurface(work,maskDpi);paintReadable(surface.ctx,e);return surface;});
    const warp=e.style.visualEffects?.layers.find(l=>l.kind==='textWarp'&&l.enabled&&l.opacity>0);
-   const image=warp?warpTextSources(raw,raw,{rect:e.rect,params:warp.params,timeSec:warp.motion.enabled?timeSec*warp.motion.speed:0,dpi:maskDpi}).source:raw;
+   const image=warp?warpTextSources(raw,raw,{rect:e.rect,params:warp.params,timeSec:warp.motion.enabled?effectTime(e)*warp.motion.speed:0,dpi:maskDpi}).source:raw;
    paintSurface(mask.ctx,image);
   }
-  return expandReadable(mask);
- });
- const nameProtectionFor=(e,run)=>effectCache.memo('readable-name:'+e.id+':'+run.id+':'+maskDpi+':'+readableKey+':'+(movingMask?timeSec:0),()=>{
+  const protection=expandReadable(mask);protection.cacheKey=key;return protection;
+ });};
+ const nameProtectionFor=(e,run)=>{const key='readable-name:'+e.id+':'+run.id+':'+maskDpi+':'+readableKey+':'+maskTimeKey;return effectCache.memo(key,()=>{
   const own=makeSurface(work,maskDpi);drawRawText(own.ctx,e,{excludeNameRun:run});
-  const mask=expandReadable(own);paintSurface(mask.ctx,protectionFor(e.id));return mask;
- });
+  const mask=expandReadable(own);paintSurface(mask.ctx,protectionFor(e.id));mask.cacheKey=key;return mask;
+ });};
  const effects=(e,rect,recipe,source,{context=ctx,protection=protectionFor(e?.id),skillId,runId}={})=>{
-  const effectGeometry=[],emitGeometry=entry=>{effectGeometry.push(entry);if(typeof onEffectGeometry==='function')onEffectGeometry({...entry,rect:{...entry.rect}});};
-  const onGeometry=geometry=>emitGeometry({elementId:e?.id??null,...(skillId?{skillId}:{}),...(runId?{runId}:{}),rect:{...geometry.rect},sizeHeightMm:geometry.sizeHeightMm});
-  const report=renderVisualEffects(context,{rect,recipe,source,dpi,timeSec,minFontPt:s.minFontPt,cache:effectCache,assets,target:e?.type||'frame',textProtection:protection,cardRect:{x:0,y:0,w,h},onGeometry});
+  const frozen=playbackTarget&&!isEffectPlaybackTarget(playbackTarget,{elementId:e?.id??null,skillId});
+  const outputCacheKey=frozen?'frozen-effect:'+JSON.stringify([e?.id,skillId,runId,dpi,effectTime(e,skillId),rect,recipe,source?.key]):null,geometry=[];
+  const report=renderVisualEffects(context,{rect,recipe,source,dpi,timeSec:effectTime(e,skillId),minFontPt:s.minFontPt,cache:effectCache,outputCacheKey,assets,target:e?.type||'frame',textProtection:protection,textProtectionKey:protection?.cacheKey,cardRect:{x:0,y:0,w,h},onGeometry:g=>geometry.push({elementId:e?.id??null,...(skillId?{skillId}:{}),...(runId?{runId}:{}),rect:{...g.rect},sizeHeightMm:g.sizeHeightMm})});
+  const effectGeometry=[];
+  const emitGeometry=entry=>{effectGeometry.push(entry);if(typeof onEffectGeometry==='function')onEffectGeometry({...entry,rect:{...entry.rect}});};
+  for(const entry of geometry)emitGeometry(entry);
   for(const entry of report.nestedNameGeometry||[])emitGeometry(entry);
   const reportedProblems=[...report.problems.map(problem=>({...problem,...(skillId?{skillId}:{})})),...(report.nestedNameProblems||[])];
   const b=report.boundsMm;
@@ -154,8 +160,8 @@ function drawCard(ctx,project,target,assets,dpi,{timeSec=getEffectFrameSec(proje
     return nestedNameProblems.length||nestedNameGeometry.length?{...layout,...(nestedNameProblems.length?{nestedNameProblems}:{}),...(nestedNameGeometry.length?{nestedNameGeometry}: {})}:layout;
    };
    if(reference.missing.length)issue('missing-skill-reference','참조한 스킬이 삭제되었어요. 표시된 이름은 유지되며 스킬 참조를 다시 고를 수 있어요.',e,'warning');
-   const movingNames=info.runs.some(run=>run.style.visualEffects?.layers.some(layer=>layer.enabled&&layer.opacity>0&&layer.motion?.enabled));
-   const sourceKey=e.id+(info.key?':named:'+info.key+':'+(movingNames?timeSec:0):'');
+   const movingNames=info.runs.filter(run=>run.style.visualEffects?.layers.some(layer=>layer.enabled&&layer.opacity>0&&layer.motion?.enabled));
+   const sourceKey=e.id+(info.key?':named:'+info.key+':'+(movingNames.length?JSON.stringify(movingNames.map(run=>[run.id,effectTime(e,run.skillId)])):0):'');
    result=active(style.visualEffects)?effects(e,r,style.visualEffects,{key:sourceKey,draw:g=>draw(g),drawPlainMask:g=>draw(g,true)}):draw(ctx);
   }
   if(result&&!result.fits){

@@ -74,7 +74,7 @@ test('generated attribute layout still reserves its multi-attribute row',async()
    const ctx={store,state,card:()=>store.getProject().cards[0],target:()=>store.getProject().cards[0],edit:(label,fn)=>store.edit(label,fn)};
    window.ui={ctx,host};store.subscribe(()=>a.renderInspector(host,ctx));a.renderInspector(host,ctx);
   });
-  await page.locator('#attribute-water').check();
+  await page.locator('#attribute-menu-toggle').click();await page.locator('#attribute-water').check();
   const result=await page.evaluate(()=>{const c=window.ui.ctx.card();return {badge:c.elements.find(e=>e.type==='attribute').rect,art:c.elements.find(e=>e.binding?.field==='art').rect};});
   assert.equal(result.badge.w,55);assert.equal(result.art.y,26);assert.equal(result.art.y+result.art.h,48);
   const manual=await page.evaluate(()=>{const {ctx}=window.ui;ctx.store.edit('그림 직접 이동',p=>{const c=p.cards[0];c.elements.find(e=>e.binding?.field==='art').rect={x:7,y:30,w:42,h:17};c.elements.push({id:'free-art',type:'image',binding:null,rect:{x:2,y:1,w:3,h:4},style:{fit:'cover'}});});const c=ctx.card();return {art:c.elements.find(e=>e.binding?.field==='art'),free:c.elements.find(e=>e.id==='free-art')};});

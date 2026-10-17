@@ -30,6 +30,8 @@ async function openSource(){
 test('monster selection stays required while items can grant multiple attributes or clear them all',async()=>{
  const {browser,page,errors}=await openSource();try{
   assert.equal(await page.locator('#attributes input[type=checkbox]').count(),6);
+  assert.equal(await page.locator('#attribute-selection').innerText(),'무속성');
+  assert.equal(await page.locator('#attribute-water').isVisible(),false);await page.locator('#attribute-menu-toggle').click();
   assert.equal(await page.locator('#attribute-neutral').isChecked(),true);assert.equal(await page.locator('#attribute-neutral').isDisabled(),true);
   for(const attribute of ['water','fire','grass','dark','light'])await page.locator('#attribute-'+attribute).check();
   const selection=await page.evaluate(()=>{const e=window.attributeEditor,a=window.attributeApi,p=a.parseProject(a.serializeProject(e.store.getProject()));return {values:a.cardAttributes(p.cards[0]),scalar:p.cards[0].attribute};});
@@ -42,12 +44,15 @@ test('monster selection stays required while items can grant multiple attributes
   assert.deepEqual(await page.evaluate(()=>{const e=window.attributeEditor,a=window.attributeApi;return a.cardAttributes(a.parseProject(a.serializeProject(e.store.getProject())).cards.at(-1));}),['water','light']);
   await page.locator('#attribute-water').uncheck();await page.locator('#attribute-light').uncheck();
   assert.deepEqual(await page.evaluate(()=>{const e=window.attributeEditor;return {values:window.attributeApi.cardAttributes(e.card()),badges:e.card().elements.filter(el=>el.type==='attribute').length};}),{values:[],badges:1});
-  assert.equal(await page.locator('#item-effect').count(),1);assert.deepEqual(errors,[]);
+  assert.equal(await page.locator('#item-effect').count(),1);assert.equal(await page.locator('#attribute-selection').innerText(),'속성 없음');
+  await page.locator('#attribute-light').press('Escape');assert.equal(await page.locator('#attribute-water').isVisible(),false);
+  await page.locator('#attribute-menu-toggle').press('Enter');assert.equal(await page.locator('#attribute-water').isVisible(),true);assert.deepEqual(errors,[]);
  }finally{await browser.close();}
 });
 
 test('variant attribute checkboxes preserve independent selection and restore current parent values',async()=>{
  const {browser,page,errors}=await openSource();try{
+  await page.locator('#attribute-menu-toggle').click();
   await page.locator('#attribute-water').check();
   await page.evaluate(()=>{const e=window.attributeEditor,a=window.attributeApi,child=a.createVariant(e.store.getProject(),e.state.activeCardId);e.state.activeCardId=child.id;e.edit('Variant',d=>d.cards.push(child));});
   await page.locator('#attribute-fire').check();
@@ -96,7 +101,7 @@ test('item candle badges render with no innate attribute and with six grants at 
 test('item attribute checkboxes inherit, clear independently and restore parent grants',async()=>{
  const {browser,page,errors}=await openSource();try{
   await page.evaluate(()=>{const a=window.attributeApi,e=window.attributeEditor,item=a.applyTemplate(a.createCard('item',e.store.getProject()),e.store.getProject().settings,'item');e.state.activeCardId=item.id;e.edit('아이템',d=>{d.cards=[item];});});
-  await page.locator('#attribute-fire').check();await page.locator('#attribute-dark').check();
+  await page.locator('#attribute-menu-toggle').click();await page.locator('#attribute-fire').check();await page.locator('#attribute-dark').check();
   await page.evaluate(()=>{const a=window.attributeApi,e=window.attributeEditor,child=a.createVariant(e.store.getProject(),e.state.activeCardId);e.state.activeCardId=child.id;e.edit('Variant',d=>d.cards.push(child));});
   await page.locator('#attribute-fire').uncheck();await page.locator('#attribute-dark').uncheck();
   await page.evaluate(()=>window.attributeEditor.edit('원본 속성 변경',d=>{d.cards[0].attributes=['water','light'];d.cards[0].attribute='water';}));
@@ -124,7 +129,7 @@ async function prepareLegacyItemCanvas(page){
    {id:'candle-badge',type:'attribute',rect:{x:49,y:4,w:8,h:9},binding:null,style:{fontPt:7}}];
   e.state.activeCardId=item.id;e.state.mode='card';e.state.cardScale=4;e.assets=new Map();e.edit('옛 아이템 테스트',d=>{d.cards=[item];});
   const region=document.createElement('div');region.className='attribute-canvas-fixture';
-  region.innerHTML='<div id="attribute-canvas-host"></div><div hidden><button id="card-effect-play"></button><input id="card-effect-time" type="number"><span id="card-effect-seconds"></span><button id="card-effect-print-frame"></button><button id="card-effect-freeze"></button><div id="card-warnings"></div><span id="canvas-size"></span></div>';
+  region.innerHTML='<div id="attribute-canvas-host"></div><div hidden><input id="card-zoom" type="range"><span id="card-zoom-value"></span><button id="card-effect-play"></button><input id="card-effect-time" type="number"><span id="card-effect-seconds"></span><button id="card-effect-print-frame"></button><button id="card-effect-freeze"></button><div id="card-warnings"></div><span id="canvas-size"></span></div>';
   document.body.prepend(region);e.renderInspector=()=>a.renderInspector(document.getElementById('inspector'),e);
   e.editTarget=(label,change)=>e.edit(label,d=>change(d.cards.find(c=>c.id===e.state.activeCardId)));
   e.cardCanvas=a.mountCardCanvas(document.getElementById('attribute-canvas-host'),e);

@@ -3,6 +3,7 @@ import {addKeyword,updateKeyword,removeKeyword,keywordUseCount,linkKeyword,inser
 import {syncSkillElements} from '../render/templates.js';
 import {materializeSkillEffect,hasPlainSkillText} from '../model/skill-references.js';
 import {importAsset} from '../model/assets.js';
+import {newId} from '../model/types.js';
 import {openDialog} from './dialogs.js';
 const reflow=project=>{project.cards=project.cards.map(c=>syncSkillElements(c,project.settings,project.keywords||[]));};
 function keywordMark(project,keyword){
@@ -14,12 +15,24 @@ function keywordMark(project,keyword){
 export function openKeywordManager(ctx){
  if(document.getElementById('keyword-editor'))return;
  const dialog=el('dialog',{id:'keyword-editor',class:'keyword-dialog','aria-labelledby':'keyword-title'});
- let selected=ctx.store.getProject().keywords?.[0]?.id,disposed=false;
+ let selected=ctx.store.getProject().keywords?.[0]?.id,disposed=false,pendingIcon=false;
  const feedback=el('p',{class:'keyword-feedback',role:'alert',hidden:true});
  const list=el('div',{class:'keyword-library'}),editor=el('div',{class:'keyword-fields'});
  let unsubscribe;
  const close=()=>{if(disposed)return;disposed=true;unsubscribe?.();dialog.close();dialog.remove();};
  const edit=(label,change)=>{try{ctx.store.edit(label,p=>{change(p);reflow(p);});feedback.hidden=true;}catch(e){feedback.textContent=e.message;feedback.hidden=false;render();}};
+ async function chooseLibraryIcon(keywordId){
+  if(pendingIcon||disposed||!ctx.openAssetLibrary)return;
+  const documentId=ctx.store.getDocumentId();pendingIcon=true;render();
+  try{
+   const picked=await ctx.openAssetLibrary({pick:true,title:'키워드 아이콘 선택'});
+   if(!picked||disposed)return;
+   if(ctx.store.getDocumentId()!==documentId||!ctx.store.getProject().keywords?.some(k=>k.id===keywordId))return;
+   const asset={id:newId(),mime:picked.mime,dataUrl:picked.dataUrl,width:picked.width,height:picked.height,paintingId:null};
+   edit('키워드 아이콘',p=>{updateKeyword(p,keywordId,{iconAssetId:asset.id});p.assets[asset.id]=asset;});
+  }catch(error){if(!disposed){feedback.textContent=error.message;feedback.hidden=false;}}
+  finally{pendingIcon=false;if(!disposed)render();}
+ }
  const iconFile=el('input',{id:'keyword-icon-file',type:'file',accept:'image/png,image/jpeg,image/webp',hidden:true,onchange:async event=>{
   const file=event.target.files[0],id=selected;event.target.value='';if(!file)return;
   try{const asset=await importAsset(file);edit('키워드 아이콘',p=>{updateKeyword(p,id,{iconAssetId:asset.id});p.assets[asset.id]=asset;});}
@@ -44,7 +57,7 @@ export function openKeywordManager(ctx){
    editor.append(el('section',{class:'keyword-icon-section'},
     el('h3',{},'아이콘'),
     asset?el('img',{id:'keyword-icon-preview',src:asset.dataUrl,alt:keyword.name+' 아이콘'}):el('p',{class:'hint'},'아이콘 없이 이름과 색만 사용해도 돼요.'),
-    el('div',{class:'two-fields'},button(asset?'아이콘 교체':'아이콘 가져오기',()=>{selected=keyword.id;iconFile.click();}),button('아이콘 지우기',()=>change('iconAssetId',null),{disabled:!asset}))));
+    el('div',{class:'two-fields'},button(asset?'아이콘 교체':'아이콘 가져오기',()=>{selected=keyword.id;iconFile.click();}),button('보관함에서 선택',()=>chooseLibraryIcon(keyword.id),{id:'keyword-icon-library',disabled:pendingIcon||!ctx.openAssetLibrary}),button('아이콘 지우기',()=>change('iconAssetId',null),{disabled:!asset}))));
    const uses=keywordUseCount(p,keyword.id);
    editor.append(el('p',{class:'hint'},'사용 중 '+uses+'곳 · 이름을 바꾸면 연결된 본문과 배지가 함께 바뀌어요.'),
     button('삭제',async()=>{

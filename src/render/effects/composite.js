@@ -7,14 +7,28 @@ import {analyzeShape} from './shape.js';
 import {applyEffectFilter} from './filters.js';
 
 export function createEffectCache(){
- const entries=new Map();let previous=null;
+ const entries=new Map(),outputs=new Map(),outputLimit=64*1024*1024;let outputBytes=0,previous=null;
+ const reset=()=>{entries.clear();outputs.clear();outputBytes=0;};
  return {
   prepare(project,target,assets){
    const materials=[...(assets||new Map())],changed=!previous||previous.project!==project||previous.target!==target||previous.assets!==assets||previous.materials.length!==materials.length||materials.some(([key,value],i)=>previous.materials[i]?.[0]!==key||previous.materials[i]?.[1]!==value);
-   if(changed)entries.clear();previous={project,target,assets,materials};
+   if(changed)reset();previous={project,target,assets,materials};
   },
   memo(key,create){if(entries.has(key))return entries.get(key);const value=create();entries.set(key,value);if(entries.size>48)entries.delete(entries.keys().next().value);return value;},
-  clear(){entries.clear();previous=null;}
+  memoOutput(key,create){
+   if(outputs.has(key)){const entry=outputs.get(key);outputs.delete(key);outputs.set(key,entry);return entry.value;}
+   const value=create(),canvas=value.surface.canvas,bytes=canvas.width*canvas.height*4;
+   // Temporary masks can churn every frame. Keep finished frozen pixels in a
+   // separate LRU, bounded by their retained RGBA memory rather than mask count.
+   if(bytes<=outputLimit){
+    while(outputs.size&&(outputBytes+bytes>outputLimit||outputs.size>=128)){
+     const oldest=outputs.keys().next().value;outputBytes-=outputs.get(oldest).bytes;outputs.delete(oldest);
+    }
+    outputs.set(key,{value,bytes});outputBytes+=bytes;
+   }
+   return value;
+  },
+  clear(){reset();previous=null;}
  };
 }
 function readSource(source,work,dpi,cache){
@@ -96,7 +110,29 @@ function obscuresText(surface,protection,base=null){
  for(let i=3;i<p.length;i+=4)if(p[i]>127){total++;if(g[i]>24&&(!b||Math.abs(g[i]-b[i])>12||Math.abs(g[i-1]-b[i-1])+Math.abs(g[i-2]-b[i-2])+Math.abs(g[i-3]-b[i-3])>24))covered++;}
  return total>0&&covered/total>.2;
 }
-export function renderVisualEffects(ctx,{rect,recipe,target,source,dpi,timeSec=1.2,minFontPt=7,cache=createEffectCache(),textProtection=null,cardRect=null,assets=null,onGeometry=null}){
+export function renderVisualEffects(ctx,options){
+ const {cache=createEffectCache(),outputCacheKey=null,textProtection=null,textProtectionKey=null,onGeometry=null}=options;
+ const compose=()=>{
+  const geometry=[],result=composeVisualEffects(ctx,{...options,cache,onGeometry:entry=>geometry.push(entry)});
+  return {...result,geometry};
+ };
+ let result;
+ if(outputCacheKey&&cache.memoOutput&&(!textProtection||textProtectionKey!==null)){
+  // A mask may be regenerated after temporary-cache eviction. Its semantic key
+  // stays stable while its pixels do, unlike the recreated surface identity.
+  result=cache.memoOutput(JSON.stringify([outputCacheKey,textProtectionKey]),compose);
+ }else if(outputCacheKey){
+  const entries=cache.memo(outputCacheKey,()=>new Map());
+  result=entries.get(textProtection);
+  if(!result){result=compose();entries.set(textProtection,result);if(entries.size>2)entries.delete(entries.keys().next().value);}
+ }else result=compose();
+ // Reuse the original composed surface, without a second raster transfer.
+ // Extra padded blits would resample edges differently at fractional DPI.
+ paintSurface(ctx,result.surface);
+ for(const entry of result.geometry)onGeometry?.({...entry,rect:{...entry.rect}});
+ return result.report;
+}
+function composeVisualEffects(ctx,{rect,recipe,target,source,dpi,timeSec=1.2,minFontPt=7,cache,textProtection=null,cardRect=null,assets=null,onGeometry=null}){
  recipe=upgradeVisualEffects(recipe,target);
  const scale=dpi/25.4,w=cardRect?.w??ctx.canvas.width/scale,h=cardRect?.h??ctx.canvas.height/scale,work={x:-12,y:-12,w:w+24,h:h+24};
  const layers=recipe.layers.filter(l=>l.enabled&&l.opacity>0),warp=layers.find(l=>l.kind==='textWarp'),problems=[];
@@ -162,8 +198,7 @@ export function renderVisualEffects(ctx,{rect,recipe,target,source,dpi,timeSec=1
  if(frame){
   const out=makeSurface(work,dpi);paintSurface(out.ctx,acc);out.ctx.globalCompositeOperation='destination-in';paintSurface(out.ctx,frameMask(work,dpi,w,h,frame));out.ctx.globalCompositeOperation='source-over';acc=out;geometry=null;
  }
- paintSurface(ctx,acc);
  const analysis=makeSurface(work,Math.min(120,dpi));paintSurface(analysis.ctx,acc);let bounds=alphaBounds(analysis);
  if(geometry&&(geometry.x<work.x||geometry.y<work.y||geometry.x+geometry.w>work.x+work.w||geometry.y+geometry.h>work.y+work.h))bounds=unionBounds(bounds,geometry);
- return {boundsMm:bounds,problems,hasVisibleContent:!!bounds,...result};
+ return {surface:acc,report:{boundsMm:bounds,problems,hasVisibleContent:!!bounds,...result}};
 }

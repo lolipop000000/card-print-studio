@@ -28,6 +28,9 @@ import {createUpdateControls} from './ui/updates.js';
 import {createCardLibraryControls} from './ui/card-library.js';
 import {createCardTemplateControls} from './ui/card-templates.js';
 import {createRecoveryControls} from './ui/recovery.js';
+import {createAssetLibraryControls} from './ui/asset-library.js';
+import {openImageCropper} from './ui/image-crop.js';
+import {placeImageAsset} from './model/asset-placement.js';
 
 export function mountEditor(root,store){
  let ignoreOutputWarnings=false;try{ignoreOutputWarnings=localStorage.getItem('card-print-studio:ignore-output-warnings:v1')==='true';}catch{}
@@ -77,6 +80,34 @@ export function mountEditor(root,store){
  ctx.pickImage=elementId=>{ctx.pendingImage={elementId,cardId:state.activeCardId,back:state.back};artFile.click();};
  const deckName=el('input',{id:'deck-name',value:store.getProject().name,'aria-label':'덱 이름',onchange:event=>ctx.edit('덱 이름',d=>d.name=event.target.value)});
  const workspaceFiles=createWorkspaceControls(store,()=>{ctx.closeVisualEffects?.({force:true});cardCanvas.resetTime();state.activeCardId=store.getProject().cards[0]?.id;state.back=false;setElementSelection(state,[]);ctx.cardLibrary?.reset();refresh();},()=>projectFile.click());
+ const assetLibrary=createAssetLibraryControls(ctx,{workspace:workspaceFiles.storage});
+ ctx.openAssetLibrary=options=>assetLibrary.open(options);
+ const imageDestination=(mode,elementId)=>({mode,elementId,cardId:state.activeCardId,back:state.back,documentId:store.getDocumentId()});
+ ctx.applyLibraryAsset=(asset,options={})=>{
+  const destination=options.documentId===undefined?imageDestination(options.mode||'art',options.elementId):options;
+  try{
+   if(destination.documentId!==store.getDocumentId())throw Error('그림을 고르는 동안 덱이 바뀌었어요. 적용할 카드를 다시 선택하세요.');
+   let elementId;store.edit('보관함 그림 적용',p=>{elementId=placeImageAsset(p,asset,destination);});
+   if(state.back===destination.back&&(state.back||state.activeCardId===destination.cardId))setElementSelection(state,[elementId],ctx.target());
+   refresh();return true;
+  }catch(error){showMessage(error.message);return false;}
+ };
+ ctx.pickLibraryImage=async(mode='art',elementId=null)=>{
+  const destination=imageDestination(mode,elementId);
+  try{const asset=await assetLibrary.open({pick:true,title:'사용할 그림 고르기'});if(asset)ctx.applyLibraryAsset(asset,destination);}catch(error){showMessage(error.message);}
+ };
+ ctx.cropImage=async(elementId=null)=>{
+  const destination=imageDestination(elementId?'replace':'art',elementId),target=ctx.target(),element=target?.elements.find(e=>e.id===elementId);
+  const id=!elementId||element?.binding?.field==='art'?target?.artAssetId:element?.assetId,asset=store.getProject().assets[id];
+  if(!asset){showMessage('자를 그림이 없어요. 그림을 먼저 가져오세요.');return;}
+  cardCanvas.setActive(false);
+  try{
+   const pieces=await openImageCropper({asset,name:ctx.card()?.name||'그림'});if(!pieces?.length)return;
+   if(!await assetLibrary.addAssets(pieces))return;
+   if(pieces.length===1){if(ctx.applyLibraryAsset(pieces[0].asset,destination))showMessage('자른 그림을 적용하고 보관함에도 저장했어요.','success');}
+   else showMessage(pieces.length+'개 조각을 에셋 보관함에 저장했어요.','success');
+  }catch(error){showMessage(error.message);}finally{refresh();}
+ };
  const cardFiles=createCardFileControls({store,workspaceFiles,card:()=>ctx.card(),onAdded:id=>ctx.selectCard(id)});
  const updates=createUpdateControls({store,onOpen:()=>cardCanvas.setActive(false),onClose:()=>refresh()});
  const save=()=>workspaceFiles.save();
@@ -88,7 +119,7 @@ export function mountEditor(root,store){
   el('div',{class:'deck-heading'},deckName,el('span',{id:'save-state',class:'save-state'},'저장됨'),workspaceFiles.status,recovery.status),
   el('div',{class:'top-actions'},
    updates.button,
-   recovery.button,cardTemplates.button,
+   recovery.button,cardTemplates.button,assetLibrary.button,
    button('키워드 관리',()=>ctx.openKeywords(),{id:'keyword-manager'}),
    button('새 덱',async()=>{if(await confirmReplacement(store,{save})){workspaceFiles.storage.unbind();ctx.closeVisualEffects?.({force:true});const p=createProject();p.cards[0]=applyTemplate(p.cards[0],p.settings,'monster-standard');state.activeCardId=p.cards[0].id;setElementSelection(state,[]);state.back=false;store.load(p);ctx.cardLibrary?.reset();cardCanvas.resetTime();}}, {'aria-label':'새 덱'}),
    button('저장',save,{'aria-label':'프로젝트 저장'}),
@@ -189,7 +220,7 @@ export function mountEditor(root,store){
  const unload=event=>{if(store.isDirty()||document.querySelector('[data-paint-dirty="true"],[data-effect-dirty="true"]')){event.preventDefault();event.returnValue='';}};
  window.addEventListener('keydown',key);window.addEventListener('beforeunload',unload);
  refresh();root.dataset.ready='true';updates.checkAtStartup();
- return Object.assign(ctx,{getActiveCardId:()=>state.activeCardId,destroy(){recovery.destroy();cardTemplates.destroy();cardLibrary.destroy();updates.destroy();fileDrop.destroy();cardFiles.destroy();workspaceFiles.destroy();ctx.closeVisualEffects?.({force:true});ctx.closeKeywords?.();unsubscribe();window.removeEventListener('keydown',key);window.removeEventListener('beforeunload',unload);cardCanvas.destroy();paperView.destroy();root.replaceChildren();}});
+ return Object.assign(ctx,{getActiveCardId:()=>state.activeCardId,destroy(){assetLibrary.destroy();recovery.destroy();cardTemplates.destroy();cardLibrary.destroy();updates.destroy();fileDrop.destroy();cardFiles.destroy();workspaceFiles.destroy();ctx.closeVisualEffects?.({force:true});ctx.closeKeywords?.();unsubscribe();window.removeEventListener('keydown',key);window.removeEventListener('beforeunload',unload);cardCanvas.destroy();paperView.destroy();root.replaceChildren();}});
 }
 async function boot(){const root=document.getElementById('app');try{await ensureFont();const p=createProject();p.cards[0]=applyTemplate(p.cards[0],p.settings,'monster-standard');mountEditor(root,createStore(p,{prepare:d=>{d.cards=d.cards.map(c=>c.variant&&c.autoSkillLayout?syncSkillElements(c,d.settings,d.keywords||[]):c);}}));}catch(e){root.textContent='작업실을 열지 못했어요: '+e.message;}}
 boot();

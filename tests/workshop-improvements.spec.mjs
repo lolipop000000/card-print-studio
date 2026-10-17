@@ -37,7 +37,7 @@ test('automatic art fit shows the whole portrait and landscape image with transp
 test('items keep candle badges with optional multiple grants and join dense actual-size PDFs',async()=>{
  const {browser,page,pageErrors,httpRequests}=await openApp();try{
  await page.locator('#card-quantity').fill('9');await page.locator('#card-quantity').press('Tab');
- await page.locator('#add-item').click();assert.equal(await page.locator('#attributes input[type=checkbox]').count(),6);assert.equal(await page.locator('#attributes input:checked').count(),0);await page.locator('#attribute-fire').check();await page.locator('#attribute-light').check();await page.locator('#card-name').fill('불의 양초');await page.locator('#card-name').press('Tab');
+ await page.locator('#add-item').click();assert.equal(await page.locator('#attributes input[type=checkbox]').count(),6);assert.equal(await page.locator('#attributes input:checked').count(),0);await page.locator('#attribute-menu-toggle').click();await page.locator('#attribute-fire').check();await page.locator('#attribute-light').check();await page.locator('#card-name').fill('불의 양초');await page.locator('#card-name').press('Tab');
  const p=await saveProject(page,'items-attributes.json'),item=p.cards.find(c=>c.kind==='item');
  assert.equal(item.attribute,'fire');assert.deepEqual(item.attributes,['fire','light']);assert.equal(item.elements.filter(e=>e.type==='attribute').length,1);assert.equal(item.elements.some(e=>e.type==='rank'||e.binding?.field==='hp'),false);
  await page.locator('#paper-tab').click();await page.locator('#print-dense').click();await page.locator('#print-duplex').check();

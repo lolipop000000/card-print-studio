@@ -38,7 +38,31 @@ function sample(pixels,w,h,x,y,out){
 }
 // Three fractional box passes approximate a smooth, finite-support Gaussian.
 // Sliding sums keep the cost linear in pixels even at the maximum print radius.
+function verticalBoxPass(input,output,w,h,radius){
+ const radiusInt=Math.floor(radius),edge=radius-radiusInt,denominator=2*radiusInt+1+2*edge,stride=w*4,sums=new Float64Array(stride);
+ // Walk adjacent pixels together instead of jumping a full row for each column.
+ // Double precision rolling sums preserve the original scalar arithmetic and
+ // each Float32 output is rounded at exactly the same point as before.
+ for(let y=0;y<=Math.min(radiusInt,h-1);y++){
+  const row=y*stride;for(let x=0;x<stride;x++)sums[x]+=input[row+x];
+ }
+ for(let y=0;y<h;y++){
+  const row=y*stride,left=y-radiusInt-1,right=y+radiusInt+1,remove=y-radiusInt,leftRow=left*stride,rightRow=right*stride,removeRow=remove*stride;
+  for(let x=0;x<stride;x+=4){
+   let r=sums[x],g=sums[x+1],b=sums[x+2],a=sums[x+3],er=0,eg=0,eb=0,ea=0;
+   if(edge){
+    if(left>=0){const i=leftRow+x;er+=input[i];eg+=input[i+1];eb+=input[i+2];ea+=input[i+3];}
+    if(right<h){const i=rightRow+x;er+=input[i];eg+=input[i+1];eb+=input[i+2];ea+=input[i+3];}
+   }
+   const at=row+x;output[at]=(r+er*edge)/denominator;output[at+1]=(g+eg*edge)/denominator;output[at+2]=(b+eb*edge)/denominator;output[at+3]=(a+ea*edge)/denominator;
+   if(right<h){const i=rightRow+x;r+=input[i];g+=input[i+1];b+=input[i+2];a+=input[i+3];}
+   if(remove>=0){const i=removeRow+x;r-=input[i];g-=input[i+1];b-=input[i+2];a-=input[i+3];}
+   sums[x]=r;sums[x+1]=g;sums[x+2]=b;sums[x+3]=a;
+  }
+ }
+}
 function boxPass(input,output,w,h,radius,horizontal){
+ if(!horizontal){verticalBoxPass(input,output,w,h,radius);return;}
  const radiusInt=Math.floor(radius),edge=radius-radiusInt,denominator=2*radiusInt+1+2*edge,length=horizontal?w:h,lines=horizontal?h:w,step=horizontal?4:w*4;
  for(let line=0;line<lines;line++){
   const base=horizontal?line*w*4:line*4;let r=0,g=0,b=0,a=0;
@@ -61,23 +85,40 @@ function boxPass(input,output,w,h,radius,horizontal){
 function bloom(surface,p){
  const radius=number(p.radius,2,0,12),strength=number(p.strength,1.1,0,3),source=imageData(surface);
  if(!radius||!strength)return copy(surface,source);
- const threshold=number(p.threshold,.55,0,1),knee=threshold*number(p.knee,.35,0,1),color=rgb(p.color),d=source.data,energy=new Float32Array(d.length);let bright=false;
- for(let at=0;at<d.length;at+=4){
-  if(!d[at+3])continue;
-  const light=(.2126*d[at]+.7152*d[at+1]+.0722*d[at+2])/255;
-  const transition=knee?clamp(light-threshold+knee,0,2*knee)**2/(4*knee):0,extraction=Math.max(light-threshold,transition,0)/Math.max(light,1e-8);
-  if(!extraction)continue;
-  // Threshold unassociated RGB, then attenuate emitted light by source coverage.
-  const alpha=d[at+3]*extraction;energy[at]=d[at]/255*alpha*color[0];energy[at+1]=d[at+1]/255*alpha*color[1];energy[at+2]=d[at+2]/255*alpha*color[2];energy[at+3]=alpha;bright=true;
+ const threshold=number(p.threshold,.55,0,1),knee=threshold*number(p.knee,.35,0,1),color=rgb(p.color),d=source.data,w=source.width,h=source.height;
+ let energy=new Float32Array(d.length),left=w,top=h,right=-1,bottom=-1;
+ for(let y=0,at=0;y<h;y++){
+  let rowLeft=w,rowRight=-1;
+  for(let x=0;x<w;x++,at+=4){
+   if(!d[at+3])continue;
+   const light=(.2126*d[at]+.7152*d[at+1]+.0722*d[at+2])/255;
+   const transition=knee?clamp(light-threshold+knee,0,2*knee)**2/(4*knee):0,extraction=Math.max(light-threshold,transition,0)/Math.max(light,1e-8);
+   if(!extraction)continue;
+   // Threshold unassociated RGB, then attenuate emitted light by source coverage.
+   const alpha=d[at+3]*extraction;energy[at]=d[at]/255*alpha*color[0];energy[at+1]=d[at+1]/255*alpha*color[1];energy[at+2]=d[at+2]/255*alpha*color[2];energy[at+3]=alpha;
+   if(rowLeft===w)rowLeft=x;rowRight=x;
+  }
+  if(rowRight>=0){left=Math.min(left,rowLeft);right=Math.max(right,rowRight);top=Math.min(top,y);bottom=y;}
  }
- if(!bright)return copy(surface,source);
- const scratch=new Float32Array(d.length),blurRadius=radius*surface.scale/3;
- for(let pass=0;pass<3;pass++){boxPass(energy,scratch,source.width,source.height,blurRadius,true);boxPass(scratch,energy,source.width,source.height,blurRadius,false);}
+ if(right<0)return copy(surface,source);
+ const blurRadius=radius*surface.scale/3,padding=3*Math.ceil(blurRadius),cropLeft=Math.max(0,left-padding),cropTop=Math.max(0,top-padding),cropWidth=Math.min(w,right+padding+1)-cropLeft,cropHeight=Math.min(h,bottom+padding+1)-cropTop;
+ let offsetX=0,offsetY=0,blurWidth=w,blurHeight=h;
+ // Three passes cannot carry light farther than three fractional box supports.
+ // Keep all of that support at print resolution and skip only transparent work
+ // padding. Dense sources keep the original buffers to avoid a redundant copy.
+ if(cropWidth*cropHeight<w*h*.75){
+  const cropped=new Float32Array(cropWidth*cropHeight*4);
+  for(let y=0;y<cropHeight;y++){const start=((cropTop+y)*w+cropLeft)*4;cropped.set(energy.subarray(start,start+cropWidth*4),y*cropWidth*4);}
+  energy=cropped;offsetX=cropLeft;offsetY=cropTop;blurWidth=cropWidth;blurHeight=cropHeight;
+ }
+ const scratch=new Float32Array(energy.length);
+ for(let pass=0;pass<3;pass++){boxPass(energy,scratch,blurWidth,blurHeight,blurRadius,true);boxPass(scratch,energy,blurWidth,blurHeight,blurRadius,false);}
  const output=fresh(surface),pixels=output.ctx.createImageData(source.width,source.height),o=pixels.data;
- for(let at=0;at<d.length;at+=4){
-  const originalAlpha=d[at+3],added=Math.max(0,energy[at+3])*strength,alpha=Math.min(255,originalAlpha+added);
-  if(!added){o[at]=d[at];o[at+1]=d[at+1];o[at+2]=d[at+2];o[at+3]=originalAlpha;continue;}
-  writePixel(o,at,d[at]*originalAlpha/255+Math.max(0,energy[at])*strength,d[at+1]*originalAlpha/255+Math.max(0,energy[at+1])*strength,d[at+2]*originalAlpha/255+Math.max(0,energy[at+2])*strength,alpha);
+ o.set(d);
+ for(let y=0,at=0;y<blurHeight;y++)for(let x=0;x<blurWidth;x++,at+=4){
+  const dest=((offsetY+y)*w+offsetX+x)*4,originalAlpha=d[dest+3],added=Math.max(0,energy[at+3])*strength,alpha=Math.min(255,originalAlpha+added);
+  if(!added)continue;
+  writePixel(o,dest,d[dest]*originalAlpha/255+Math.max(0,energy[at])*strength,d[dest+1]*originalAlpha/255+Math.max(0,energy[at+1])*strength,d[dest+2]*originalAlpha/255+Math.max(0,energy[at+2])*strength,alpha);
  }
  output.ctx.putImageData(pixels,0,0);return output;
 }

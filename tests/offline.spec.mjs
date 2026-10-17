@@ -4,7 +4,7 @@ const pages=bytes=>(bytes.toString('latin1').match(/\/Type\s*\/Page\b/g)||[]).le
 async function fill(page,selector,value){await page.locator(selector).fill(value);await page.locator(selector).press('Tab');}
 test('complete offline deck workflow restores named skills and layers in a fresh session and prints matching sheets',async()=>{const first=await openApp(),page=first.page;let second;try{
  await page.setViewportSize({width:1280,height:800});
- await fill(page,'#card-name','해류 정령');await fill(page,'#card-quantity','9');await fill(page,'#hp-reduction','25');await page.locator('#attribute-water').check();await page.locator('#attribute-neutral').uncheck();
+ await fill(page,'#card-name','해류 정령');await fill(page,'#card-quantity','9');await fill(page,'#hp-reduction','25');await page.locator('#attribute-menu-toggle').click();await page.locator('#attribute-water').check();await page.locator('#attribute-neutral').uncheck();
  for(const [key,names,effects] of [['passives',['물결','젖은 바람'],['체력을 5 회복한다.','판정을 한 번 다시 굴린다.']],['actives',['방울탄','큰 파도'],['대미지 20.','대미지 30.']]]){
   for(let i=0;i<2;i++){await page.locator(key==='passives'?'#add-passive':'#add-active').click();await fill(page,'#'+key+' .skill-name >> nth='+i,names[i]);await page.locator('#'+key+' .skill-effect').nth(i).fill(effects[i]);}
  }

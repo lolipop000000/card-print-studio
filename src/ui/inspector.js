@@ -11,10 +11,14 @@ import {preserveSkillReferenceNames,remapSkillReferences} from '../model/skill-r
 import {createVisualEffects,writeTargetEffects} from '../model/visual-effects.js';
 import {textStyleFields} from './text-style-fields.js';
 import {renderElementAlignmentControls} from './element-alignment.js';
+import {renderObjectList} from './object-list.js';
 function group(title,...children){return el('section',{class:'inspector-group'},el('h3',{},title),children);}
 function attributeControls(card,editCard){
  const selectedAttributes=cardAttributes(card),item=card.kind==='item',label=item?'아이템에 부여한 속성':'몬스터 속성';
- return el('div',{id:'attributes',role:'group','aria-label':label},el('p',{class:'hint'},item?'부여할 속성 · 여러 개를 선택할 수 있어요. 전부 해제하면 속성 없음이며, 양초 표시는 유지됩니다.':'속성 · 여러 개를 선택할 수 있어요.'),
+ const selection=selectedAttributes.map(value=>ATTRIBUTES[value].name).join(' · ')||'속성 없음';
+ const picker=el('details',{id:'attributes',class:'attribute-picker',role:'group','aria-label':label},
+  el('summary',{id:'attribute-menu-toggle','aria-label':'속성 선택: '+selection},el('span',{id:'attribute-selection'},selection),el('span',{class:'attribute-menu-arrow','aria-hidden':true},'⌄')),
+  el('div',{class:'attribute-options'},el('p',{class:'hint'},item?'여러 개를 선택할 수 있어요. 전부 해제하면 속성 없음이며, 양초 표시는 유지됩니다.':'여러 개를 선택할 수 있어요. 최소 한 개는 남겨 주세요.'),
   el('div',{class:'two-fields'},Object.entries(ATTRIBUTES).map(([value,attribute])=>el('label',{class:'check'},
    el('input',{id:'attribute-'+value,type:'checkbox',checked:selectedAttributes.includes(value),disabled:!item&&selectedAttributes.length===1&&selectedAttributes[0]===value,onchange:event=>editCard(label,(c,d)=>{
     const selected=new Set(cardAttributes(c));if(event.target.checked)selected.add(value);else selected.delete(value);if(!selected.size&&!item)return;
@@ -28,7 +32,9 @@ function attributeControls(card,editCard){
      }
     }
     Object.assign(c,syncSkillElements(c,d.settings,d.keywords||[]));
-   })}),attribute.name))));
+   })}),el('span',{class:'attribute-swatch',style:'background:'+attribute.color,'aria-hidden':true}),attribute.name)))));
+ picker.addEventListener('keydown',event=>{if(event.key==='Escape'&&picker.open){event.preventDefault();event.stopPropagation();picker.open=false;picker.querySelector('summary').focus();}});
+ return el('div',{class:'field attribute-field'},el('span',{},'속성'),picker);
 }
 function boundTextControls(card,field,skillId,editCard,minFontPt,idPrefix,label){
  const e=card.elements.find(e=>e.type==='text'&&e.binding?.field===field&&(skillId===null||e.binding.skillId===skillId));if(!e)return null;
@@ -39,9 +45,10 @@ function boundTextControls(card,field,skillId,editCard,minFontPt,idPrefix,label)
   }),{idPrefix,minFontPt,includeColor:true})));
 }
 export function renderInspector(host,ctx){
- const settingsOpen=host.querySelector('.settings')?.open??false,scroll=host.scrollTop,openTextStyles=new Set([...host.querySelectorAll('details[data-text-style][open]')].map(node=>node.dataset.textStyle));
+ const settingsOpen=host.querySelector('.settings')?.open??false,attributesOpen=host.querySelector('#attributes')?.open??false,scroll=host.scrollTop,openTextStyles=new Set([...host.querySelectorAll('details[data-text-style][open]')].map(node=>node.dataset.textStyle));
  preserveFocus(()=>{
  host.replaceChildren();const p=ctx.store.getProject(),card=ctx.card(),target=ctx.target();
+ if(target){const objects=el('div',{class:'object-panel'});renderObjectList(objects,ctx);host.append(objects);}
  const editCard=(label,fn)=>ctx.edit(label,d=>{const c=d.cards.find(c=>c.id===ctx.state.activeCardId);if(!c)return;fn(c,d);});
  const set=(key,value)=>editCard('카드 '+key,(c,d)=>{c[key]=value;if(key==='effect')Object.assign(c,syncSkillElements(c,d.settings,d.keywords||[]));});
  if(!ctx.state.back&&card){
@@ -96,7 +103,7 @@ export function renderInspector(host,ctx){
    const selected=card.elements.find(e=>e.id===ctx.state.selectedElementId&&['text','image','effect'].includes(e.type))||card.elements.find(e=>e.binding?.field==='name')||card.elements.find(e=>['text','image','effect'].includes(e.type));
    if(selected)ctx.openVisualEffects({cardId:card.id,back:false,elementId:selected.id});
   },{id:'card-text-effects',class:'wide primary',disabled:!card.elements.some(e=>['text','image','effect'].includes(e.type))}),button('프레임 이펙트 만들기',()=>ctx.openVisualEffects({cardId:card.id,back:false,elementId:null}),{id:'card-frame-effects',class:'wide'}),button('프레임 이펙트 해제',()=>ctx.edit('프레임 이펙트 해제',p=>writeTargetEffects(p,{cardId:card.id,back:false,elementId:null},createVisualEffects())),{id:'card-frame-effects-clear',class:'wide subtle',disabled:!card.visualEffects?.layers.length})));
-  host.append(group('사용자 그림',button('그림 가져오기',()=>ctx.pickImage(null),{class:'wide'}),button('그림 그리기',()=>ctx.openPainting(),{id:'open-painting',class:'wide primary'}),button('그림 자동 맞춤',()=>editCard('그림 자동 맞춤',c=>{for(const e of c.elements)if(e.binding?.field==='art')e.style.fit='contain';c.template='custom';}),{id:'art-auto-fit',class:'wide'}),el('p',{class:'hint'},'원본을 포함해 저장해요. 그림을 다시 열어 레이어를 계속 편집할 수 있어요.')));
+  host.append(group('사용자 그림',button('그림 가져오기',()=>ctx.pickImage(null),{class:'wide'}),button('보관함에서 가져오기',()=>ctx.pickLibraryImage('art'),{id:'art-library',class:'wide'}),button('현재 그림 자르기',()=>ctx.cropImage(),{id:'art-crop',class:'wide',disabled:!card.artAssetId}),button('그림 그리기',()=>ctx.openPainting(),{id:'open-painting',class:'wide primary'}),button('그림 자동 맞춤',()=>editCard('그림 자동 맞춤',c=>{for(const e of c.elements)if(e.binding?.field==='art')e.style.fit='contain';c.template='custom';}),{id:'art-auto-fit',class:'wide'}),el('p',{class:'hint'},'자르기는 새 그림으로 저장해요. 그리기 원본과 레이어는 그대로 남아요.')));
   host.append(group('내용 맞춤',el('label',{class:'check'},el('input',{id:'auto-skill-layout',type:'checkbox',checked:card.autoSkillLayout??card.template!=='custom',onchange:event=>editCard('기술 자동 배치',(c,d)=>{c.autoSkillLayout=event.target.checked;if(c.autoSkillLayout)Object.assign(c,syncSkillElements(c,d.settings,d.keywords||[]));else c.template='custom';})}),'기술 영역 자동 맞춤'),el('div',{class:'two-fields'},button('기본 템플릿',()=>editCard('기본 템플릿',(c,d)=>Object.assign(c,applyTemplate(c,d.settings,c.kind==='monster'?'monster-standard':'item',d.keywords||[])))),button('긴 효과 맞춤',()=>editCard('내용 맞춤',(c,d)=>Object.assign(c,fitCard(c,d.settings,d.keywords||[]))))),el('p',{class:'hint'},'설명과 글자 설정에 맞춰 높이가 늘어나고 다음 기술은 아래로 이어져요. 위치나 크기를 직접 바꾸면 수동 배치로 전환합니다.')));
  }else if(ctx.state.back)host.append(group('공통 뒷면',el('p',{class:'hint'},'모든 카드에 같은 뒷면이 인쇄돼요. 아래 요소를 추가해 디자인하세요.')));
  const selectedItems=selectedElements(ctx.state,target),selected=selectedItems.length===1?selectedItems[0]:null;
@@ -118,7 +125,7 @@ export function renderInspector(host,ctx){
   if(selected.type==='text')body.push(...textStyleFields(selected.style,(key,value)=>update('style.'+key,value),{idPrefix:'element',minFontPt:p.settings.minFontPt,includeColor:true}));
   if(selected.type==='image')body.push(el('label',{class:'check'},el('input',{id:'image-transparent',type:'checkbox',checked:!selected.style.fill||selected.style.fill==='transparent',onchange:e=>update('style.fill',e.target.checked?'transparent':'#eef0e8')}),'투명 배경 유지'));
   if(['rect','dice'].includes(selected.type)||selected.type==='image'&&selected.style.fill&&selected.style.fill!=='transparent')body.push(field('바탕 색','element-fill',selected.style.fill||'#eef0e8',v=>update('style.fill',v),{type:'color'}));
-  if(selected.type==='image')body.push(field('그림 맞춤','image-fit',selected.style.fit||'contain',v=>update('style.fit',v),{options:[['contain','전체 보이기'],['cover','영역 채우기']]}),field('자르기 가로 위치','image-crop-x',selected.style.cropX??.5,v=>update('style.cropX',v),{type:'number',min:0,max:1,step:.05}),field('자르기 세로 위치','image-crop-y',selected.style.cropY??.5,v=>update('style.cropY',v),{type:'number',min:0,max:1,step:.05}),button('그림 교체',()=>ctx.pickImage(selected.id),{class:'wide'}));
+  if(selected.type==='image')body.push(field('그림 맞춤','image-fit',selected.style.fit||'contain',v=>update('style.fit',v),{options:[['contain','전체 보이기'],['cover','영역 채우기']]}),field('자르기 가로 위치','image-crop-x',selected.style.cropX??.5,v=>update('style.cropX',v),{type:'number',min:0,max:1,step:.05}),field('자르기 세로 위치','image-crop-y',selected.style.cropY??.5,v=>update('style.cropY',v),{type:'number',min:0,max:1,step:.05}),button('그림 교체',()=>ctx.pickImage(selected.id),{class:'wide'}),button('보관함 그림으로 교체',()=>ctx.pickLibraryImage('replace',selected.id),{id:'image-library',class:'wide'}),button('선택한 그림 자르기',()=>ctx.cropImage(selected.id),{id:'image-crop',class:'wide',disabled:!p.assets[selected.binding?.field==='art'?target.artAssetId:selected.assetId]}));
   if(selected.type==='dice'&&!selected.binding){const dice=selected.dice||{faces:[],text:'',color:'#427963'};body.push(field('조건 문구','element-dice-text',dice.text,v=>update('dice',{...dice,text:v})),el('div',{class:'dice-options'},[1,2,3,4,5,6].map(n=>button(String(n),()=>update('dice',{...dice,faces:dice.faces.includes(n)?dice.faces.filter(f=>f!==n):[...dice.faces,n].sort()}),{class:dice.faces.includes(n)?'selected':''}))));}
   if(['text','image','effect'].includes(selected.type))body.push(
    button('선택한 대상 이펙트 만들기',()=>ctx.openVisualEffects({cardId:ctx.state.activeCardId,back:ctx.state.back,elementId:selected.id}),{id:'element-effects',class:'wide primary'}),
@@ -127,7 +134,7 @@ export function renderInspector(host,ctx){
   body.push(el('div',{class:'two-fields'},button('뒤로 보내기',()=>ctx.reorderElement(-1)),button('앞으로 가져오기',()=>ctx.reorderElement(1))),button('요소 삭제',()=>ctx.deleteElement(),{id:'delete-element',class:'wide danger'}));
   host.append(group('선택한 요소',...body));
  }
- host.append(group('자유 요소 추가',el('div',{class:'two-fields'},button('텍스트 추가',()=>ctx.addElement('text')),button('이미지 추가',()=>ctx.addElement('image')),button('사각형 추가',()=>ctx.addElement('rect')),button('주사위 추가',()=>ctx.addElement('dice')),button('이펙트 요소 추가',()=>ctx.addElement('effect'),{id:'add-effect'}))));
+ host.append(group('자유 요소 추가',el('div',{class:'two-fields'},button('텍스트 추가',()=>ctx.addElement('text')),button('이미지 추가',()=>ctx.addElement('image')),button('보관함 이미지 추가',()=>ctx.pickLibraryImage('element'),{id:'add-library-image'}),button('사각형 추가',()=>ctx.addElement('rect')),button('주사위 추가',()=>ctx.addElement('dice')),button('이펙트 요소 추가',()=>ctx.addElement('effect'),{id:'add-effect'}))));
  const settings=el('details',{class:'settings'},el('summary',{},'덱 설정 · 크기 / 글자 / 등급'));
  const resize=(d,w,h)=>{const sx=w/d.settings.cardWidthMm,sy=h/d.settings.cardHeightMm;for(const t of [...d.cards,d.back])for(const e of t.elements){e.rect.x*=sx;e.rect.w*=sx;e.rect.y*=sy;e.rect.h*=sy;}d.settings.cardWidthMm=w;d.settings.cardHeightMm=h;};
  const changeSetting=async(key,v)=>{if(v===null||v<=0){showMessage('0보다 큰 값을 입력하세요.');ctx.renderInspector();return;}
@@ -145,6 +152,7 @@ export function renderInspector(host,ctx){
  const table=el('div',{class:'rank-table'},el('p',{class:'hint'},'등급 기준 HP / 선택적 상한 (빈칸 = 제한 없음)'));
  for(const rank of RANKS)table.append(el('div',{class:'rank-rule'},el('strong',{},rank),field('기준',rank+'-base',p.settings.rankRules[rank].baseHp,v=>ctx.edit('등급 기준',d=>d.settings.rankRules[rank].baseHp=v),{type:'number',min:0}),field('상한',rank+'-cap',p.settings.rankRules[rank].hpCap??'',v=>ctx.edit('등급 상한',d=>d.settings.rankRules[rank].hpCap=v),{type:'number',min:0})));
  settings.open=settingsOpen;settings.append(table);host.append(settings);
+ const attributes=host.querySelector('#attributes');if(attributes)attributes.open=attributesOpen;
  for(const node of host.querySelectorAll('details[data-text-style]'))node.open=openTextStyles.has(node.dataset.textStyle);
  });
  host.scrollTop=scroll;

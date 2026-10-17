@@ -153,6 +153,7 @@ export function validateProject(p){
       const context=cardProblemLabel(card,e),extra={cardId:card?.id,elementId:e.id};
       checkId(e.id,context,extra);
       if(!ELEMENT_TYPES.includes(e.type))invalid('element',context,'요소 종류',e.type,ELEMENT_TYPES.join(', ')+' 중 하나여야 합니다',extra);
+      if(e.locked!==undefined&&typeof e.locked!=='boolean')invalid('element-lock',context,'포인터 잠금',e.locked,'true 또는 false여야 합니다',extra);
       if(!object(e.rect))invalid('element',context,'위치·크기',e.rect,'x, y, w, h가 있는 객체여야 합니다',extra);
       else for(const [key,label,min] of [['x','가로 위치',-Infinity],['y','세로 위치',-Infinity],['w','폭',0.01],['h','높이',0.01]])
         if(!number(e.rect[key],min))invalid('element',context,label,e.rect[key],min===-Infinity?'mm 단위의 유한한 숫자여야 합니다':'0.01 mm 이상의 유한한 숫자여야 합니다',extra);

@@ -4,7 +4,7 @@ import {renderCard} from '../render/card.js';
 import {getEffectFrameSec} from '../model/visual-effects.js';
 import {createEffectCache} from '../render/effects/composite.js';
 import {createEffectTimeline,syncEffectTimeInput} from './effect-timeline.js';
-import {setElementSelection,selectedElements,selectionBounds,groupDelta,marqueeElements} from './element-selection.js';
+import {setElementSelection,selectedElements,pointerElements,selectionBounds,groupDelta,marqueeElements} from './element-selection.js';
 import {effectPreviewDpi} from './effect-preview.js';
 import {CSS_MM,wheelZoomFactor,captureViewAnchor,restoreViewAnchor} from './view-zoom.js';
 export function mountCardCanvas(host,ctx){
@@ -39,6 +39,7 @@ export function mountCardCanvas(host,ctx){
  function refreshSelection(){
   const target=preview||ctx.target();setElementSelection(ctx.state,ctx.state.selectedElementIds??[ctx.state.selectedElementId],target);
   const selected=selectedElements(ctx.state,target),bounds=selectionBounds(selected);selection.hidden=!bounds;selection.dataset.count=selected.length;selection.classList.toggle('multi',selected.length>1);selection.setAttribute('aria-label',selected.length+'개 요소 선택');members.replaceChildren();
+  selection.dataset.locked=String(selected.some(e=>e.locked===true));for(const handle of selection.querySelectorAll('.resize-handle'))handle.hidden=selected.length!==1||selected[0].locked===true;
   if(bounds)place(selection,bounds);
   if(selected.length>1)for(const element of selected){const node=el('div',{class:'selection-member','data-element-id':element.id});place(node,element.rect);members.append(node);}
   marquee.hidden=gesture?.kind!=='marquee'||!gesture.moved;if(!marquee.hidden)place(marquee,gesture.rect);
@@ -56,16 +57,16 @@ export function mountCardCanvas(host,ctx){
  function begin(event,handle){
   if(event.button!==0||ctx.state.mode!=='card'||!ctx.target())return;
   refreshSelection();
-  if(handle&&selectedElements(ctx.state,ctx.target()).length!==1)return;
+  if(handle){const chosen=selectedElements(ctx.state,ctx.target());if(chosen.length!==1||chosen[0].locked===true)return;}
   timeline.pause();updateTransport();event.preventDefault();event.stopPropagation();stage.focus({preventScroll:true});
   const start=point(event),target=ctx.target(),initialIds=[...ctx.state.selectedElementIds],p=ctx.store.getProject();let collapseId=null;
   if(!handle){
-   const hit=[...target.elements].reverse().find(e=>start.x>=e.rect.x&&start.x<=e.rect.x+e.rect.w&&start.y>=e.rect.y&&start.y<=e.rect.y+e.rect.h);
+   const hit=pointerElements(target.elements).reverse().find(e=>start.x>=e.rect.x&&start.x<=e.rect.x+e.rect.w&&start.y>=e.rect.y&&start.y<=e.rect.y+e.rect.h);
    if(hit&&event.shiftKey){select(initialIds.includes(hit.id)?initialIds.filter(id=>id!==hit.id):[...initialIds,hit.id]);ctx.renderInspector();return;}
    if(hit){if(initialIds.includes(hit.id)){select([...initialIds.filter(id=>id!==hit.id),hit.id]);if(initialIds.length>1)collapseId=hit.id;}else select([hit.id]);}
    else {const baseIds=event.shiftKey?initialIds:[];select(baseIds);gesture={kind:'marquee',start,initialIds,baseIds,rect:{...start,w:0,h:0},moved:false,pointer:event.pointerId,project:p,targetId:target.id};stage.setPointerCapture(event.pointerId);ctx.renderInspector();return;}
   }
-  const chosen=selectedElements(ctx.state,target);if(!chosen.length)return;
+  const chosen=pointerElements(selectedElements(ctx.state,target));if(!chosen.length)return;
   gesture={kind:handle?'resize':'move',handle,start,initialIds,collapseId,original:target,elements:chosen,moved:false,pointer:event.pointerId,project:p,targetId:target.id};stage.setPointerCapture(event.pointerId);ctx.renderInspector();
  }
  function move(event){

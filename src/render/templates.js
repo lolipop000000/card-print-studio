@@ -9,6 +9,7 @@ import {diceContentHeight} from './icons.js';
 const textStyle={fontPt:9,fontWeight:400,color:'#253d32',align:'left'};
 const bindingKey=binding=>binding?binding.field+':'+(binding.skillId||''):null;
 const previousElements=card=>new Map(card.elements.filter(e=>e.binding).map(e=>[bindingKey(e.binding),e]));
+const preserveLock=(previous,element)=>{if(previous?.locked!==undefined)element.locked=previous.locked;};
 const flowElement=e=>e.binding?.skillId||e.binding?.field?.startsWith('item.');
 /** Keep authored layers on the same side of existing text when rows are regenerated. */
 function replaceFlowElements(ordered,generated){
@@ -49,7 +50,7 @@ function addSkills(card,s,top,rows,previous){
  for(const row of rows){
   const {sk,titleH,badgeH,bodyH,gap}=row;
   const add=(key,type,rect,field,style)=>{
-   const e=element(card,sk.id+':'+key,type,rect,{field,skillId:sk.id},style),old=previous.get(bindingKey(e.binding));if(old)e.id=old.id;card.elements.push(e);
+   const e=element(card,sk.id+':'+key,type,rect,{field,skillId:sk.id},style),old=previous.get(bindingKey(e.binding));if(old)e.id=old.id;preserveLock(old,e);card.elements.push(e);
   };
   add('name','text',{x:4*sx,y,w:width,h:titleH},'skill.name',row.titleStyle);y+=titleH+gap;
   add('effect','text',{x:4*sx,y,w:row.effectW,h:bodyH},'skill.effect',row.bodyStyle);
@@ -67,7 +68,7 @@ function layoutSkillArea(card,s,keywords,artH,customTop,artTop=15,previous=new M
 }
 function addItemEffect(card,s,keywords,top,previous=new Map()){
  const sx=s.cardWidthMm/63,sy=s.cardHeightMm/88,w=55*sx,ctx=context(),badges=selectedKeywords({keywords},card,'badge');let y=top;
- const add=(key,type,rect,field,style)=>{const e=element(card,key,type,rect,{field},style),old=previous.get(bindingKey(e.binding));if(old)e.id=old.id;card.elements.push(e);};
+ const add=(key,type,rect,field,style)=>{const e=element(card,key,type,rect,{field},style),old=previous.get(bindingKey(e.binding));if(old)e.id=old.id;preserveLock(old,e);card.elements.push(e);};
  if(badges.length){
   const style=authoredStyle(previous,'item.keywords',null,{fontPt:8.5},s.minFontPt),height=ctx?fitKeywordBadges(ctx,badges,{w,h:Infinity},style,style.fontPt).heightMm:4.5*sy;
   add('keywords','keywords',{x:4*sx,y,w,h:Math.max(.1,height)},'item.keywords',style);y+=height+.5*sy;
@@ -79,7 +80,7 @@ export function applyTemplate(input,s,variant,keywords=[]){
  const previous=previousElements(input),c=clone(input);c.template=variant;c.autoSkillLayout=true;c.elements=[];const sx=s.cardWidthMm/63,sy=s.cardHeightMm/88;
  const multiple=cardAttributes(c).length>1,artTop=multiple?26:15;
  const r=(x,y,w,h)=>({x:x*sx,y:y*sy,w:w*sx,h:h*sy}),add=(key,type,rect,binding,style)=>{
-  const e=element(c,key,type,rect,binding,style),old=previous.get(bindingKey(binding));if(old){e.id=old.id;e.style={...e.style,...old.style};}c.elements.push(e);
+  const e=element(c,key,type,rect,binding,style),old=previous.get(bindingKey(binding));if(old){e.id=old.id;e.style={...e.style,...old.style};}preserveLock(old??input.elements.find(previous=>previous.id===e.id),e);c.elements.push(e);
  };
  add('name','text',r(4,4,29,8),{field:'name'},{fontPt:14,fontWeight:760});
  if(c.kind==='monster'){
