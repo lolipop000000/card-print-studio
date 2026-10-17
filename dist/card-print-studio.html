@@ -44333,12 +44333,12 @@
   // release.json
   var release_default = {
     format: "card-print-studio-update",
-    version: "1.1.2",
+    version: "1.1.3",
     releasedAt: "2026-10-17",
     notes: [
-      "\uACF5\uAC1C GitHub \uC800\uC7A5\uC18C\uC5D0 \uC0C8 \uBC84\uC804 \uD655\uC778\uACFC HTML \uB2E4\uC6B4\uB85C\uB4DC\uB97C \uC5F0\uACB0\uD588\uC5B4\uC694.",
-      "\uD3B8\uC9D1\xB7\uC800\uC7A5\xB7\uC778\uC1C4\uB294 \uACC4\uC18D \uC624\uD504\uB77C\uC778\uC73C\uB85C \uC0AC\uC6A9\uD558\uBA70, \uC5C5\uB370\uC774\uD2B8\uB97C \uD655\uC778\uD560 \uB54C\uB9CC \uC811\uC18D\uD574\uC694.",
-      "\uC774\uD399\uD2B8 \uBBF8\uB9AC\uBCF4\uAE30\uC758 Ctrl+\uD720 \uD655\uB300\uC640 \uBC30\uC728\uC5D0 \uB9DE\uCD98 \uC120\uBA85\uD55C \uB80C\uB354\uB9C1\uB3C4 \uD3EC\uD568\uD574\uC694."
+      "\uC0C8 \uBC84\uC804 \uD655\uC778 \uC8FC\uC18C\uAC00 \uACF5\uAC1C GitHub \uC800\uC7A5\uC18C\uB85C \uBBF8\uB9AC \uCC44\uC6CC\uC838 \uC788\uC5B4\uC694.",
+      "\uC608\uC804 \uBC84\uC804\uC5D0\uC11C \uBE48 \uC8FC\uC18C\uAC00 \uC800\uC7A5\uB41C \uACBD\uC6B0\uC5D0\uB3C4 \uAE30\uBCF8 \uC8FC\uC18C\uB97C \uC790\uB3D9\uC73C\uB85C \uBCF5\uC6D0\uD574\uC694.",
+      "\uC9C1\uC811 \uC9C0\uC815\uD55C \uC8FC\uC18C\uC640 \uC774 \uBC84\uC804\uC5D0\uC11C \uC5F0\uACB0 \uD574\uC81C\uD55C \uC124\uC815\uC744 \uC720\uC9C0\uD558\uACE0, \uC790\uB3D9 \uD655\uC778\uC740 \uAE30\uBCF8 \uAEBC\uC9D0\uC774\uC5D0\uC694."
     ],
     downloadUrl: "./card-print-studio.html",
     sourceUrl: "https://raw.githubusercontent.com/lolipop000000/card-print-studio/main/dist/update.json"
@@ -44494,10 +44494,13 @@
   function createUpdateControls({ store, onOpen = () => {
   }, onClose = () => {
   } }) {
-    let settings = { sourceUrl: release_default.sourceUrl || "", autoCheck: false }, storageNote = "", dialog = null, view = null, disposed = false, request = null, generation = 0, receiving = false, downloadMessage = "", downloadKind = "idle";
+    let settings = { sourceUrl: release_default.sourceUrl || "", autoCheck: false, disconnected: false }, storageNote = "", dialog = null, view = null, disposed = false, request = null, generation = 0, receiving = false, downloadMessage = "", downloadKind = "idle";
     try {
       const saved = JSON.parse(localStorage.getItem(KEY) || "null");
-      if (saved && typeof saved.sourceUrl === "string") settings = { sourceUrl: saved.sourceUrl ? normalizeSource(saved.sourceUrl) : "", autoCheck: saved.autoCheck === true };
+      if (saved && typeof saved.sourceUrl === "string") {
+        const source = saved.sourceUrl.trim(), disconnected = !source && saved.disconnected === true;
+        settings = { sourceUrl: source ? normalizeSource(source) : disconnected ? "" : release_default.sourceUrl || "", autoCheck: !!source && saved.autoCheck === true, disconnected };
+      }
     } catch {
       storageNote = "\uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C \uC5C5\uB370\uC774\uD2B8 \uC124\uC815\uC744 \uC77D\uC9C0 \uBABB\uD588\uC5B4\uC694. \uC8FC\uC18C\uB97C \uB2E4\uC2DC \uC785\uB825\uD560 \uC218 \uC788\uC5B4\uC694.";
     }
@@ -44564,6 +44567,7 @@
       const value = view.source.value.trim();
       settings.sourceUrl = value ? normalizeSource(value) : "";
       view.source.value = settings.sourceUrl;
+      settings.disconnected = !settings.sourceUrl;
       settings.autoCheck = view.auto.checked;
       remember();
     }

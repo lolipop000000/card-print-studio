@@ -5,8 +5,14 @@ import {saveProjectFile,download as downloadFile} from './files.js';
 
 const KEY='card-print-studio:updates:v1';
 export function createUpdateControls({store,onOpen=()=>{},onClose=()=>{}}){
- let settings={sourceUrl:release.sourceUrl||'',autoCheck:false},storageNote='',dialog=null,view=null,disposed=false,request=null,generation=0,receiving=false,downloadMessage='',downloadKind='idle';
- try{const saved=JSON.parse(localStorage.getItem(KEY)||'null');if(saved&&typeof saved.sourceUrl==='string')settings={sourceUrl:saved.sourceUrl?normalizeSource(saved.sourceUrl):'',autoCheck:saved.autoCheck===true};}
+ let settings={sourceUrl:release.sourceUrl||'',autoCheck:false,disconnected:false},storageNote='',dialog=null,view=null,disposed=false,request=null,generation=0,receiving=false,downloadMessage='',downloadKind='idle';
+ try{
+  const saved=JSON.parse(localStorage.getItem(KEY)||'null');
+  if(saved&&typeof saved.sourceUrl==='string'){
+   const source=saved.sourceUrl.trim(),disconnected=!source&&saved.disconnected===true;
+   settings={sourceUrl:source?normalizeSource(source):disconnected?'':release.sourceUrl||'',autoCheck:!!source&&saved.autoCheck===true,disconnected};
+  }
+ }
  catch{storageNote='이 브라우저에서 업데이트 설정을 읽지 못했어요. 주소를 다시 입력할 수 있어요.';}
  let state={phase:settings.sourceUrl?'idle':'unconfigured',message:'',result:null,checkedAt:''};
  const action=button('새 버전',open,{id:'studio-updates',title:'작업실 v'+release.version+' · 새 버전 확인과 백업','data-available':'false'});
@@ -30,7 +36,7 @@ export function createUpdateControls({store,onOpen=()=>{},onClose=()=>{}}){
  }
  function clearResult(){stop();resetDownload();state={phase:view?.source.value.trim()?'idle':'unconfigured',message:'',result:null,checkedAt:''};paint();}
  function applySource(){
-  const value=view.source.value.trim();settings.sourceUrl=value?normalizeSource(value):'';view.source.value=settings.sourceUrl;settings.autoCheck=view.auto.checked;remember();
+  const value=view.source.value.trim();settings.sourceUrl=value?normalizeSource(value):'';view.source.value=settings.sourceUrl;settings.disconnected=!settings.sourceUrl;settings.autoCheck=view.auto.checked;remember();
  }
  async function check({fromDialog=false}={}){
   stop();resetDownload();

@@ -140,3 +140,38 @@ test('invalid update addresses never send a request or change the project',async
   assert.deepEqual(httpRequests,[]);await page.locator('#updates-close').click();assert.equal(await page.locator('#save-state').innerText(),'저장됨');
  }finally{await browser.close();}
 });
+
+test('legacy empty update settings restore the GitHub default without enabling network checks',async()=>{
+ const {browser,page,httpRequests,pageErrors}=await openApp();try{
+  for(const saved of [{sourceUrl:'',autoCheck:false},{sourceUrl:'  ',autoCheck:true}]){
+   await page.evaluate(value=>localStorage.setItem('card-print-studio:updates:v1',JSON.stringify(value)),saved);
+   await page.reload();await page.waitForSelector('[data-ready=true]');await openUpdates(page);
+   assert.equal(await page.locator('#update-source').inputValue(),'https://raw.githubusercontent.com/lolipop000000/card-print-studio/main/dist/update.json');
+   assert.equal(await page.locator('#update-auto').isChecked(),false);
+   assert.equal(await page.locator('#update-status').getAttribute('data-state'),'idle');
+   await page.locator('#updates-close').click();
+  }
+  assert.deepEqual(httpRequests,[]);assert.deepEqual(pageErrors,[]);
+ }finally{await browser.close();}
+});
+
+test('a saved custom update address takes precedence over the built-in default',async()=>{
+ const {browser,page,httpRequests,pageErrors}=await openApp();try{
+  await page.evaluate(value=>localStorage.setItem('card-print-studio:updates:v1',JSON.stringify({sourceUrl:value,autoCheck:false})),source);
+  await page.reload();await page.waitForSelector('[data-ready=true]');await openUpdates(page);
+  assert.equal(await page.locator('#update-source').inputValue(),source);
+  assert.equal(await page.locator('#update-auto').isChecked(),false);
+  assert.deepEqual(httpRequests,[]);assert.deepEqual(pageErrors,[]);
+ }finally{await browser.close();}
+});
+
+test('explicitly disconnecting updates stays disconnected after reopening the HTML',async()=>{
+ const {browser,page,httpRequests,pageErrors}=await openApp();try{
+  await openUpdates(page);await page.locator('#update-disconnect').click();
+  await page.locator('#updates-close').click();await page.reload();await page.waitForSelector('[data-ready=true]');await openUpdates(page);
+  assert.equal(await page.locator('#update-source').inputValue(),'');
+  assert.equal(await page.locator('#update-auto').isChecked(),false);
+  assert.equal(await page.locator('#update-status').getAttribute('data-state'),'unconfigured');
+  assert.deepEqual(httpRequests,[]);assert.deepEqual(pageErrors,[]);
+ }finally{await browser.close();}
+});
