@@ -39,6 +39,13 @@ GPU를 제공하지 않는 브라우저, 부동소수점 대상 미지원, 텍�
 
 추가 성능 명령: `node tests/bloom-gpu-benchmark.mjs`. 자료는 Git에서 제외한 `artifacts/qa/bloom-gpu-{production,parity,benchmark,review-adversarial}.json`, `sprite-bloom-editor.png`, `effects-pixels-{1,2}.json`에 보관합니다. 배포 HTML은 **5,386,481 bytes**, SHA256 `c73812f4cb8066df2615eafa3919be2e8a2e6fcb70228b1ad78163087a2d0bbb`입니다.
 
+## 공개 배포와 로컬 반영
+
+- 코드 커밋 `5578620056f1d2e832380e2b2e5f4af22a891396`, [v1.3.1 Release](https://github.com/lolipop000000/card-print-studio/releases/tag/v1.3.1). 공개 첨부 5개 파일의 서버 크기·SHA256이 검증 파일과 일치했습니다.
+- 별도 실제 Edge에서 기존 v1.3.0의 새 버전 확인·HTML 받기를 실행해 새 빌드와 일치함을 확인했습니다. 미저장 내용과 실행 취소·다시 실행이 유지됐고 페이지 오류는 없었습니다. 자동 확인은 기본 꺼짐이며 명시적 정보·HTML GET 요청만 사용했습니다.
+- 로그인 없는 최신 Release 다운로드도 HTTP 200과 동일 SHA256을 확인했습니다.
+- 백업 당시의 원본 해시가 바뀌지 않은 것을 확인한 뒤 기존 작업실의 HTML·사용법·품질 규칙·검증 기록·라이선스·버전 정보 6개 파일을 갱신했습니다. 로컬 HTML도 위 SHA256과 같으며 개인 작업실 데이터는 바꾸지 않았습니다.
+
 ---
 
 # v1.3.0 검증 기록 · 2026-10-18
