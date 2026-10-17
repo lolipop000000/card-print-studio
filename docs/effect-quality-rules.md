@@ -53,6 +53,8 @@
 - [Unity Color over Lifetime](https://docs.unity3d.com/Manual/PartSysColorOverLifeModule.html): 입자의 수명에 따른 색·투명도 곡선과 사라지는 꼬리 방향을 참고한다.
 
 - [Unity Bloom](https://docs.unity3d.com/6000.0/Documentation/Manual/urp/post-processing-bloom.html): 밝기 기준·강도·퍼짐·색을 독립 조절한다.
+- [Khronos EXT_color_buffer_float](https://registry.khronos.org/webgl/extensions/EXT_color_buffer_float/): 지원을 확인한 RGBA32F 대상으로 계산하고 RGBA/FLOAT로 읽어 약한 빛을 중간 단계에서 양자화하지 않는다.
+- [WebGL best practices](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/WebGL_best_practices): 선택적 확장과 자원 제한에 맞춰 대체 경로를 두고, 텍스처·프로그램을 재사용한다. 현재 동기 렌더러와 연결할 때는 여섯 단계가 끝난 뒤 한 번만 CPU로 읽는다.
 - [Unity Size over Lifetime](https://docs.unity3d.com/6000.0/Documentation/Manual/PartSysSizeOverLifeModule.html): 입자의 수명에 따라 크기를 늘리거나 줄이는 조절 체계를 참고한다.
 - [Adobe Distort effects](https://helpx.adobe.com/after-effects/desktop/apply-effects-and-animation-presets/list-of-effects/distort-effects.html): 거리·간격·방향을 나누는 변형 조절을 참고한다. 이 작업실의 교차 일렁임은 부드러운 교차 사인파이며 난류 노이즈 구현을 뜻하지 않는다.
 
@@ -68,7 +70,8 @@
 35. 공용 에셋은 적용 시 독립 ID와 이미지를 복사한다. 보관함 삭제·폴더 변경·늦은 비동기 완료가 기존 카드·다른 대상에 영향을 주지 않는다. 저장 실패·외부 변경 충돌·임시 저장을 디스크 저장 완료와 구별한다.
 36. 오브젝트 순서·마우스 잠금은 실행 취소와 JSON에 보존하며, 자동 기술 재배치가 잠금을 지우지 않는다. 잠긴 요소는 캔버스 포인터 조작에서 제외하되 목록의 명시적 편집은 허용한다.
 37. 선택 대상만 재생은 보기 설정이다. 선택하지 않은 효과의 시간과 계산 이미지를 재사용하며, 스킬 이름의 반복 표시·읽기 보호 마스크·중첩 효과 진단을 누락하지 않는다. 정한 인쇄 시간에서 전체 재생과 300 DPI 픽셀이 일치해야 한다.
-38. 블룸 최적화는 기존 출력과 RGBA를 정확히 비교한다. 특정 효과의 미세 측정과 앱 전체 FPS를 구별하고, CPU 개선을 GPU 가속으로 표시하지 않는다.
+38. 블룸의 CPU 대체 경로는 기존 출력과 RGBA를 정확히 비교한다. GPU는 실제 연산과 결과 사용을 검증하고, 32비트 부동소수점 차이는 알파와 premultiplied 색의 8비트 값 약 한 단계 이내로 비교한다. 같은 GPU 경로의 고정 인쇄 장면은 반복 픽셀이 같아야 한다. 특정 효과의 미세 측정과 앱 전체 FPS를 구별하고, CPU 개선을 GPU 가속으로 표시하지 않는다.
+39. GPU 블룸은 WebGL2와 부동소수점 렌더 대상을 확인하고, 미지원·연결 손실·할당 실패·작업 크기 제한에서 CPU로 전환한다. 복구 뒤에는 새 자원으로 재개한다. 한 컨텍스트와 최대 128 MiB의 흐림 텍스처 두 장을 재사용하며 크기 변경 시 이전 텍스처를 해제한다. 원본·행 방향·투명도를 바꾸지 않으며 외부 의존성을 추가하지 않는다.
 
 ## 실행 순서
 

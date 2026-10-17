@@ -1,5 +1,6 @@
 import {makeSurface} from './masks.js';
 import {effectRandom} from './random.js';
+import {blurBloomOnGpu,recordCpuBloom} from './gpu-bloom.js';
 
 const clamp=(value,min=0,max=1)=>Math.max(min,Math.min(max,value));
 const number=(value,fallback,min,max)=>clamp(Number.isFinite(value)?value:fallback,min,max);
@@ -82,7 +83,7 @@ function boxPass(input,output,w,h,radius,horizontal){
   }
  }
 }
-function bloom(surface,p){
+function bloom(surface,p,bloomBackend){
  const radius=number(p.radius,2,0,12),strength=number(p.strength,1.1,0,3),source=imageData(surface);
  if(!radius||!strength)return copy(surface,source);
  const threshold=number(p.threshold,.55,0,1),knee=threshold*number(p.knee,.35,0,1),color=rgb(p.color),d=source.data,w=source.width,h=source.height;
@@ -111,8 +112,12 @@ function bloom(surface,p){
   for(let y=0;y<cropHeight;y++){const start=((cropTop+y)*w+cropLeft)*4;cropped.set(energy.subarray(start,start+cropWidth*4),y*cropWidth*4);}
   energy=cropped;offsetX=cropLeft;offsetY=cropTop;blurWidth=cropWidth;blurHeight=cropHeight;
  }
- const scratch=new Float32Array(energy.length);
- for(let pass=0;pass<3;pass++){boxPass(energy,scratch,blurWidth,blurHeight,blurRadius,true);boxPass(scratch,energy,blurWidth,blurHeight,blurRadius,false);}
+ const accelerated=bloomBackend==='cpu'?null:blurBloomOnGpu(energy,blurWidth,blurHeight,blurRadius);
+ if(accelerated)energy=accelerated;
+ else{
+  recordCpuBloom();const scratch=new Float32Array(energy.length);
+  for(let pass=0;pass<3;pass++){boxPass(energy,scratch,blurWidth,blurHeight,blurRadius,true);boxPass(scratch,energy,blurWidth,blurHeight,blurRadius,false);}
+ }
  const output=fresh(surface),pixels=output.ctx.createImageData(source.width,source.height),o=pixels.data;
  o.set(d);
  for(let y=0,at=0;y<blurHeight;y++)for(let x=0;x<blurWidth;x++,at+=4){
@@ -151,10 +156,10 @@ function displacement(surface,layer,p,timeSec,seed){
 
 /** Independent full-accumulator filters. The compositor owns opacity, scope,
  * protection and clipping. Unknown kinds let the dispatch chain try its next family. */
-export function applyCreativeFilter(surface,layer,{rect=surface.work,timeSec=1.2,seed=1}={}){
+export function applyCreativeFilter(surface,layer,{rect=surface.work,timeSec=1.2,seed=1,bloomBackend='auto'}={}){
  const p=layer.params||{};
  switch(layer.kind){
-  case 'bloom':return bloom(surface,p);
+  case 'bloom':return bloom(surface,p,bloomBackend);
   case 'directionalBlur':return directionalBlur(surface,p);
   case 'displacement':return displacement(surface,layer,p,timeSec,seed);
   default:return null;

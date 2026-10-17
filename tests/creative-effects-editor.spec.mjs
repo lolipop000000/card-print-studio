@@ -37,6 +37,8 @@ test('image preset saves its resource, survives cancel, applies without replacin
   await page.locator('#card-frame-effects').click();await page.locator('[data-effect-preset]').click();assert.equal(await page.locator('#effect-param-assetId').inputValue(),id);
   await page.locator('#effect-placement').selectOption('front');await fill(page,'#effect-param-sizeEnd',0);await add(page,'bloom');await fill(page,'#effect-param-threshold',.25);
   await page.locator('#effect-print-quality').check();await page.waitForFunction(()=>document.getElementById('effect-preview-status')?.dataset.busy==='false');
+  assert.equal(await page.locator('#effect-preview-status').getAttribute('data-bloom-backend'),'gpu','Actual offline editor uses GPU bloom');
+  assert.match(await page.locator('#effect-preview-status').innerText(),/블룸 GPU/);
   await page.screenshot({path:path.join(qa,'sprite-bloom-editor.png'),fullPage:true});await page.locator('#effect-apply').click();
   const applied=await saveProject(page,'sprite-preset-applied.json');assert.equal(applied.cards[0].artAssetId,before.cards[0].artAssetId);assert.equal(applied.cards[0].visualEffects.layers[0].params.assetId,id);assert.equal(applied.cards[0].visualEffects.layers[0].params.sizeEnd,0);assert.equal(applied.cards[0].visualEffects.layers[1].params.threshold,.25);
   await page.locator('#card-frame-effects').click();assert.equal(await page.locator('#effect-layer-list [data-kind="bloom"]').count(),1);await page.locator('#effect-close').click();

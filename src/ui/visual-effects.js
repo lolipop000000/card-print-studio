@@ -7,6 +7,7 @@ import {createVisualEffectsForTarget} from '../model/effect-emission.js';
 import {renderCard} from '../render/card.js';
 import {createEffectCache,renderVisualEffects} from '../render/effects/composite.js';
 import {makeSurface} from '../render/effects/masks.js';
+import {getBloomAccelerationStatus} from '../render/effects/gpu-bloom.js';
 import {createEffectTimeline,syncEffectTimeInput} from './effect-timeline.js';
 import {renderVisualEffectFields} from './visual-effect-fields.js';
 import {mountEffectTransform} from './effect-transform.js';
@@ -199,7 +200,7 @@ export function openVisualEffectsEditor(ctx,initialTarget){
  }
  function draw(){
   clearTimeout(timer);if(disposed||!previewTarget)return;
-  const started=performance.now(),dpi=previewView?.dpi()||(quality.checked?300:200);
+  const started=performance.now(),accelerationBefore=getBloomAccelerationStatus(),dpi=previewView?.dpi()||(quality.checked?300:200);
   if(dpi!==lastDpi){cache.clear();lastDpi=dpi;}
   const report=renderCard(canvas.getContext('2d',{willReadFrequently:true}),comparing?comparisonProject:previewProject,comparing?comparisonTarget:previewTarget,previewAssets,dpi,{timeSec:timeline.getTime(),playbackTarget:selectedPlayback.checked?target:null,frozenTimeSec:draftFrame,effectCache:cache,onEffectGeometry:entry=>{
    if(comparing)return;
@@ -211,7 +212,10 @@ export function openVisualEffectsEditor(ctx,initialTarget){
   previewView?.afterDraw(dpi);transform?.refresh();
   const problems=ctx.state.ignoreOutputWarnings?[]:report.problems.filter(p=>target.skillId?p.skillId===target.skillId:p.elementId===target.elementId||!target.elementId&&!p.elementId);
   message(problems.slice(0,2).map(p=>(p.severity==='warning'?'안내: ':'인쇄 확인: ')+p.message).join(' '));
-  status.dataset.busy=String(pendingImports>0);status.textContent=pendingImports?'입자 그림 읽는 중…':(quality.checked?'인쇄 품질 확인 · ':'미리보기 · ')+dpi+'dpi'+' · '+Math.round(performance.now()-started)+'ms';
+  const acceleration=getBloomAccelerationStatus(),gpu=acceleration.gpuRenders>accelerationBefore.gpuRenders,cpu=acceleration.cpuRenders>accelerationBefore.cpuRenders;
+  status.dataset.bloomBackend=gpu?(cpu?'mixed':'gpu'):(cpu?'cpu':'idle');
+  status.title=cpu&&acceleration.reason?'GPU 가속을 사용할 수 없는 작업은 기본 방식으로 처리해요.':'';
+  status.dataset.busy=String(pendingImports>0);status.textContent=pendingImports?'입자 그림 읽는 중…':(quality.checked?'인쇄 품질 확인 · ':'미리보기 · ')+dpi+'dpi'+' · '+Math.round(performance.now()-started)+'ms'+(gpu?' · 블룸 GPU'+(cpu?' + CPU':''):cpu?' · 블룸 CPU':'');
  }
  function scheduleDraw(){clearTimeout(timer);status.dataset.busy='true';status.textContent='계산 중…';timer=setTimeout(draw,150);}
  function renderFields(){

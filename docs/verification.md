@@ -1,3 +1,46 @@
+# v1.3.1 검증 기록 · 2026-10-18
+
+블룸의 여섯 단계 흐림 계산을 WebGL2 GPU로 이전했습니다. 추출·잘라내기·최종 알파 합성은 기존 경로를 사용하고, GPU 미지원·오류·연결 손실·작업 한도 초과에서는 기존 CPU로 처리합니다. 전체 렌더러를 GPU로 바꾼 것은 아닙니다.
+
+- 기본 모델·저장소 검사 **345/345** 통과.
+- GPU·CPU 블룸, 실제 이펙트 편집 화면, 혼합·선택 재생·캐시·확대·드래그 변형·기존 창작 필터의 실제 Edge 검사 **55/55** 통과.
+- 실제 오프라인 편집 화면의 GPU 미지원 안내와 편집 지속 검사 **1/1** 통과. 지원 환경의 실제 HTML에서는 **블룸 GPU** 표시와 300 DPI 미리보기 화면을 확인했습니다.
+- 바로 인쇄·오프라인 덱 복원·PDF·고정 장면·스프라이트·경고가 있는 출력 검사 **18/18** 통과. 실제 양면 PDF 두 번의 모든 카드 이미지가 300 DPI 기준과 같았고 용지 미리보기도 해당 DPI 기준과 일치했습니다.
+- 위 자동 검사 **419/419** 통과. 포함 패키지 라이선스 15개를 유지하며 새 실행 의존성은 없습니다.
+
+## 실제 GPU 사용과 출력 보존
+
+별도 실제 Edge 155에서 생산 코드의 GPU draw 호출 6회와 반환 결과에 포함된 빛 번짐을 함께 검사했습니다. 장치 문자열은 **Intel Arc 130V GPU (8GB), ANGLE / Direct3D11**입니다. 단순히 GPU를 탐지한 결과가 아닙니다. 원본 그림·표면 독립성·행 방향·mm/DPI 좌표를 보존했습니다.
+
+최종 픽셀을 비교한 **90개 조합**의 알파와 premultiplied 색 오차는 모두 0이었습니다. 68개 조합은 GPU로 두 번씩 계산됐으며 시간이 지나거나 시드가 달라져도 반복 출력이 같았습니다. 나머지는 반경·강도 0이나 발광 영역 없음으로 그대로 복사하는 경우입니다. 다른 드라이버의 Float32 연산 차이를 고려해 허용 한도는 알파 1·premultiplied 색 1.1의 8비트 단계로 정했습니다. CPU 대체 경로는 기존 136개 조합의 정확한 RGBA 비교를 유지합니다.
+
+작은 그림, 가로·세로 한 픽셀, 투명·반투명 색, 소수 반경, 캔버스 경계, 최대 12 mm 반경, 크기 변경을 검사했습니다. 한 컨텍스트와 텍스처 두 장을 재사용하고 이전 크기의 자원을 해제하며 흐림 텍스처 총량은 128 MiB로 제한합니다. 큰 작업 뒤에도 가능한 작업의 GPU 사용을 재개합니다.
+
+## 성능 측정
+
+동일한 Edge에서 **현재 최적화된 v1.3.0 CPU 경로**와 GPU를 번갈아 9회 측정한 중간값입니다. 업로드·읽기·최종 합성을 포함한 개별 블룸 처리 시간이며 앱 전체 FPS는 아닙니다.
+
+| 검사 장면 | CPU | GPU | 비율 |
+| --- | ---: | ---: | ---: |
+| 작은 발광 영역 · 150 DPI | 7.2 ms | 5.2 ms | 1.38배 |
+| 작은 발광 영역 · 300 DPI | 27.7 ms | 17.7 ms | 1.56배 |
+| 넓은 발광 영역 · 300 DPI | 125.4 ms | 57.6 ms | 2.18배 |
+| 최대 12 mm 반경 · 300 DPI | 48.0 ms | 35.1 ms | 1.37배 |
+
+첫 처리나 크기 전환에는 준비 비용이 듭니다. 이 네 장면의 최초 전체 처리 시간은 41~175 ms였습니다. 독립 리뷰의 넓은 발광 영역·최대 반경 추가 측정도 CPU 157.1 ms, GPU 78.4 ms의 중간값으로 빨랐습니다. 컴퓨터·드라이버·효과 조합에 따라 달라집니다.
+
+## 독립 리뷰와 실패 상황
+
+리뷰어가 GPU·CPU 검사 **8/8**을 별도로 실행했습니다. 첫 번째 draw, 여섯 번째 draw, 읽기 직후에 각각 GPU 연결을 끊고, 세 번째 draw 뒤에 실제 WebGL 오류를 넣었습니다. 모두 정확한 CPU 출력으로 전환했고 연결 복구 뒤 GPU 계산을 재개했습니다. 페이지 오류가 없고, 검토 범위에서 남은 확인된 문제 없이 승인됐습니다.
+
+GPU를 제공하지 않는 브라우저, 부동소수점 대상 미지원, 텍스처 할당 실패도 검사했으며 실패한 초기화를 계속 반복하지 않습니다. 기존 카드 JSON·그림 원본·레이어·키워드·인쇄 수치는 바꾸지 않습니다. 사용자의 열린 작업 탭은 새로고침하지 않습니다. 실제 프린터 급지·정합 검사는 포함하지 않았습니다.
+
+재현 명령: `node --test tests/*.test.mjs`; `node --test --test-concurrency=1 tests/bloom-gpu.spec.mjs tests/bloom-performance.spec.mjs tests/creative-effects-editor.spec.mjs tests/visual-effects-creative-filters.spec.mjs tests/effect-selected-playback.spec.mjs tests/effect-playback-cache.spec.mjs tests/effect-preview-zoom.spec.mjs tests/effect-transform.spec.mjs tests/effect-blending.spec.mjs`; `node --test tests/bloom-gpu-editor.spec.mjs`; `node --test --test-concurrency=1 tests/browser-print.spec.mjs tests/offline.spec.mjs tests/pdf.spec.mjs tests/visual-effects-print.spec.mjs tests/sprite-customization-print.spec.mjs tests/printing-tolerant.spec.mjs`.
+
+추가 성능 명령: `node tests/bloom-gpu-benchmark.mjs`. 자료는 Git에서 제외한 `artifacts/qa/bloom-gpu-{production,parity,benchmark,review-adversarial}.json`, `sprite-bloom-editor.png`, `effects-pixels-{1,2}.json`에 보관합니다. 배포 HTML은 **5,386,481 bytes**, SHA256 `c73812f4cb8066df2615eafa3919be2e8a2e6fcb70228b1ad78163087a2d0bbb`입니다.
+
+---
+
 # v1.3.0 검증 기록 · 2026-10-18
 
 이미지 자르기와 공용 에셋 보관함, 요소 찾기·순서·잠금, 선택 대상만 이펙트 재생과 블룸 CPU 최적화를 검증했습니다. 개인 카드와 첨부 이미지는 배포 파일에 넣지 않습니다.

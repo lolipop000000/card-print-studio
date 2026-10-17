@@ -5,12 +5,12 @@ import {build} from 'esbuild';
 import {openHarness} from './helpers/browser.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
-const bundle=await build({absWorkingDir:root,stdin:{contents:`import {makeSurface} from './src/render/effects/masks.js'; import {applyCreativeFilter} from './src/render/effects/creative-filters.js'; import {referenceBloom,bloomFixture} from './tests/bloom-performance-reference.mjs'; window.bloomTestApi={makeSurface,applyCreativeFilter,referenceBloom,bloomFixture};`,resolveDir:root},bundle:true,format:'iife',target:'es2022',write:false});
+const bundle=await build({absWorkingDir:root,stdin:{contents:`import {makeSurface} from './src/render/effects/masks.js'; import {applyCreativeFilter as dispatch} from './src/render/effects/creative-filters.js'; import {referenceBloom,bloomFixture} from './tests/bloom-performance-reference.mjs'; const applyCreativeFilter=(surface,layer,options={})=>dispatch(surface,layer,{...options,bloomBackend:'cpu'}); window.bloomTestApi={makeSurface,applyCreativeFilter,referenceBloom,bloomFixture};`,resolveDir:root},bundle:true,format:'iife',target:'es2022',write:false});
 let session;
 before(async()=>{session=await openHarness();await session.page.addScriptTag({content:bundle.outputFiles[0].text});});
 after(async()=>{await session?.browser.close();});
 
-test('bloom preserves baseline RGBA across print, tint, threshold, transparency and tiny canvases',async()=>{
+test('CPU fallback bloom preserves baseline RGBA across print, tint, threshold, transparency and tiny canvases',async()=>{
  const results=await session.page.evaluate(()=>{
   const {makeSurface,applyCreativeFilter,referenceBloom,bloomFixture}=bloomTestApi;
   const bytes=s=>s.ctx.getImageData(0,0,s.canvas.width,s.canvas.height).data;

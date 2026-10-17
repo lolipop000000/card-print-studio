@@ -4329,15 +4329,15 @@
         };
         var testSVG = function(document2) {
           var img = new Image();
-          var canvas2 = document2.createElement("canvas");
-          var ctx = canvas2.getContext("2d");
+          var canvas3 = document2.createElement("canvas");
+          var ctx = canvas3.getContext("2d");
           if (!ctx) {
             return false;
           }
           img.src = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'></svg>";
           try {
             ctx.drawImage(img, 0, 0);
-            canvas2.toDataURL();
+            canvas3.toDataURL();
           } catch (e3) {
             return false;
           }
@@ -4347,18 +4347,18 @@
           return data[0] === 0 && data[1] === 255 && data[2] === 0 && data[3] === 255;
         };
         var testForeignObject = function(document2) {
-          var canvas2 = document2.createElement("canvas");
+          var canvas3 = document2.createElement("canvas");
           var size = 100;
-          canvas2.width = size;
-          canvas2.height = size;
-          var ctx = canvas2.getContext("2d");
+          canvas3.width = size;
+          canvas3.height = size;
+          var ctx = canvas3.getContext("2d");
           if (!ctx) {
             return Promise.reject(false);
           }
           ctx.fillStyle = "rgb(0, 255, 0)";
           ctx.fillRect(0, 0, size, size);
           var img = new Image();
-          var greenImageSrc = canvas2.toDataURL();
+          var greenImageSrc = canvas3.toDataURL();
           img.src = greenImageSrc;
           var svg2 = createForeignObjectSVG(size, size, 0, 0, img);
           ctx.fillStyle = "red";
@@ -4618,11 +4618,11 @@
           /** @class */
           (function(_super) {
             __extends(CanvasElementContainer2, _super);
-            function CanvasElementContainer2(context2, canvas2) {
-              var _this = _super.call(this, context2, canvas2) || this;
-              _this.canvas = canvas2;
-              _this.intrinsicWidth = canvas2.width;
-              _this.intrinsicHeight = canvas2.height;
+            function CanvasElementContainer2(context2, canvas3) {
+              var _this = _super.call(this, context2, canvas3) || this;
+              _this.canvas = canvas3;
+              _this.intrinsicWidth = canvas3.width;
+              _this.intrinsicHeight = canvas3.height;
               return _this;
             }
             return CanvasElementContainer2;
@@ -5531,56 +5531,56 @@
               }
               return node2.cloneNode(false);
             };
-            DocumentCloner2.prototype.createCanvasClone = function(canvas2) {
+            DocumentCloner2.prototype.createCanvasClone = function(canvas3) {
               var _a2;
-              if (this.options.inlineImages && canvas2.ownerDocument) {
-                var img = canvas2.ownerDocument.createElement("img");
+              if (this.options.inlineImages && canvas3.ownerDocument) {
+                var img = canvas3.ownerDocument.createElement("img");
                 try {
-                  img.src = canvas2.toDataURL();
+                  img.src = canvas3.toDataURL();
                   return img;
                 } catch (e3) {
-                  this.context.logger.info("Unable to inline canvas contents, canvas is tainted", canvas2);
+                  this.context.logger.info("Unable to inline canvas contents, canvas is tainted", canvas3);
                 }
               }
-              var clonedCanvas = canvas2.cloneNode(false);
+              var clonedCanvas = canvas3.cloneNode(false);
               try {
-                clonedCanvas.width = canvas2.width;
-                clonedCanvas.height = canvas2.height;
-                var ctx = canvas2.getContext("2d");
+                clonedCanvas.width = canvas3.width;
+                clonedCanvas.height = canvas3.height;
+                var ctx = canvas3.getContext("2d");
                 var clonedCtx = clonedCanvas.getContext("2d");
                 if (clonedCtx) {
                   if (!this.options.allowTaint && ctx) {
-                    clonedCtx.putImageData(ctx.getImageData(0, 0, canvas2.width, canvas2.height), 0, 0);
+                    clonedCtx.putImageData(ctx.getImageData(0, 0, canvas3.width, canvas3.height), 0, 0);
                   } else {
-                    var gl = (_a2 = canvas2.getContext("webgl2")) !== null && _a2 !== void 0 ? _a2 : canvas2.getContext("webgl");
+                    var gl = (_a2 = canvas3.getContext("webgl2")) !== null && _a2 !== void 0 ? _a2 : canvas3.getContext("webgl");
                     if (gl) {
                       var attribs = gl.getContextAttributes();
                       if ((attribs === null || attribs === void 0 ? void 0 : attribs.preserveDrawingBuffer) === false) {
-                        this.context.logger.warn("Unable to clone WebGL context as it has preserveDrawingBuffer=false", canvas2);
+                        this.context.logger.warn("Unable to clone WebGL context as it has preserveDrawingBuffer=false", canvas3);
                       }
                     }
-                    clonedCtx.drawImage(canvas2, 0, 0);
+                    clonedCtx.drawImage(canvas3, 0, 0);
                   }
                 }
                 return clonedCanvas;
               } catch (e3) {
-                this.context.logger.info("Unable to clone canvas as it is tainted", canvas2);
+                this.context.logger.info("Unable to clone canvas as it is tainted", canvas3);
               }
               return clonedCanvas;
             };
             DocumentCloner2.prototype.createVideoClone = function(video) {
-              var canvas2 = video.ownerDocument.createElement("canvas");
-              canvas2.width = video.offsetWidth;
-              canvas2.height = video.offsetHeight;
-              var ctx = canvas2.getContext("2d");
+              var canvas3 = video.ownerDocument.createElement("canvas");
+              canvas3.width = video.offsetWidth;
+              canvas3.height = video.offsetHeight;
+              var ctx = canvas3.getContext("2d");
               try {
                 if (ctx) {
-                  ctx.drawImage(video, 0, 0, canvas2.width, canvas2.height);
+                  ctx.drawImage(video, 0, 0, canvas3.width, canvas3.height);
                   if (!this.options.allowTaint) {
-                    ctx.getImageData(0, 0, canvas2.width, canvas2.height);
+                    ctx.getImageData(0, 0, canvas3.width, canvas3.height);
                   }
                 }
-                return canvas2;
+                return canvas3;
               } catch (e3) {
                 this.context.logger.info("Unable to clone video as it is tainted", video);
               }
@@ -6972,7 +6972,7 @@
             };
             CanvasRenderer2.prototype.renderNodeContent = function(paint2) {
               return __awaiter(this, void 0, void 0, function() {
-                var container, curves, styles, _i, _a2, child, image2, image2, iframeRenderer, canvas2, size, _b2, fontFamily2, fontSize2, baseline, bounds, x3, textBounds, img, image2, url, fontFamily2, bounds;
+                var container, curves, styles, _i, _a2, child, image2, image2, iframeRenderer, canvas3, size, _b2, fontFamily2, fontSize2, baseline, bounds, x3, textBounds, img, image2, url, fontFamily2, bounds;
                 return __generator(this, function(_c) {
                   switch (_c.label) {
                     case 0:
@@ -7038,9 +7038,9 @@
                       });
                       return [4, iframeRenderer.render(container.tree)];
                     case 13:
-                      canvas2 = _c.sent();
+                      canvas3 = _c.sent();
                       if (container.width && container.height) {
-                        this.ctx.drawImage(canvas2, 0, 0, container.width, container.height, container.bounds.left, container.bounds.top, container.bounds.width, container.bounds.height);
+                        this.ctx.drawImage(canvas3, 0, 0, container.width, container.height, container.bounds.left, container.bounds.top, container.bounds.width, container.bounds.height);
                       }
                       _c.label = 14;
                     case 14:
@@ -7310,12 +7310,12 @@
                 return image2;
               }
               var ownerDocument = (_a2 = this.canvas.ownerDocument) !== null && _a2 !== void 0 ? _a2 : document;
-              var canvas2 = ownerDocument.createElement("canvas");
-              canvas2.width = Math.max(1, width);
-              canvas2.height = Math.max(1, height);
-              var ctx = canvas2.getContext("2d");
+              var canvas3 = ownerDocument.createElement("canvas");
+              canvas3.width = Math.max(1, width);
+              canvas3.height = Math.max(1, height);
+              var ctx = canvas3.getContext("2d");
               ctx.drawImage(image2, 0, 0, image2.width, image2.height, 0, 0, width, height);
-              return canvas2;
+              return canvas3;
             };
             CanvasRenderer2.prototype.renderBackgroundImage = function(container) {
               return __awaiter(this, void 0, void 0, function() {
@@ -7325,7 +7325,7 @@
                     case 0:
                       index2 = container.styles.backgroundImage.length - 1;
                       _loop_1 = function(backgroundImage3) {
-                        var image2, url, _c, path, x3, y3, width, height, pattern, _d, path, x3, y3, width, height, _e2, lineLength, x0, x1, y0, y1, canvas2, ctx, gradient_1, pattern, _f, path, left, top_1, width, height, position2, x3, y3, _g, rx, ry, radialGradient_1, midX, midY, f4, invF;
+                        var image2, url, _c, path, x3, y3, width, height, pattern, _d, path, x3, y3, width, height, _e2, lineLength, x0, x1, y0, y1, canvas3, ctx, gradient_1, pattern, _f, path, left, top_1, width, height, position2, x3, y3, _g, rx, ry, radialGradient_1, midX, midY, f4, invF;
                         return __generator(this, function(_h) {
                           switch (_h.label) {
                             case 0:
@@ -7358,10 +7358,10 @@
                               if (isLinearGradient(backgroundImage3)) {
                                 _d = calculateBackgroundRendering(container, index2, [null, null, null]), path = _d[0], x3 = _d[1], y3 = _d[2], width = _d[3], height = _d[4];
                                 _e2 = calculateGradientDirection(backgroundImage3.angle, width, height), lineLength = _e2[0], x0 = _e2[1], x1 = _e2[2], y0 = _e2[3], y1 = _e2[4];
-                                canvas2 = document.createElement("canvas");
-                                canvas2.width = width;
-                                canvas2.height = height;
-                                ctx = canvas2.getContext("2d");
+                                canvas3 = document.createElement("canvas");
+                                canvas3.width = width;
+                                canvas3.height = height;
+                                ctx = canvas3.getContext("2d");
                                 gradient_1 = ctx.createLinearGradient(x0, y0, x1, y1);
                                 processColorStops(backgroundImage3.stops, lineLength).forEach(function(colorStop) {
                                   return gradient_1.addColorStop(colorStop.stop, asString(colorStop.color));
@@ -7369,7 +7369,7 @@
                                 ctx.fillStyle = gradient_1;
                                 ctx.fillRect(0, 0, width, height);
                                 if (width > 0 && height > 0) {
-                                  pattern = this_1.ctx.createPattern(canvas2, "repeat");
+                                  pattern = this_1.ctx.createPattern(canvas3, "repeat");
                                   this_1.renderRepeat(path, pattern, x3, y3);
                                 }
                               } else if (isRadialGradient(backgroundImage3)) {
@@ -7892,7 +7892,7 @@
         }
         var renderElement = function(element2, opts) {
           return __awaiter(void 0, void 0, void 0, function() {
-            var ownerDocument, defaultView, resourceOptions, contextOptions, windowOptions, windowBounds, context2, foreignObjectRendering, cloneOptions, documentCloner, clonedElement, container, _a2, width, height, left, top, backgroundColor2, renderOptions, canvas2, renderer, root, renderer;
+            var ownerDocument, defaultView, resourceOptions, contextOptions, windowOptions, windowBounds, context2, foreignObjectRendering, cloneOptions, documentCloner, clonedElement, container, _a2, width, height, left, top, backgroundColor2, renderOptions, canvas3, renderer, root, renderer;
             var _b2, _c, _d, _e2, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t2;
             return __generator(this, function(_u) {
               switch (_u.label) {
@@ -7956,7 +7956,7 @@
                   renderer = new ForeignObjectRenderer(context2, renderOptions);
                   return [4, renderer.render(clonedElement)];
                 case 2:
-                  canvas2 = _u.sent();
+                  canvas3 = _u.sent();
                   return [3, 5];
                 case 3:
                   context2.logger.debug("Document cloned, element located at " + left + "," + top + " with size " + width + "x" + height + " using computed rendering");
@@ -7969,7 +7969,7 @@
                   renderer = new CanvasRenderer(context2, renderOptions);
                   return [4, renderer.render(root)];
                 case 4:
-                  canvas2 = _u.sent();
+                  canvas3 = _u.sent();
                   _u.label = 5;
                 case 5:
                   if ((_t2 = opts.removeContainer) !== null && _t2 !== void 0 ? _t2 : true) {
@@ -7978,7 +7978,7 @@
                     }
                   }
                   context2.logger.debug("Finished rendering");
-                  return [2, canvas2];
+                  return [2, canvas3];
               }
             });
           });
@@ -15024,28 +15024,28 @@
       throw new TypeError("Cannot call a class as a function");
     }
   }
-  function getImageDataFromCanvas(canvas2, topX, topY, width, height) {
-    if (typeof canvas2 === "string") {
-      canvas2 = document.getElementById(canvas2);
+  function getImageDataFromCanvas(canvas3, topX, topY, width, height) {
+    if (typeof canvas3 === "string") {
+      canvas3 = document.getElementById(canvas3);
     }
-    if (!canvas2 || _typeof2(canvas2) !== "object" || !("getContext" in canvas2)) {
+    if (!canvas3 || _typeof2(canvas3) !== "object" || !("getContext" in canvas3)) {
       throw new TypeError("Expecting canvas with `getContext` method in processCanvasRGB(A) calls!");
     }
-    var context2 = canvas2.getContext("2d");
+    var context2 = canvas3.getContext("2d");
     try {
       return context2.getImageData(topX, topY, width, height);
     } catch (e2) {
       throw new Error("unable to access image data: " + e2);
     }
   }
-  function processCanvasRGBA(canvas2, topX, topY, width, height, radius) {
+  function processCanvasRGBA(canvas3, topX, topY, width, height, radius) {
     if (isNaN(radius) || radius < 1) {
       return;
     }
     radius |= 0;
-    var imageData3 = getImageDataFromCanvas(canvas2, topX, topY, width, height);
+    var imageData3 = getImageDataFromCanvas(canvas3, topX, topY, width, height);
     imageData3 = processImageDataRGBA(imageData3, topX, topY, width, height, radius);
-    canvas2.getContext("2d").putImageData(imageData3, topX, topY);
+    canvas3.getContext("2d").putImageData(imageData3, topX, topY);
   }
   function processImageDataRGBA(imageData3, topX, topY, width, height, radius) {
     var pixels2 = imageData3.data;
@@ -15347,7 +15347,7 @@
   function node(_ref2) {
     var {
       DOMParser: DOMParser2,
-      canvas: canvas2,
+      canvas: canvas3,
       fetch: fetch2
     } = _ref2;
     return {
@@ -15356,8 +15356,8 @@
       ignoreMouse: true,
       DOMParser: DOMParser2,
       fetch: fetch2,
-      createCanvas: canvas2.createCanvas,
-      createImage: canvas2.loadImage
+      createCanvas: canvas3.createCanvas,
+      createImage: canvas3.loadImage
     };
   }
   function compressSpaces(str) {
@@ -15578,10 +15578,10 @@
     return target;
   }
   function createCanvas(width, height) {
-    var canvas2 = document.createElement("canvas");
-    canvas2.width = width;
-    canvas2.height = height;
-    return canvas2;
+    var canvas3 = document.createElement("canvas");
+    canvas3.width = width;
+    canvas3.height = height;
+    return canvas3;
   }
   function createImage(_x) {
     return _createImage.apply(this, arguments);
@@ -16021,19 +16021,19 @@
             onClick,
             onMouseMove
           } = this;
-          var canvas2 = screen.ctx.canvas;
-          canvas2.onclick = onClick;
-          canvas2.onmousemove = onMouseMove;
+          var canvas3 = screen.ctx.canvas;
+          canvas3.onclick = onClick;
+          canvas3.onmousemove = onMouseMove;
           this.working = true;
         }
         stop() {
           if (!this.working) {
             return;
           }
-          var canvas2 = this.screen.ctx.canvas;
+          var canvas3 = this.screen.ctx.canvas;
           this.working = false;
-          canvas2.onclick = null;
-          canvas2.onmousemove = null;
+          canvas3.onclick = null;
+          canvas3.onmousemove = null;
         }
         hasEvents() {
           return this.working && this.events.length > 0;
@@ -16375,10 +16375,10 @@
             ctx,
             isFirstRender
           } = this;
-          var canvas2 = ctx.canvas;
+          var canvas3 = ctx.canvas;
           viewPort.clear();
-          if (canvas2.width && canvas2.height) {
-            viewPort.setCurrent(canvas2.width, canvas2.height);
+          if (canvas3.width && canvas3.height) {
+            viewPort.setCurrent(canvas3.width, canvas3.height);
           } else {
             viewPort.setCurrent(CLIENT_WIDTH, CLIENT_HEIGHT);
           }
@@ -16386,20 +16386,20 @@
           var heightStyle = element2.getStyle("height");
           if (!ignoreDimensions && (isFirstRender || typeof scaleWidth !== "number" && typeof scaleHeight !== "number")) {
             if (widthStyle.hasValue()) {
-              canvas2.width = widthStyle.getPixels("x");
-              if (canvas2.style) {
-                canvas2.style.width = "".concat(canvas2.width, "px");
+              canvas3.width = widthStyle.getPixels("x");
+              if (canvas3.style) {
+                canvas3.style.width = "".concat(canvas3.width, "px");
               }
             }
             if (heightStyle.hasValue()) {
-              canvas2.height = heightStyle.getPixels("y");
-              if (canvas2.style) {
-                canvas2.style.height = "".concat(canvas2.height, "px");
+              canvas3.height = heightStyle.getPixels("y");
+              if (canvas3.style) {
+                canvas3.style.height = "".concat(canvas3.height, "px");
               }
             }
           }
-          var cWidth = canvas2.clientWidth || canvas2.width;
-          var cHeight = canvas2.clientHeight || canvas2.height;
+          var cWidth = canvas3.clientWidth || canvas3.width;
+          var cHeight = canvas3.clientHeight || canvas3.height;
           if (ignoreDimensions && widthStyle.hasValue() && heightStyle.hasValue()) {
             cWidth = widthStyle.getPixels("x");
             cHeight = heightStyle.getPixels("y");
@@ -18295,10 +18295,10 @@
             screen,
             window: window2
           } = document2;
-          var canvas2 = ctx.canvas;
+          var canvas3 = ctx.canvas;
           screen.setDefaults(ctx);
-          if (canvas2.style && typeof ctx.font !== "undefined" && window2 && typeof window2.getComputedStyle !== "undefined") {
-            ctx.font = window2.getComputedStyle(canvas2).getPropertyValue("font");
+          if (canvas3.style && typeof ctx.font !== "undefined" && window2 && typeof window2.getComputedStyle !== "undefined") {
+            ctx.font = window2.getComputedStyle(canvas3).getPropertyValue("font");
             var fontSizeProp = new Property(document2, "fontSize", Font.parse(ctx.font).fontSize);
             if (fontSizeProp.hasValue()) {
               document2.rootEmSize = fontSizeProp.getPixels("y");
@@ -20282,15 +20282,15 @@
             blurRadius
           } = this;
           var body = document2.window ? document2.window.document.body : null;
-          var canvas2 = ctx.canvas;
-          canvas2.id = document2.getUniqueId();
+          var canvas3 = ctx.canvas;
+          canvas3.id = document2.getUniqueId();
           if (body) {
-            canvas2.style.display = "none";
-            body.appendChild(canvas2);
+            canvas3.style.display = "none";
+            body.appendChild(canvas3);
           }
-          processCanvasRGBA(canvas2, x3, y3, width, height, blurRadius);
+          processCanvasRGBA(canvas3, x3, y3, width, height, blurRadius);
           if (body) {
-            body.removeChild(canvas2);
+            body.removeChild(canvas3);
           }
         }
       };
@@ -20668,19 +20668,19 @@
     const ids = /* @__PURE__ */ new Set();
     let end = 0;
     for (const [index2, ref] of skill.skillReferences.entries()) {
-      const fail2 = (field2, value, rule) => bad(field2, value, rule, index2, ref);
-      if (!object(ref)) return fail2("\uCC38\uC870 \uC815\uBCF4", ref, "\uCC38\uC870 ID, \uB300\uC0C1 \uC2A4\uD0AC ID, \uC2DC\uC791\xB7\uB05D \uC704\uCE58\uAC00 \uC788\uB294 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4");
-      if (!id(ref.id)) return fail2("\uCC38\uC870 ID", ref.id, idRule2);
-      if (ids.has(ref.id)) return fail2("\uCC38\uC870 ID", ref.id, "\uC774\uC804 \uCC38\uC870 " + (skill.skillReferences.findIndex((previous) => previous?.id === ref.id) + 1) + "\uBC88\uACFC \uC911\uBCF5\uB41C ID\uC785\uB2C8\uB2E4. \uCC38\uC870\uB9C8\uB2E4 \uC11C\uB85C \uB2E4\uB978 ID\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4");
-      if (!id(ref.skillId)) return fail2("\uB300\uC0C1 \uC2A4\uD0AC ID", ref.skillId, idRule2);
-      if (!Number.isInteger(ref.start)) return fail2("\uC2DC\uC791 \uC704\uCE58", ref.start, "0 \uC774\uC0C1\uC758 \uC815\uC218\uC5EC\uC57C \uD569\uB2C8\uB2E4");
-      if (!Number.isInteger(ref.end)) return fail2("\uB05D \uC704\uCE58", ref.end, "\uC2DC\uC791 \uC704\uCE58\uBCF4\uB2E4 \uD070 \uC815\uC218\uC5EC\uC57C \uD569\uB2C8\uB2E4");
-      if (ref.start < 0) return fail2("\uC2DC\uC791 \uC704\uCE58", ref.start, "0 \uC774\uC0C1\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4");
-      if (ref.start < end) return fail2("\uC2DC\uC791 \uC704\uCE58", ref.start, "\uC774\uC804 \uCC38\uC870 " + index2 + "\uBC88\uC758 \uB05D \uC704\uCE58 " + valueLabel(end) + " \uC774\uC0C1\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4. \uCC38\uC870\uB294 \uC704\uCE58 \uC21C\uC11C\uB300\uB85C \uBC30\uCE58\uD558\uACE0 \uC11C\uB85C \uACB9\uCE58\uBA74 \uC548 \uB429\uB2C8\uB2E4");
-      if (ref.end <= ref.start) return fail2("\uB05D \uC704\uCE58", ref.end, "\uC2DC\uC791 \uC704\uCE58 " + valueLabel(ref.start) + "\uBCF4\uB2E4 \uCEE4\uC57C \uD569\uB2C8\uB2E4");
-      if (ref.end > skill.effect.length) return fail2("\uB05D \uC704\uCE58", ref.end, "\uD6A8\uACFC \uD14D\uC2A4\uD2B8 \uAE38\uC774 " + skill.effect.length + " (UTF-16) \uC774\uD558\uC5EC\uC57C \uD569\uB2C8\uB2E4");
-      if (!boundary(skill.effect, ref.start)) return fail2("\uC2DC\uC791 \uC704\uCE58", ref.start, "\uBB38\uC790 \uC0AC\uC774\uC758 \uACBD\uACC4\uC5EC\uC57C \uD569\uB2C8\uB2E4. \uD604\uC7AC \uC704\uCE58\uB294 \uC774\uBAA8\uC9C0 \uB4F1 UTF-16 \uBB38\uC790 \uC911\uAC04\uC785\uB2C8\uB2E4");
-      if (!boundary(skill.effect, ref.end)) return fail2("\uB05D \uC704\uCE58", ref.end, "\uBB38\uC790 \uC0AC\uC774\uC758 \uACBD\uACC4\uC5EC\uC57C \uD569\uB2C8\uB2E4. \uD604\uC7AC \uC704\uCE58\uB294 \uC774\uBAA8\uC9C0 \uB4F1 UTF-16 \uBB38\uC790 \uC911\uAC04\uC785\uB2C8\uB2E4");
+      const fail3 = (field2, value, rule) => bad(field2, value, rule, index2, ref);
+      if (!object(ref)) return fail3("\uCC38\uC870 \uC815\uBCF4", ref, "\uCC38\uC870 ID, \uB300\uC0C1 \uC2A4\uD0AC ID, \uC2DC\uC791\xB7\uB05D \uC704\uCE58\uAC00 \uC788\uB294 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4");
+      if (!id(ref.id)) return fail3("\uCC38\uC870 ID", ref.id, idRule2);
+      if (ids.has(ref.id)) return fail3("\uCC38\uC870 ID", ref.id, "\uC774\uC804 \uCC38\uC870 " + (skill.skillReferences.findIndex((previous) => previous?.id === ref.id) + 1) + "\uBC88\uACFC \uC911\uBCF5\uB41C ID\uC785\uB2C8\uB2E4. \uCC38\uC870\uB9C8\uB2E4 \uC11C\uB85C \uB2E4\uB978 ID\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4");
+      if (!id(ref.skillId)) return fail3("\uB300\uC0C1 \uC2A4\uD0AC ID", ref.skillId, idRule2);
+      if (!Number.isInteger(ref.start)) return fail3("\uC2DC\uC791 \uC704\uCE58", ref.start, "0 \uC774\uC0C1\uC758 \uC815\uC218\uC5EC\uC57C \uD569\uB2C8\uB2E4");
+      if (!Number.isInteger(ref.end)) return fail3("\uB05D \uC704\uCE58", ref.end, "\uC2DC\uC791 \uC704\uCE58\uBCF4\uB2E4 \uD070 \uC815\uC218\uC5EC\uC57C \uD569\uB2C8\uB2E4");
+      if (ref.start < 0) return fail3("\uC2DC\uC791 \uC704\uCE58", ref.start, "0 \uC774\uC0C1\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4");
+      if (ref.start < end) return fail3("\uC2DC\uC791 \uC704\uCE58", ref.start, "\uC774\uC804 \uCC38\uC870 " + index2 + "\uBC88\uC758 \uB05D \uC704\uCE58 " + valueLabel(end) + " \uC774\uC0C1\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4. \uCC38\uC870\uB294 \uC704\uCE58 \uC21C\uC11C\uB300\uB85C \uBC30\uCE58\uD558\uACE0 \uC11C\uB85C \uACB9\uCE58\uBA74 \uC548 \uB429\uB2C8\uB2E4");
+      if (ref.end <= ref.start) return fail3("\uB05D \uC704\uCE58", ref.end, "\uC2DC\uC791 \uC704\uCE58 " + valueLabel(ref.start) + "\uBCF4\uB2E4 \uCEE4\uC57C \uD569\uB2C8\uB2E4");
+      if (ref.end > skill.effect.length) return fail3("\uB05D \uC704\uCE58", ref.end, "\uD6A8\uACFC \uD14D\uC2A4\uD2B8 \uAE38\uC774 " + skill.effect.length + " (UTF-16) \uC774\uD558\uC5EC\uC57C \uD569\uB2C8\uB2E4");
+      if (!boundary(skill.effect, ref.start)) return fail3("\uC2DC\uC791 \uC704\uCE58", ref.start, "\uBB38\uC790 \uC0AC\uC774\uC758 \uACBD\uACC4\uC5EC\uC57C \uD569\uB2C8\uB2E4. \uD604\uC7AC \uC704\uCE58\uB294 \uC774\uBAA8\uC9C0 \uB4F1 UTF-16 \uBB38\uC790 \uC911\uAC04\uC785\uB2C8\uB2E4");
+      if (!boundary(skill.effect, ref.end)) return fail3("\uB05D \uC704\uCE58", ref.end, "\uBB38\uC790 \uC0AC\uC774\uC758 \uACBD\uACC4\uC5EC\uC57C \uD569\uB2C8\uB2E4. \uD604\uC7AC \uC704\uCE58\uB294 \uC774\uBAA8\uC9C0 \uB4F1 UTF-16 \uBB38\uC790 \uC911\uAC04\uC785\uB2C8\uB2E4");
       ids.add(ref.id);
       end = ref.end;
     }
@@ -23618,20 +23618,20 @@
 
   // src/render/effects/masks.js
   function makeSurface(work, dpi) {
-    const scale = dpi / 25.4, canvas2 = document.createElement("canvas");
-    canvas2.width = Math.max(1, Math.round(work.w * scale));
-    canvas2.height = Math.max(1, Math.round(work.h * scale));
-    const ctx = canvas2.getContext("2d", { willReadFrequently: true });
+    const scale = dpi / 25.4, canvas3 = document.createElement("canvas");
+    canvas3.width = Math.max(1, Math.round(work.w * scale));
+    canvas3.height = Math.max(1, Math.round(work.h * scale));
+    const ctx = canvas3.getContext("2d", { willReadFrequently: true });
     ctx.setTransform(scale, 0, 0, scale, -work.x * scale, -work.y * scale);
-    return { canvas: canvas2, ctx, work, scale, dpi };
+    return { canvas: canvas3, ctx, work, scale, dpi };
   }
   function paintSurface(ctx, surface) {
     ctx.drawImage(surface.canvas, surface.work.x, surface.work.y, surface.work.w, surface.work.h);
   }
   function alphaBounds(surface) {
-    const { canvas: canvas2, work, scale } = surface, bytes2 = surface.ctx.getImageData(0, 0, canvas2.width, canvas2.height).data;
-    let left = canvas2.width, top = canvas2.height, right = -1, bottom = -1;
-    for (let y3 = 0; y3 < canvas2.height; y3++) for (let x3 = 0; x3 < canvas2.width; x3++) if (bytes2[(y3 * canvas2.width + x3) * 4 + 3] > 2) {
+    const { canvas: canvas3, work, scale } = surface, bytes2 = surface.ctx.getImageData(0, 0, canvas3.width, canvas3.height).data;
+    let left = canvas3.width, top = canvas3.height, right = -1, bottom = -1;
+    for (let y3 = 0; y3 < canvas3.height; y3++) for (let x3 = 0; x3 < canvas3.width; x3++) if (bytes2[(y3 * canvas3.width + x3) * 4 + 3] > 2) {
       left = Math.min(left, x3);
       right = Math.max(right, x3);
       top = Math.min(top, y3);
@@ -23648,8 +23648,8 @@
 
   // src/render/effects/text-warp.js
   function occupiedColumns(surface, rect, columns) {
-    const { scale, work, canvas: canvas2 } = surface, left = Math.max(0, Math.floor((rect.x - work.x) * scale)), top = Math.max(0, Math.floor((rect.y - work.y) * scale));
-    const right = Math.min(canvas2.width, Math.ceil((rect.x + rect.w - work.x) * scale)), bottom = Math.min(canvas2.height, Math.ceil((rect.y + rect.h - work.y) * scale)), result = Array(columns).fill(null);
+    const { scale, work, canvas: canvas3 } = surface, left = Math.max(0, Math.floor((rect.x - work.x) * scale)), top = Math.max(0, Math.floor((rect.y - work.y) * scale));
+    const right = Math.min(canvas3.width, Math.ceil((rect.x + rect.w - work.x) * scale)), bottom = Math.min(canvas3.height, Math.ceil((rect.y + rect.h - work.y) * scale)), result = Array(columns).fill(null);
     if (right <= left || bottom <= top) return result;
     const width = right - left, height = bottom - top, data = surface.ctx.getImageData(left, top, width, height).data, step = rect.w / columns;
     for (let x3 = 0; x3 < width; x3++) {
@@ -24115,22 +24115,22 @@
       }
     }
     const scale = Math.min(1, MAX_TINT_SIDE / Math.max(region3.w, region3.h));
-    const canvas2 = document.createElement("canvas");
-    canvas2.width = Math.max(1, Math.round(region3.w * scale));
-    canvas2.height = Math.max(1, Math.round(region3.h * scale));
-    const ctx = canvas2.getContext("2d");
-    if (region3.x === 0 && region3.y === 0 && region3.w === width && region3.h === height) ctx.drawImage(image, 0, 0, canvas2.width, canvas2.height);
-    else ctx.drawImage(image, region3.x, region3.y, region3.w, region3.h, 0, 0, canvas2.width, canvas2.height);
+    const canvas3 = document.createElement("canvas");
+    canvas3.width = Math.max(1, Math.round(region3.w * scale));
+    canvas3.height = Math.max(1, Math.round(region3.h * scale));
+    const ctx = canvas3.getContext("2d");
+    if (region3.x === 0 && region3.y === 0 && region3.w === width && region3.h === height) ctx.drawImage(image, 0, 0, canvas3.width, canvas3.height);
+    else ctx.drawImage(image, region3.x, region3.y, region3.w, region3.h, 0, 0, canvas3.width, canvas3.height);
     ctx.globalCompositeOperation = "source-in";
     ctx.fillStyle = fill;
-    ctx.fillRect(0, 0, canvas2.width, canvas2.height);
-    local.set(localKey, canvas2);
+    ctx.fillRect(0, 0, canvas3.width, canvas3.height);
+    local.set(localKey, canvas3);
     if (local.size > MAX_TINTS) local.delete(local.keys().next().value);
     if (immutable) {
-      tintCache.set(key, canvas2);
+      tintCache.set(key, canvas3);
       if (tintCache.size > MAX_TINTS) tintCache.delete(tintCache.keys().next().value);
     }
-    return canvas2;
+    return canvas3;
   }
   function imageLayout(width, height, p3) {
     const left = number3(p3.cropLeft, 0, 0, 0.95), right = number3(p3.cropRight, 0, 0, 0.95), top = number3(p3.cropTop, 0, 0, 0.95), bottom = number3(p3.cropBottom, 0, 0, 0.95);
@@ -24497,10 +24497,10 @@
   function analyzeShape(surface, { fillHoles = true } = {}) {
     const dpi = Math.min(surface.dpi ?? surface.scale * 25.4, 150), scale = dpi / 25.4, work = surface.work;
     const width = Math.max(1, Math.round(work.w * scale)), height = Math.max(1, Math.round(work.h * scale));
-    const canvas2 = document.createElement("canvas");
-    canvas2.width = width;
-    canvas2.height = height;
-    const ctx = canvas2.getContext("2d", { willReadFrequently: true });
+    const canvas3 = document.createElement("canvas");
+    canvas3.width = width;
+    canvas3.height = height;
+    const ctx = canvas3.getContext("2d", { willReadFrequently: true });
     ctx.drawImage(surface.canvas, 0, 0, width, height);
     const rgba2 = ctx.getImageData(0, 0, width, height).data, alpha = new Uint8Array(width * height);
     let hash = 2166136261;
@@ -24777,10 +24777,10 @@
     ctx.restore();
   }
   function contourSurface(shape, rings, color3, width) {
-    const canvas2 = document.createElement("canvas");
-    canvas2.width = shape.width;
-    canvas2.height = shape.height;
-    const ctx = canvas2.getContext("2d"), data = ctx.createImageData(shape.width, shape.height), c4 = rgb(color3), aa = 1 / shape.scale;
+    const canvas3 = document.createElement("canvas");
+    canvas3.width = shape.width;
+    canvas3.height = shape.height;
+    const ctx = canvas3.getContext("2d"), data = ctx.createImageData(shape.width, shape.height), c4 = rgb(color3), aa = 1 / shape.scale;
     for (let i4 = 0; i4 < shape.distance.length; i4++) {
       const d2 = shape.distance[i4];
       if (d2 < 0 || !Number.isFinite(d2)) continue;
@@ -24796,7 +24796,7 @@
       data.data[i4 * 4 + 3] = Math.round(alpha * 255);
     }
     ctx.putImageData(data, 0, 0);
-    return canvas2;
+    return canvas3;
   }
   function drawGenerator(ctx, layer2, { rect, seed, timeSec = 1.2, shape, edgePoints, sizeHeightMm, assets }) {
     const p3 = layer2.params ?? {}, t3 = layer2.motion?.enabled ? timeSec * (layer2.motion.speed ?? 1) : 1.2, setup = emissionSetup(layer2, rect, shape, edgePoints), r2 = setup.r;
@@ -25302,6 +25302,213 @@
     }
   }
 
+  // src/render/effects/gpu-bloom.js
+  var MAX_TEXTURE_BYTES = 128 * 1024 * 1024;
+  var vertexSource = `#version 300 es
+layout(location=0) in vec2 position;
+void main(){gl_Position=vec4(position,0.,1.);}`;
+  var fragmentSource = `#version 300 es
+precision highp float;
+precision highp int;
+precision highp sampler2D;
+uniform sampler2D image;
+uniform ivec2 size;
+uniform ivec2 axis;
+uniform int radius;
+uniform float fraction;
+out vec4 result;
+vec4 at(ivec2 p){
+ if(any(lessThan(p,ivec2(0)))||any(greaterThanEqual(p,size)))return vec4(0.);
+ return texelFetch(image,p,0);
+}
+void main(){
+ ivec2 p=ivec2(gl_FragCoord.xy);
+ vec4 sum=vec4(0.);
+ for(int i=-radius;i<=radius;i++)sum+=at(p+axis*i);
+ if(fraction>0.)sum+=(at(p-axis*(radius+1))+at(p+axis*(radius+1)))*fraction;
+ result=sum/(float(2*radius+1)+2.*fraction);
+}`;
+  var canvas2;
+  var device;
+  var unavailable = null;
+  var lost = false;
+  var status = { backend: "idle", reason: null, renderer: null, gpuRenders: 0, cpuRenders: 0, gpuPasses: 0 };
+  function getBloomAccelerationStatus() {
+    return { ...status };
+  }
+  function recordCpuBloom() {
+    status.backend = "cpu";
+    status.reason = unavailable || status.reason;
+    status.cpuRenders++;
+  }
+  function freeTargets(d2) {
+    for (const target of d2.targets) {
+      d2.gl.deleteFramebuffer(target.framebuffer);
+      d2.gl.deleteTexture(target.texture);
+    }
+    d2.targets = [];
+    d2.width = d2.height = 0;
+  }
+  function fail(reason) {
+    unavailable = reason;
+    status.reason = reason;
+    if (device && !device.gl.isContextLost()) {
+      freeTargets(device);
+      device.gl.deleteProgram(device.program);
+      device.gl.deleteBuffer(device.buffer);
+      device.gl.deleteVertexArray(device.vao);
+    }
+    device = null;
+  }
+  function createDevice() {
+    if (unavailable || lost) return null;
+    try {
+      if (!canvas2) {
+        canvas2 = document.createElement("canvas");
+        canvas2.width = canvas2.height = 1;
+        canvas2.addEventListener("webglcontextlost", (event) => {
+          event.preventDefault();
+          lost = true;
+          device = null;
+          status.reason = "context-lost";
+        });
+        canvas2.addEventListener("webglcontextrestored", () => {
+          lost = false;
+          unavailable = null;
+          device = null;
+          status.reason = null;
+        });
+      }
+      const gl = canvas2.getContext("webgl2", { alpha: true, depth: false, stencil: false, antialias: false, premultipliedAlpha: false, preserveDrawingBuffer: false, powerPreference: "high-performance", failIfMajorPerformanceCaveat: true });
+      if (!gl) {
+        fail("webgl2-unavailable");
+        return null;
+      }
+      if (!gl.getExtension("EXT_color_buffer_float")) {
+        fail("float-target-unavailable");
+        return null;
+      }
+      const info = gl.getExtension("WEBGL_debug_renderer_info");
+      status.renderer = info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+      const shaders = [];
+      let program;
+      try {
+        for (const [kind, source] of [[gl.VERTEX_SHADER, vertexSource], [gl.FRAGMENT_SHADER, fragmentSource]]) {
+          const shader = gl.createShader(kind);
+          if (!shader) throw new Error("shader allocation");
+          shaders.push(shader);
+          gl.shaderSource(shader, source);
+          gl.compileShader(shader);
+        }
+        program = gl.createProgram();
+        if (!program) throw new Error("program allocation");
+        for (const shader of shaders) gl.attachShader(program, shader);
+        gl.linkProgram(program);
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error("shader link");
+      } catch (error) {
+        if (program) gl.deleteProgram(program);
+        throw error;
+      } finally {
+        for (const shader of shaders) gl.deleteShader(shader);
+      }
+      const vao = gl.createVertexArray(), buffer = gl.createBuffer();
+      if (!vao || !buffer) {
+        gl.deleteProgram(program);
+        gl.deleteVertexArray(vao);
+        gl.deleteBuffer(buffer);
+        throw new Error("vertex allocation");
+      }
+      gl.bindVertexArray(vao);
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(0);
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+      gl.disable(gl.BLEND);
+      gl.disable(gl.DEPTH_TEST);
+      gl.disable(gl.DITHER);
+      const limit = gl.getParameter(gl.MAX_TEXTURE_SIZE), viewport = gl.getParameter(gl.MAX_VIEWPORT_DIMS);
+      device = { gl, program, vao, buffer, limit: Math.min(limit, ...viewport), targets: [], width: 0, height: 0, uniforms: Object.fromEntries(["image", "size", "axis", "radius", "fraction"].map((name) => [name, gl.getUniformLocation(program, name)])) };
+      if (gl.getError() !== gl.NO_ERROR) throw new Error("device setup");
+      return device;
+    } catch {
+      fail("gpu-setup-failed");
+      return null;
+    }
+  }
+  function prepareTargets(d2, width, height) {
+    if (d2.width === width && d2.height === height) return;
+    freeTargets(d2);
+    const gl = d2.gl;
+    for (let i4 = 0; i4 < 2; i4++) {
+      const texture = gl.createTexture(), framebuffer = gl.createFramebuffer();
+      if (!texture || !framebuffer) {
+        gl.deleteTexture(texture);
+        gl.deleteFramebuffer(framebuffer);
+        throw new Error("target allocation");
+      }
+      d2.targets.push({ texture, framebuffer });
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32F, width, height);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+      if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error("incomplete target");
+    }
+    if (gl.getError() !== gl.NO_ERROR) throw new Error("target setup");
+    d2.width = width;
+    d2.height = height;
+  }
+  function blurBloomOnGpu(energy, width, height, blurRadius) {
+    const d2 = device || createDevice();
+    if (!d2) {
+      status.reason = lost ? "context-lost" : unavailable;
+      return null;
+    }
+    if (width > d2.limit || height > d2.limit || width * height * 32 > MAX_TEXTURE_BYTES) {
+      status.reason = "job-too-large";
+      return null;
+    }
+    const gl = d2.gl;
+    try {
+      if (gl.isContextLost()) {
+        status.reason = "context-lost";
+        return null;
+      }
+      prepareTargets(d2, width, height);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, d2.targets[0].texture);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, width, height, gl.RGBA, gl.FLOAT, energy);
+      gl.useProgram(d2.program);
+      gl.bindVertexArray(d2.vao);
+      gl.viewport(0, 0, width, height);
+      const u3 = d2.uniforms, radius = Math.floor(blurRadius);
+      gl.uniform1i(u3.image, 0);
+      gl.uniform2i(u3.size, width, height);
+      gl.uniform1i(u3.radius, radius);
+      gl.uniform1f(u3.fraction, blurRadius - radius);
+      for (let pass = 0; pass < 6; pass++) {
+        gl.bindTexture(gl.TEXTURE_2D, d2.targets[pass % 2].texture);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, d2.targets[(pass + 1) % 2].framebuffer);
+        gl.uniform2i(u3.axis, pass % 2 ? 0 : 1, pass % 2 ? 1 : 0);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+      }
+      const result = new Float32Array(energy.length);
+      gl.readPixels(0, 0, width, height, gl.RGBA, gl.FLOAT, result);
+      if (gl.isContextLost() || gl.getError() !== gl.NO_ERROR) throw new Error("GPU render");
+      status.backend = "gpu";
+      status.reason = null;
+      status.gpuRenders++;
+      status.gpuPasses += 6;
+      return result;
+    } catch {
+      fail(gl.isContextLost() ? "context-lost" : "gpu-render-failed");
+      return null;
+    }
+  }
+
   // src/render/effects/creative-filters.js
   var clamp6 = (value, min = 0, max = 1) => Math.max(min, Math.min(max, value));
   var number5 = (value, fallback, min, max) => clamp6(Number.isFinite(value) ? value : fallback, min, max);
@@ -25467,7 +25674,7 @@
       }
     }
   }
-  function bloom(surface, p3) {
+  function bloom(surface, p3, bloomBackend) {
     const radius = number5(p3.radius, 2, 0, 12), strength = number5(p3.strength, 1.1, 0, 3), source = imageData(surface);
     if (!radius || !strength) return copy2(surface, source);
     const threshold = number5(p3.threshold, 0.55, 0, 1), knee = threshold * number5(p3.knee, 0.35, 0, 1), color3 = rgb3(p3.color), d2 = source.data, w2 = source.width, h3 = source.height;
@@ -25509,10 +25716,15 @@
       blurWidth = cropWidth;
       blurHeight = cropHeight;
     }
-    const scratch = new Float32Array(energy.length);
-    for (let pass = 0; pass < 3; pass++) {
-      boxPass2(energy, scratch, blurWidth, blurHeight, blurRadius, true);
-      boxPass2(scratch, energy, blurWidth, blurHeight, blurRadius, false);
+    const accelerated = bloomBackend === "cpu" ? null : blurBloomOnGpu(energy, blurWidth, blurHeight, blurRadius);
+    if (accelerated) energy = accelerated;
+    else {
+      recordCpuBloom();
+      const scratch = new Float32Array(energy.length);
+      for (let pass = 0; pass < 3; pass++) {
+        boxPass2(energy, scratch, blurWidth, blurHeight, blurRadius, true);
+        boxPass2(scratch, energy, blurWidth, blurHeight, blurRadius, false);
+      }
     }
     const output = fresh2(surface), pixels2 = output.ctx.createImageData(source.width, source.height), o3 = pixels2.data;
     o3.set(d2);
@@ -25560,11 +25772,11 @@
     output.ctx.putImageData(pixels2, 0, 0);
     return output;
   }
-  function applyCreativeFilter(surface, layer2, { rect = surface.work, timeSec = 1.2, seed = 1 } = {}) {
+  function applyCreativeFilter(surface, layer2, { rect = surface.work, timeSec = 1.2, seed = 1, bloomBackend = "auto" } = {}) {
     const p3 = layer2.params || {};
     switch (layer2.kind) {
       case "bloom":
-        return bloom(surface, p3);
+        return bloom(surface, p3, bloomBackend);
       case "directionalBlur":
         return directionalBlur(surface, p3);
       case "displacement":
@@ -25966,7 +26178,7 @@
           outputs.set(key, entry);
           return entry.value;
         }
-        const value = create2(), canvas2 = value.surface.canvas, bytes2 = canvas2.width * canvas2.height * 4;
+        const value = create2(), canvas3 = value.surface.canvas, bytes2 = canvas3.width * canvas3.height * 4;
         if (bytes2 <= outputLimit) {
           while (outputs.size && (outputBytes + bytes2 > outputLimit || outputs.size >= 128)) {
             const oldest = outputs.keys().next().value;
@@ -26034,10 +26246,10 @@
       out.ctx.fillRect(0, 0, w2, h3);
     }
     if (frame.scope === "borderBleed") {
-      const { canvas: canvas2, scale } = out, c4 = out.ctx, bytes2 = c4.getImageData(0, 0, canvas2.width, canvas2.height);
-      for (let y3 = 0; y3 < canvas2.height; y3++) for (let x3 = 0; x3 < canvas2.width; x3++) {
+      const { canvas: canvas3, scale } = out, c4 = out.ctx, bytes2 = c4.getImageData(0, 0, canvas3.width, canvas3.height);
+      for (let y3 = 0; y3 < canvas3.height; y3++) for (let x3 = 0; x3 < canvas3.width; x3++) {
         const mx = work.x + (x3 + 0.5) / scale, my = work.y + (y3 + 0.5) / scale, d2 = Math.min(mx, my, w2 - mx, h3 - my);
-        if (d2 >= frame.bandMm && d2 < frame.bandMm + 6) bytes2.data[(y3 * canvas2.width + x3) * 4 + 3] = Math.round(255 * (1 - smooth5((d2 - frame.bandMm) / 6)));
+        if (d2 >= frame.bandMm && d2 < frame.bandMm + 6) bytes2.data[(y3 * canvas3.width + x3) * 4 + 3] = Math.round(255 * (1 - smooth5((d2 - frame.bandMm) / 6)));
       }
       c4.putImageData(bytes2, 0, 0);
     }
@@ -26781,7 +26993,7 @@
     return node2;
   };
   var midpoint = (a3, b2) => ({ x: (a3.x + b2.x) / 2, y: (a3.y + b2.y) / 2 });
-  function mountEffectTransform({ canvas: canvas2, viewport, toolbar, scope, getState, onBegin, onPreview, onCommit, onCancel }) {
+  function mountEffectTransform({ canvas: canvas3, viewport, toolbar, scope, getState, onBegin, onPreview, onCommit, onCancel }) {
     let enabled = false, gesture = null, destroyed = false;
     const toggle = button("\uB4DC\uB798\uADF8 \uBCC0\uD615", () => {
       if (gesture) finish3(false);
@@ -26800,7 +27012,7 @@
       return { ...value, geometry: effectTransformGeometry(value.layer, value) };
     }
     function coordinates(event) {
-      const box = canvas2.getBoundingClientRect(), value = getState();
+      const box = canvas3.getBoundingClientRect(), value = getState();
       return { x: (event.clientX - box.left) * value.cardWidthMm / box.width, y: (event.clientY - box.top) * value.cardHeightMm / box.height };
     }
     function refresh() {
@@ -26814,9 +27026,9 @@
       const hidden = !enabled || !available;
       overlay.toggleAttribute("hidden", hidden);
       if (hidden) return;
-      const box = canvas2.getBoundingClientRect(), scaleX = box.width / value.cardWidthMm, scaleY = box.height / value.cardHeightMm;
-      overlay.style.left = canvas2.offsetLeft + "px";
-      overlay.style.top = canvas2.offsetTop + "px";
+      const box = canvas3.getBoundingClientRect(), scaleX = box.width / value.cardWidthMm, scaleY = box.height / value.cardHeightMm;
+      overlay.style.left = canvas3.offsetLeft + "px";
+      overlay.style.top = canvas3.offsetTop + "px";
       overlay.style.width = box.width + "px";
       overlay.style.height = box.height + "px";
       overlay.setAttribute("viewBox", "0 0 " + box.width + " " + box.height);
@@ -26904,7 +27116,7 @@
       changeOnce((layer2, g2) => nudgeEffectLayer(layer2, g2, direction2[0] * amount, direction2[1] * amount));
     }
     const blur2 = () => finish3(false), observer = new ResizeObserver(refresh);
-    observer.observe(canvas2);
+    observer.observe(canvas3);
     observer.observe(viewport);
     overlay.addEventListener("pointerdown", down);
     overlay.addEventListener("pointermove", move);
@@ -26943,7 +27155,7 @@
     const budget = Math.min(MAX_DPI, Math.floor(25.4 * Math.sqrt(MAX_PIXELS / ((widthMm + 24) * (heightMm + 24)))));
     return Math.max(1, Math.min(Math.ceil(needed / 25) * 25, budget));
   }
-  function mountEffectPreview({ canvas: canvas2, viewport, select, widthMm, heightMm, getPrintQuality, canZoom = () => true, onChange, onLayout = () => {
+  function mountEffectPreview({ canvas: canvas3, viewport, select, widthMm, heightMm, getPrintQuality, canZoom = () => true, onChange, onLayout = () => {
   } }) {
     let zoom = 1, disposed = false, lastWidth = 0, lastRatio = window.devicePixelRatio || 1;
     function synchronize() {
@@ -26957,11 +27169,11 @@
         select.append(option);
       }
       select.value = value;
-      canvas2.dataset.previewZoom = value;
+      canvas3.dataset.previewZoom = value;
     }
     function crisp() {
-      const width = canvas2.getBoundingClientRect().width * (window.devicePixelRatio || 1);
-      canvas2.style.imageRendering = canvas2.width + 0.5 < width ? "pixelated" : "auto";
+      const width = canvas3.getBoundingClientRect().width * (window.devicePixelRatio || 1);
+      canvas3.style.imageRendering = canvas3.width + 0.5 < width ? "pixelated" : "auto";
     }
     function setZoom(value, anchor) {
       if (disposed || !canZoom()) return false;
@@ -26972,13 +27184,13 @@
         synchronize();
         return false;
       }
-      const before = canvas2.getBoundingClientRect(), area = viewport.getBoundingClientRect();
+      const before = canvas3.getBoundingClientRect(), area = viewport.getBoundingClientRect();
       const point = anchor || { x: area.left + viewport.clientWidth / 2, y: area.top + viewport.clientHeight / 2 };
       const x3 = before.width ? (point.x - before.left) / before.width : 0.5, y3 = before.height ? (point.y - before.top) / before.height : 0.5;
       zoom = next;
       synchronize();
-      canvas2.style.width = BASE_WIDTH * zoom + "px";
-      const after = canvas2.getBoundingClientRect();
+      canvas3.style.width = BASE_WIDTH * zoom + "px";
+      const after = canvas3.getBoundingClientRect();
       viewport.scrollLeft += after.left + x3 * after.width - point.x;
       viewport.scrollTop += after.top + y3 * after.height - point.y;
       lastWidth = after.width;
@@ -26998,7 +27210,7 @@
     }
     function resized() {
       if (disposed) return;
-      const width = canvas2.getBoundingClientRect().width, ratio = window.devicePixelRatio || 1;
+      const width = canvas3.getBoundingClientRect().width, ratio = window.devicePixelRatio || 1;
       crisp();
       onLayout();
       if (Math.abs(width - lastWidth) < 0.1 && ratio === lastRatio) return;
@@ -27008,19 +27220,19 @@
     }
     const observer = new ResizeObserver(resized);
     observer.observe(viewport);
-    observer.observe(canvas2);
+    observer.observe(canvas3);
     viewport.addEventListener("wheel", wheel, { passive: false });
     window.addEventListener("resize", resized);
-    canvas2.style.width = BASE_WIDTH + "px";
+    canvas3.style.width = BASE_WIDTH + "px";
     synchronize();
-    lastWidth = canvas2.getBoundingClientRect().width;
+    lastWidth = canvas3.getBoundingClientRect().width;
     crisp();
     onChange();
     return {
       setZoom,
-      dpi: () => effectPreviewDpi({ widthMm, heightMm, displayWidth: canvas2.getBoundingClientRect().width, pixelRatio: window.devicePixelRatio || 1, printQuality: getPrintQuality() }),
+      dpi: () => effectPreviewDpi({ widthMm, heightMm, displayWidth: canvas3.getBoundingClientRect().width, pixelRatio: window.devicePixelRatio || 1, printQuality: getPrintQuality() }),
       afterDraw(dpi) {
-        canvas2.dataset.previewDpi = String(dpi);
+        canvas3.dataset.previewDpi = String(dpi);
         crisp();
       },
       destroy() {
@@ -27089,9 +27301,9 @@
     const imageFile = el("input", { id: "effect-sprite-file", type: "file", hidden: true, accept: "image/png,image/jpeg,image/webp", onchange: importSpriteImage });
     let target = { ...initialTarget }, targetType, currentKey, textColor, textStyle2, recipe, selected, savedId = null, presetName = "", draftFrame = initialFrame, disposed = false, confirming = false, confirmation = null, previewProject, previewTarget, comparisonProject, comparisonTarget, comparing = false, unsubscribe, timer, librarySearch = "", libraryCategory = "all", libraryComposing = false, transform, previewView, lastDpi = 0, renderGeometry = null;
     const cache2 = createEffectCache(), dialog = el("dialog", { id: "effect-editor", class: "effect-dialog", "aria-labelledby": "effect-title" });
-    const library = el("aside", { class: "effect-library" }), fields = el("aside", { class: "effect-controls" }), canvas2 = el("canvas", { id: "effect-preview", "aria-label": "\uC120\uD0DD\uD55C \uB300\uC0C1\uACFC \uCE74\uB4DC\uC758 \uC774\uD399\uD2B8 \uBBF8\uB9AC\uBCF4\uAE30" });
+    const library = el("aside", { class: "effect-library" }), fields = el("aside", { class: "effect-controls" }), canvas3 = el("canvas", { id: "effect-preview", "aria-label": "\uC120\uD0DD\uD55C \uB300\uC0C1\uACFC \uCE74\uB4DC\uC758 \uC774\uD399\uD2B8 \uBBF8\uB9AC\uBCF4\uAE30" });
     const feedback = el("p", { id: "effect-feedback", class: "effect-feedback", role: "status", hidden: true });
-    const status = el("span", { id: "effect-preview-status", role: "status", "data-busy": "false" }, "\uBBF8\uB9AC\uBCF4\uAE30");
+    const status2 = el("span", { id: "effect-preview-status", role: "status", "data-busy": "false" }, "\uBBF8\uB9AC\uBCF4\uAE30");
     const quality = el("input", { id: "effect-print-quality", type: "checkbox", onchange: () => scheduleDraw() });
     const selectedPlayback = el("input", { id: "effect-selected-playback", type: "checkbox", checked: true, onchange: () => {
       cache2.clear();
@@ -27144,8 +27356,8 @@
       setZoom("2");
       const e2 = previewTarget.elements.find((e3) => target.skillId ? e3.binding?.field === "skill.name" && e3.binding.skillId === target.skillId : e3.id === target.elementId);
       if (!e2) return;
-      const viewport = canvas2.parentElement, scale = canvas2.getBoundingClientRect().width / p3.settings.cardWidthMm;
-      viewport.scrollTo({ left: canvas2.offsetLeft + (e2.rect.x + e2.rect.w / 2) * scale - viewport.clientWidth / 2, top: canvas2.offsetTop + (e2.rect.y + e2.rect.h / 2) * scale - viewport.clientHeight / 2 });
+      const viewport = canvas3.parentElement, scale = canvas3.getBoundingClientRect().width / p3.settings.cardWidthMm;
+      viewport.scrollTo({ left: canvas3.offsetLeft + (e2.rect.x + e2.rect.w / 2) * scale - viewport.clientWidth / 2, top: canvas3.offsetTop + (e2.rect.y + e2.rect.h / 2) * scale - viewport.clientHeight / 2 });
     }, { id: "effect-focus-target" });
     function setZoom(value) {
       previewView?.setZoom(value);
@@ -27159,8 +27371,8 @@
     function releaseComparison() {
       showOriginal(false);
     }
-    function paintSample(canvas3) {
-      const key = canvas3.dataset.sampleKey;
+    function paintSample(canvas4) {
+      const key = canvas4.dataset.sampleKey;
       if (!sampleCache.has(key)) {
         const surface = makeSurface({ x: 0, y: 0, w: 38, h: 16 }, 80), r2 = createVisualEffects(key, { seed: 31515 });
         r2.layers.forEach((layer2, i4) => layer2.id = "sample-" + key + "-" + i4);
@@ -27175,10 +27387,10 @@
         sampleCache.set(key, surface.canvas);
       }
       const image = sampleCache.get(key);
-      canvas3.width = image.width;
-      canvas3.height = image.height;
-      canvas3.getContext("2d").drawImage(image, 0, 0);
-      canvas3.dataset.ready = "true";
+      canvas4.width = image.width;
+      canvas4.height = image.height;
+      canvas4.getContext("2d").drawImage(image, 0, 0);
+      canvas4.dataset.ready = "true";
     }
     function remember() {
       if (!recipe) return;
@@ -27429,12 +27641,12 @@
     function draw() {
       clearTimeout(timer);
       if (disposed || !previewTarget) return;
-      const started = performance.now(), dpi = previewView?.dpi() || (quality.checked ? 300 : 200);
+      const started = performance.now(), accelerationBefore = getBloomAccelerationStatus(), dpi = previewView?.dpi() || (quality.checked ? 300 : 200);
       if (dpi !== lastDpi) {
         cache2.clear();
         lastDpi = dpi;
       }
-      const report = renderCard(canvas2.getContext("2d", { willReadFrequently: true }), comparing ? comparisonProject : previewProject, comparing ? comparisonTarget : previewTarget, previewAssets, dpi, { timeSec: timeline.getTime(), playbackTarget: selectedPlayback.checked ? target : null, frozenTimeSec: draftFrame, effectCache: cache2, onEffectGeometry: (entry) => {
+      const report = renderCard(canvas3.getContext("2d", { willReadFrequently: true }), comparing ? comparisonProject : previewProject, comparing ? comparisonTarget : previewTarget, previewAssets, dpi, { timeSec: timeline.getTime(), playbackTarget: selectedPlayback.checked ? target : null, frozenTimeSec: draftFrame, effectCache: cache2, onEffectGeometry: (entry) => {
         if (comparing) return;
         if (target.skillId) {
           const title = previewTarget.elements.find((e2) => e2.binding?.field === "skill.name" && e2.binding.skillId === target.skillId);
@@ -27445,13 +27657,16 @@
       transform?.refresh();
       const problems = ctx.state.ignoreOutputWarnings ? [] : report.problems.filter((p4) => target.skillId ? p4.skillId === target.skillId : p4.elementId === target.elementId || !target.elementId && !p4.elementId);
       message(problems.slice(0, 2).map((p4) => (p4.severity === "warning" ? "\uC548\uB0B4: " : "\uC778\uC1C4 \uD655\uC778: ") + p4.message).join(" "));
-      status.dataset.busy = String(pendingImports > 0);
-      status.textContent = pendingImports ? "\uC785\uC790 \uADF8\uB9BC \uC77D\uB294 \uC911\u2026" : (quality.checked ? "\uC778\uC1C4 \uD488\uC9C8 \uD655\uC778 \xB7 " : "\uBBF8\uB9AC\uBCF4\uAE30 \xB7 ") + dpi + "dpi \xB7 " + Math.round(performance.now() - started) + "ms";
+      const acceleration = getBloomAccelerationStatus(), gpu = acceleration.gpuRenders > accelerationBefore.gpuRenders, cpu = acceleration.cpuRenders > accelerationBefore.cpuRenders;
+      status2.dataset.bloomBackend = gpu ? cpu ? "mixed" : "gpu" : cpu ? "cpu" : "idle";
+      status2.title = cpu && acceleration.reason ? "GPU \uAC00\uC18D\uC744 \uC0AC\uC6A9\uD560 \uC218 \uC5C6\uB294 \uC791\uC5C5\uC740 \uAE30\uBCF8 \uBC29\uC2DD\uC73C\uB85C \uCC98\uB9AC\uD574\uC694." : "";
+      status2.dataset.busy = String(pendingImports > 0);
+      status2.textContent = pendingImports ? "\uC785\uC790 \uADF8\uB9BC \uC77D\uB294 \uC911\u2026" : (quality.checked ? "\uC778\uC1C4 \uD488\uC9C8 \uD655\uC778 \xB7 " : "\uBBF8\uB9AC\uBCF4\uAE30 \xB7 ") + dpi + "dpi \xB7 " + Math.round(performance.now() - started) + "ms" + (gpu ? " \xB7 \uBE14\uB8F8 GPU" + (cpu ? " + CPU" : "") : cpu ? " \xB7 \uBE14\uB8F8 CPU" : "");
     }
     function scheduleDraw() {
       clearTimeout(timer);
-      status.dataset.busy = "true";
-      status.textContent = "\uACC4\uC0B0 \uC911\u2026";
+      status2.dataset.busy = "true";
+      status2.textContent = "\uACC4\uC0B0 \uC911\u2026";
       timer = setTimeout(draw, 150);
     }
     function renderFields() {
@@ -27706,13 +27921,13 @@
           })) cleanup();
         }, { id: "effect-apply", class: "primary" }))
       ),
-      el("div", { class: "effect-target-bar" }, targetPicker, el("label", { class: "check" }, quality, "\uC778\uC1C4 \uD488\uC9C8\uB85C \uBCF4\uAE30"), status),
-      el("div", { class: "effect-grid" }, library, el("main", { class: "effect-center" }, el("div", { class: "effect-preview-tools" }, zoom, focus, compare, el("span", { class: "effect-zoom-hint" }, "Ctrl+\uD720 \uD655\uB300\xB7\uCD95\uC18C")), el("div", { class: "effect-preview-scroll" }, canvas2), transport), fields),
+      el("div", { class: "effect-target-bar" }, targetPicker, el("label", { class: "check" }, quality, "\uC778\uC1C4 \uD488\uC9C8\uB85C \uBCF4\uAE30"), status2),
+      el("div", { class: "effect-grid" }, library, el("main", { class: "effect-center" }, el("div", { class: "effect-preview-tools" }, zoom, focus, compare, el("span", { class: "effect-zoom-hint" }, "Ctrl+\uD720 \uD655\uB300\xB7\uCD95\uC18C")), el("div", { class: "effect-preview-scroll" }, canvas3), transport), fields),
       feedback
     );
     transform = mountEffectTransform({
-      canvas: canvas2,
-      viewport: canvas2.parentElement,
+      canvas: canvas3,
+      viewport: canvas3.parentElement,
       toolbar: dialog.querySelector(".effect-preview-tools"),
       scope: dialog,
       getState: () => ({ layer: recipe?.layers.find((l3) => l3.id === selected), ...renderGeometry, image: previewAssets.get(recipe?.layers.find((l3) => l3.id === selected)?.params.assetId), timeSec: timeline.getTime(), cardWidthMm: p3.settings.cardWidthMm, cardHeightMm: p3.settings.cardHeightMm, hidden: comparing || confirming }),
@@ -27770,7 +27985,7 @@
     draw();
     updateTransport();
     dialog.showModal();
-    previewView = mountEffectPreview({ canvas: canvas2, viewport: canvas2.parentElement, select: zoom.querySelector("select"), widthMm: p3.settings.cardWidthMm, heightMm: p3.settings.cardHeightMm, getPrintQuality: () => quality.checked, canZoom: () => !disposed && !confirming && !transform?.isDragging(), onChange: scheduleDraw, onLayout: () => transform?.refresh() });
+    previewView = mountEffectPreview({ canvas: canvas3, viewport: canvas3.parentElement, select: zoom.querySelector("select"), widthMm: p3.settings.cardWidthMm, heightMm: p3.settings.cardHeightMm, getPrintQuality: () => quality.checked, canZoom: () => !disposed && !confirming && !transform?.isDragging(), onChange: scheduleDraw, onLayout: () => transform?.refresh() });
     document.addEventListener("visibilitychange", visibility);
     document.addEventListener("pointerup", releaseComparison);
     window.addEventListener("blur", releaseComparison);
@@ -30824,9 +31039,9 @@
     if (deflateStateCheck(strm)) {
       return Z_STREAM_ERROR$2;
     }
-    const status = strm.state.status;
+    const status2 = strm.state.status;
     strm.state = null;
-    return status === BUSY_STATE ? err(strm, Z_DATA_ERROR$2) : Z_OK$3;
+    return status2 === BUSY_STATE ? err(strm, Z_DATA_ERROR$2) : Z_OK$3;
   };
   var deflateSetDictionary = (strm, dictionary) => {
     let dictLength = dictionary.length;
@@ -31119,7 +31334,7 @@
     this.chunks = [];
     this.strm = new zstream();
     this.strm.avail_out = 0;
-    let status = deflate_1$2.deflateInit2(
+    let status2 = deflate_1$2.deflateInit2(
       this.strm,
       opt.level,
       opt.method,
@@ -31128,8 +31343,8 @@
       opt.strategy,
       opt.legacyHash
     );
-    if (status !== Z_OK$2) {
-      throw new Error(messages[status]);
+    if (status2 !== Z_OK$2) {
+      throw new Error(messages[status2]);
     }
     if (opt.header) {
       deflate_1$2.deflateSetHeader(this.strm, opt.header);
@@ -31143,9 +31358,9 @@
       } else {
         dict = opt.dictionary;
       }
-      status = deflate_1$2.deflateSetDictionary(this.strm, dict);
-      if (status !== Z_OK$2) {
-        throw new Error(messages[status]);
+      status2 = deflate_1$2.deflateSetDictionary(this.strm, dict);
+      if (status2 !== Z_OK$2) {
+        throw new Error(messages[status2]);
       }
       this._dict_set = true;
     }
@@ -31153,7 +31368,7 @@
   Deflate$1.prototype.push = function(data, flush_mode) {
     const strm = this.strm;
     const chunkSize = this.options.chunkSize;
-    let status, _flush_mode;
+    let status2, _flush_mode;
     if (this.ended) {
       return false;
     }
@@ -31179,15 +31394,15 @@
         strm.avail_out = 0;
         continue;
       }
-      status = deflate_1$2.deflate(strm, _flush_mode);
-      if (status === Z_STREAM_END$2) {
+      status2 = deflate_1$2.deflate(strm, _flush_mode);
+      if (status2 === Z_STREAM_END$2) {
         if (strm.next_out > 0) {
           this.onData(strm.output.subarray(0, strm.next_out));
         }
-        status = deflate_1$2.deflateEnd(this.strm);
-        this.onEnd(status);
+        status2 = deflate_1$2.deflateEnd(this.strm);
+        this.onEnd(status2);
         this.ended = true;
-        return status === Z_OK$2;
+        return status2 === Z_OK$2;
       }
       if (strm.avail_out === 0) {
         this.onData(strm.output);
@@ -31205,12 +31420,12 @@
   Deflate$1.prototype.onData = function(chunk) {
     this.chunks.push(chunk);
   };
-  Deflate$1.prototype.onEnd = function(status) {
-    if (status === Z_OK$2) {
+  Deflate$1.prototype.onEnd = function(status2) {
+    if (status2 === Z_OK$2) {
       this.result = common.flattenChunks(this.chunks);
     }
     this.chunks = [];
-    this.err = status;
+    this.err = status2;
     this.msg = this.strm.msg;
   };
   function deflate$1(input, options) {
@@ -33073,12 +33288,12 @@
     this.chunks = [];
     this.strm = new zstream();
     this.strm.avail_out = 0;
-    let status = inflate_1$2.inflateInit2(
+    let status2 = inflate_1$2.inflateInit2(
       this.strm,
       opt.windowBits
     );
-    if (status !== Z_OK) {
-      throw new Error(messages[status]);
+    if (status2 !== Z_OK) {
+      throw new Error(messages[status2]);
     }
     this.header = new gzheader();
     inflate_1$2.inflateGetHeader(this.strm, this.header);
@@ -33089,9 +33304,9 @@
         opt.dictionary = new Uint8Array(opt.dictionary);
       }
       if (opt.raw) {
-        status = inflate_1$2.inflateSetDictionary(this.strm, opt.dictionary);
-        if (status !== Z_OK) {
-          throw new Error(messages[status]);
+        status2 = inflate_1$2.inflateSetDictionary(this.strm, opt.dictionary);
+        if (status2 !== Z_OK) {
+          throw new Error(messages[status2]);
         }
       }
     }
@@ -33100,7 +33315,7 @@
     const strm = this.strm;
     const chunkSize = this.options.chunkSize;
     const dictionary = this.options.dictionary;
-    let status, _flush_mode, last_avail_out;
+    let status2, _flush_mode, last_avail_out;
     if (this.ended) return false;
     if (flush_mode === ~~flush_mode) _flush_mode = flush_mode;
     else _flush_mode = flush_mode === true ? Z_FINISH : Z_NO_FLUSH;
@@ -33117,31 +33332,31 @@
         strm.next_out = 0;
         strm.avail_out = chunkSize;
       }
-      status = inflate_1$2.inflate(strm, _flush_mode);
-      if (status === Z_NEED_DICT && dictionary) {
-        status = inflate_1$2.inflateSetDictionary(strm, dictionary);
-        if (status === Z_OK) {
-          status = inflate_1$2.inflate(strm, _flush_mode);
-        } else if (status === Z_DATA_ERROR) {
-          status = Z_NEED_DICT;
+      status2 = inflate_1$2.inflate(strm, _flush_mode);
+      if (status2 === Z_NEED_DICT && dictionary) {
+        status2 = inflate_1$2.inflateSetDictionary(strm, dictionary);
+        if (status2 === Z_OK) {
+          status2 = inflate_1$2.inflate(strm, _flush_mode);
+        } else if (status2 === Z_DATA_ERROR) {
+          status2 = Z_NEED_DICT;
         }
       }
-      while (strm.avail_in > 0 && status === Z_STREAM_END && strm.state.wrap & 2 && strm.state.flags !== 0 && strm.input[strm.next_in] !== 0) {
+      while (strm.avail_in > 0 && status2 === Z_STREAM_END && strm.state.wrap & 2 && strm.state.flags !== 0 && strm.input[strm.next_in] !== 0) {
         inflate_1$2.inflateReset(strm);
-        status = inflate_1$2.inflate(strm, _flush_mode);
+        status2 = inflate_1$2.inflate(strm, _flush_mode);
       }
-      switch (status) {
+      switch (status2) {
         case Z_STREAM_ERROR:
         case Z_DATA_ERROR:
         case Z_NEED_DICT:
         case Z_MEM_ERROR:
-          this.onEnd(status);
+          this.onEnd(status2);
           this.ended = true;
           return false;
       }
       last_avail_out = strm.avail_out;
       if (strm.next_out) {
-        if (strm.avail_out === 0 || status === Z_STREAM_END || _flush_mode > 0) {
+        if (strm.avail_out === 0 || status2 === Z_STREAM_END || _flush_mode > 0) {
           if (this.options.to === "string") {
             let next_out_utf8 = strings.utf8border(strm.output, strm.next_out);
             let tail = strm.next_out - next_out_utf8;
@@ -33157,17 +33372,17 @@
           }
         }
       }
-      if ((status === Z_OK || status === Z_BUF_ERROR) && last_avail_out === 0) continue;
-      if (status === Z_STREAM_END) {
-        status = inflate_1$2.inflateEnd(this.strm);
-        this.onEnd(status);
+      if ((status2 === Z_OK || status2 === Z_BUF_ERROR) && last_avail_out === 0) continue;
+      if (status2 === Z_STREAM_END) {
+        status2 = inflate_1$2.inflateEnd(this.strm);
+        this.onEnd(status2);
         this.ended = true;
         return true;
       }
       if (strm.avail_in === 0) {
         if (_flush_mode === Z_FINISH) {
-          status = inflate_1$2.inflateEnd(this.strm);
-          this.onEnd(status === Z_OK ? Z_BUF_ERROR : status);
+          status2 = inflate_1$2.inflateEnd(this.strm);
+          this.onEnd(status2 === Z_OK ? Z_BUF_ERROR : status2);
           this.ended = true;
           return false;
         }
@@ -33179,8 +33394,8 @@
   Inflate$1.prototype.onData = function(chunk) {
     this.chunks.push(chunk);
   };
-  Inflate$1.prototype.onEnd = function(status) {
-    if (status === Z_OK) {
+  Inflate$1.prototype.onEnd = function(status2) {
+    if (status2 === Z_OK) {
       if (this.options.to === "string") {
         this.result = this.chunks.join("");
       } else {
@@ -33188,7 +33403,7 @@
       }
     }
     this.chunks = [];
-    this.err = status;
+    this.err = status2;
     this.msg = this.strm.msg;
   };
   function inflate$1(input, options) {
@@ -41374,10 +41589,10 @@
     } catch (e2) {
       problems.push(...e2.problems ?? [{ code: "paper-layout", message: e2.message }]);
     }
-    const canvas2 = document.createElement("canvas");
+    const canvas3 = document.createElement("canvas");
     const printable = (report) => report.problems.map((problem3) => ({ ...problem3, severity: "warning" }));
-    for (const card of project.cards) problems.push(...printable(renderCard(canvas2.getContext("2d", { willReadFrequently: true }), project, card, assets, 100)));
-    if (project.print.duplex) problems.push(...printable(renderCard(canvas2.getContext("2d", { willReadFrequently: true }), project, project.back, assets, 100)).map((p3) => ({ ...p3, message: "\uACF5\uD1B5 \uB4B7\uBA74: " + p3.message })));
+    for (const card of project.cards) problems.push(...printable(renderCard(canvas3.getContext("2d", { willReadFrequently: true }), project, card, assets, 100)));
+    if (project.print.duplex) problems.push(...printable(renderCard(canvas3.getContext("2d", { willReadFrequently: true }), project, project.back, assets, 100)).map((p3) => ({ ...p3, message: "\uACF5\uD1B5 \uB4B7\uBA74: " + p3.message })));
     return problems;
   }
   async function createPdf(project) {
@@ -41397,9 +41612,9 @@
       for (const c4 of page.cells.filter((c5) => c5.cardId)) {
         const key = page.side === "back" ? "back" : c4.cardId;
         if (!cache2.has(key)) {
-          const canvas2 = document.createElement("canvas");
-          renderCard(canvas2.getContext("2d", { willReadFrequently: true }), project, page.side === "back" ? project.back : project.cards.find((card) => card.id === c4.cardId), assets, 300);
-          cache2.set(key, canvas2.toDataURL("image/png"));
+          const canvas3 = document.createElement("canvas");
+          renderCard(canvas3.getContext("2d", { willReadFrequently: true }), project, page.side === "back" ? project.back : project.cards.find((card) => card.id === c4.cardId), assets, 300);
+          cache2.set(key, canvas3.toDataURL("image/png"));
         }
         pdf.addImage(cache2.get(key), "PNG", c4.xMm, c4.yMm, c4.widthMm, c4.heightMm, key, "FAST");
       }
@@ -41420,9 +41635,9 @@
   var commonBack = /* @__PURE__ */ Symbol("common back");
   var svgNS = "http://www.w3.org/2000/svg";
   var failure2 = (problems) => Object.assign(new Error(problems.map((p3) => p3.message).join("\n")), { problems });
-  var unavailable = () => failure2([{ code: "native-print-unavailable", message: "\uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C\uB294 \uBC14\uB85C \uC778\uC1C4\uB97C \uC5F4 \uC218 \uC5C6\uC5B4\uC694. \uC778\uC1C4\uB97C \uC9C0\uC6D0\uD558\uB294 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694." }]);
+  var unavailable2 = () => failure2([{ code: "native-print-unavailable", message: "\uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C\uB294 \uBC14\uB85C \uC778\uC1C4\uB97C \uC5F4 \uC218 \uC5C6\uC5B4\uC694. \uC778\uC1C4\uB97C \uC9C0\uC6D0\uD558\uB294 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694." }]);
   async function printProject(project, { document: document2 = globalThis.document } = {}) {
-    if (!document2?.body || typeof document2.createElement !== "function") throw unavailable();
+    if (!document2?.body || typeof document2.createElement !== "function") throw unavailable2();
     const previous = sessions.get(document2);
     if (previous && (!previous.returned || previous.waitingAfterPrint)) throw failure2([{ code: "print-busy", message: "\uC778\uC1C4\uB97C \uC900\uBE44\uD558\uAC70\uB098 \uC778\uC1C4\uCC3D\uC744 \uC5F4\uACE0 \uC788\uC5B4\uC694. \uC778\uC1C4\uCC3D\uC744 \uB2EB\uC740 \uB4A4 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694." }]);
     previous?.cleanup();
@@ -41446,9 +41661,9 @@
       for (const page of plan.pages) for (const cell of page.cells.filter((c4) => c4.cardId)) {
         const key = page.side === "back" ? commonBack : cell.cardId;
         if (images.has(key)) continue;
-        const canvas2 = document2.createElement("canvas"), card = page.side === "back" ? snapshot2.back : snapshot2.cards.find((c4) => c4.id === cell.cardId);
-        renderCard(canvas2.getContext("2d", { willReadFrequently: true }), snapshot2, card, assets, 300);
-        images.set(key, { src: canvas2.toDataURL("image/png"), width: canvas2.width, height: canvas2.height });
+        const canvas3 = document2.createElement("canvas"), card = page.side === "back" ? snapshot2.back : snapshot2.cards.find((c4) => c4.id === cell.cardId);
+        renderCard(canvas3.getContext("2d", { willReadFrequently: true }), snapshot2, card, assets, 300);
+        images.set(key, { src: canvas3.toDataURL("image/png"), width: canvas3.width, height: canvas3.height });
       }
       const frame = document2.createElement("iframe");
       frame.dataset.cardPrint = "";
@@ -41468,7 +41683,7 @@
         if (sessions.get(document2) === session) sessions.delete(document2);
       };
       session.cleanup = cleanup;
-      if (!doc || typeof win?.print !== "function") throw unavailable();
+      if (!doc || typeof win?.print !== "function") throw unavailable2();
       doc.open();
       doc.write('<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>');
       doc.close();
@@ -42413,8 +42628,8 @@
 
   // src/ui/canvas-editor.js
   function mountCardCanvas(host, ctx) {
-    const stage = el("div", { class: "card-stage", tabIndex: 0, role: "group", "aria-label": "\uCE74\uB4DC \uC694\uC18C \uC120\uD0DD \uC601\uC5ED" }), canvas2 = el("canvas", { id: "card-canvas" }), members = el("div", { class: "selection-members" }), selection = el("div", { id: "selection-box", hidden: true }), marquee = el("div", { id: "selection-marquee", hidden: true });
-    stage.append(canvas2, members, selection, marquee);
+    const stage = el("div", { class: "card-stage", tabIndex: 0, role: "group", "aria-label": "\uCE74\uB4DC \uC694\uC18C \uC120\uD0DD \uC601\uC5ED" }), canvas3 = el("canvas", { id: "card-canvas" }), members = el("div", { class: "selection-members" }), selection = el("div", { id: "selection-box", hidden: true }), marquee = el("div", { id: "selection-marquee", hidden: true });
+    stage.append(canvas3, members, selection, marquee);
     host.append(stage);
     const area = host.closest(".canvas-scroll") || host;
     let gesture = null, preview = null, report = { problems: [] }, projectRef = ctx.store.getProject(), lastRatio = window.devicePixelRatio || 1;
@@ -42436,9 +42651,9 @@
       const width = stage.getBoundingClientRect().width;
       lastRatio = window.devicePixelRatio || 1;
       const dpi = effectPreviewDpi({ widthMm: p3.settings.cardWidthMm, heightMm: p3.settings.cardHeightMm, displayWidth: width, pixelRatio: lastRatio });
-      report = renderCard(canvas2.getContext("2d", { willReadFrequently: true }), p3, target, ctx.assets, dpi, { timeSec: timeline.getTime(), effectCache });
-      canvas2.dataset.previewDpi = String(dpi);
-      canvas2.style.imageRendering = canvas2.width + 0.5 < width * lastRatio ? "pixelated" : "auto";
+      report = renderCard(canvas3.getContext("2d", { willReadFrequently: true }), p3, target, ctx.assets, dpi, { timeSec: timeline.getTime(), effectCache });
+      canvas3.dataset.previewDpi = String(dpi);
+      canvas3.style.imageRendering = canvas3.width + 0.5 < width * lastRatio ? "pixelated" : "auto";
     }
     function setActive(value) {
       timeline.setActive(value && !document.hidden);
@@ -42479,7 +42694,7 @@
       selection.append(b2);
     }
     const point = (event) => {
-      const r2 = canvas2.getBoundingClientRect(), s3 = ctx.store.getProject().settings;
+      const r2 = canvas3.getBoundingClientRect(), s3 = ctx.store.getProject().settings;
       return { x: (event.clientX - r2.left) / r2.width * s3.cardWidthMm, y: (event.clientY - r2.top) / r2.height * s3.cardHeightMm };
     };
     function place(node2, rect) {
@@ -42514,13 +42729,13 @@
       }
       const target = preview || ctx.target();
       if (!target) {
-        canvas2.hidden = true;
+        canvas3.hidden = true;
         selection.hidden = true;
         members.replaceChildren();
         marquee.hidden = true;
         return;
       }
-      canvas2.hidden = false;
+      canvas3.hidden = false;
       const scale = ctx.state.cardScale;
       stage.style.width = p3.settings.cardWidthMm * scale + "px";
       stage.style.height = p3.settings.cardHeightMm * scale + "px";
@@ -42684,7 +42899,7 @@
       if (lastRatio !== (window.devicePixelRatio || 1)) drawCanvas();
     }
     const down = (event) => {
-      if ([canvas2, stage, host, area].includes(event.target)) begin(event, null);
+      if ([canvas3, stage, host, area].includes(event.target)) begin(event, null);
     };
     area.addEventListener("pointerdown", down);
     area.addEventListener("wheel", wheel, { passive: false });
@@ -42841,9 +43056,9 @@
           if (c4.cardId) {
             const key = page.side === "back" ? "back" : c4.cardId;
             if (!cache2.has(key)) {
-              const canvas2 = el("canvas");
-              renderCard(canvas2.getContext("2d", { willReadFrequently: true }), p3, page.side === "back" ? p3.back : p3.cards.find((card) => card.id === c4.cardId), assets, dpi);
-              cache2.set(key, { src: canvas2.toDataURL(), width: canvas2.width });
+              const canvas3 = el("canvas");
+              renderCard(canvas3.getContext("2d", { willReadFrequently: true }), p3, page.side === "back" ? p3.back : p3.cards.find((card) => card.id === c4.cardId), assets, dpi);
+              cache2.set(key, { src: canvas3.toDataURL(), width: canvas3.width });
             }
             const image = cache2.get(key), img = el("img", { src: image.src, alt: page.side === "back" ? "\uACF5\uD1B5 \uB4B7\uBA74" : p3.cards.find((card) => card.id === c4.cardId).name, draggable: false, "data-preview-dpi": dpi });
             img.style.imageRendering = image.width + 0.5 < c4.widthMm * scale * lastRatio ? "pixelated" : "auto";
@@ -42962,10 +43177,10 @@
 
   // src/painting/document.js
   function newCanvas(width, height) {
-    const canvas2 = document.createElement("canvas");
-    canvas2.width = width;
-    canvas2.height = height;
-    return canvas2;
+    const canvas3 = document.createElement("canvas");
+    canvas3.width = width;
+    canvas3.height = height;
+    return canvas3;
   }
   function copyCanvas(source) {
     const c4 = newCanvas(source.width, source.height);
@@ -43014,7 +43229,7 @@
     return { id: s3.id, width: s3.width, height: s3.height, activeLayerId: s3.activeLayerId, layers: s3.layers.map((l3) => ({ id: l3.id, name: l3.name, visible: l3.visible, locked: l3.locked, opacity: l3.opacity, blendMode: normalizeBlendMode(l3.blendMode), png: l3.canvas.toDataURL("image/png") })) };
   }
   function compositePainting(s3, whiteBackground = false, { preview = null, layerId = null } = {}) {
-    const canvas2 = newCanvas(s3.width, s3.height), ctx = canvas2.getContext("2d");
+    const canvas3 = newCanvas(s3.width, s3.height), ctx = canvas3.getContext("2d");
     for (const l3 of s3.layers) if (l3.visible) {
       ctx.globalAlpha = l3.opacity;
       ctx.globalCompositeOperation = normalizeBlendMode(l3.blendMode);
@@ -43027,7 +43242,7 @@
       ctx.fillRect(0, 0, s3.width, s3.height);
     }
     ctx.globalCompositeOperation = "source-over";
-    return canvas2;
+    return canvas3;
   }
   function trimTransparentCanvas(source) {
     const { width, height } = source, pixels2 = source.getContext("2d").getImageData(0, 0, width, height).data;
@@ -43040,17 +43255,17 @@
     }
     if (right < left) return newCanvas(1, 1);
     if (left === 0 && top === 0 && right === width - 1 && bottom === height - 1) return source;
-    const w2 = right - left + 1, h3 = bottom - top + 1, canvas2 = newCanvas(w2, h3);
-    canvas2.getContext("2d").drawImage(source, left, top, w2, h3, 0, 0, w2, h3);
-    return canvas2;
+    const w2 = right - left + 1, h3 = bottom - top + 1, canvas3 = newCanvas(w2, h3);
+    canvas3.getContext("2d").drawImage(source, left, top, w2, h3, 0, 0, w2, h3);
+    return canvas3;
   }
   async function compressCanvas(c4) {
     const blob = await new Promise((resolve, reject) => c4.toBlob((b2) => b2 ? resolve(b2) : reject(Error("PNG\uB97C \uC800\uC7A5\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694.")), "image/png"));
     return new Uint8Array(await blob.arrayBuffer());
   }
-  async function drawBytes(canvas2, png, x3 = 0, y3 = 0, clear = true) {
+  async function drawBytes(canvas3, png, x3 = 0, y3 = 0, clear = true) {
     const image = await createImageBitmap(new Blob([png], { type: "image/png" }));
-    const ctx = canvas2.getContext("2d");
+    const ctx = canvas3.getContext("2d");
     if (clear) ctx.clearRect(x3, y3, image.width, image.height);
     ctx.drawImage(image, x3, y3);
     image.close();
@@ -43132,8 +43347,8 @@
     if (op.type === "reorder" && (!Number.isInteger(op.index) || op.index < 0 || op.index >= s3.layers.length)) throw Error("\uC798\uBABB\uB41C \uB808\uC774\uC5B4 \uC21C\uC11C\uC608\uC694.");
     let merged;
     if (op.type === "mergeDown") {
-      const below = s3.layers[index2 - 1], canvas2 = compositePainting({ ...s3, layers: [below, target] });
-      merged = { ...below, canvas: canvas2, visible: true, opacity: 1, blendMode: DEFAULT_BLEND_MODE };
+      const below = s3.layers[index2 - 1], canvas3 = compositePainting({ ...s3, layers: [below, target] });
+      merged = { ...below, canvas: canvas3, visible: true, opacity: 1, blendMode: DEFAULT_BLEND_MODE };
       const candidate = { ...s3, layers: s3.layers.flatMap((l3, i4) => i4 === index2 ? [] : i4 === index2 - 1 ? [merged] : [l3]) };
       if (!sameCanvasPixels(compositePainting(s3), compositePainting(candidate))) throw Error("\uD604\uC7AC \uB808\uC774\uC5B4\uC758 " + blendModeLabel(target.blendMode) + " / \uC544\uB798 \uB808\uC774\uC5B4\uC758 " + blendModeLabel(below.blendMode) + " \uD63C\uD569 \uACB0\uACFC\uAC00 \uB354 \uC544\uB798 \uBC30\uACBD\uC5D0 \uC758\uC874\uD574\uC694. \uD569\uCE58\uBA74 \uADF8\uB9BC\uC774 \uB2EC\uB77C\uC838 \uB808\uC774\uC5B4\uB97C \uC720\uC9C0\uD588\uC5B4\uC694.");
     }
@@ -43207,9 +43422,9 @@
     const left = Math.max(0, Math.floor(Math.min(rect.x, rect.x + rect.w))), top = Math.max(0, Math.floor(Math.min(rect.y, rect.y + rect.h))), right = Math.min(width, Math.ceil(Math.max(rect.x, rect.x + rect.w))), bottom = Math.min(height, Math.ceil(Math.max(rect.y, rect.y + rect.h)));
     return right > left && bottom > top ? { x: left, y: top, w: right - left, h: bottom - top } : null;
   }
-  function region2(canvas2, rect) {
+  function region2(canvas3, rect) {
     const c4 = newCanvas(rect.w, rect.h);
-    c4.getContext("2d").drawImage(canvas2, rect.x, rect.y, rect.w, rect.h, 0, 0, rect.w, rect.h);
+    c4.getContext("2d").drawImage(canvas3, rect.x, rect.y, rect.w, rect.h, 0, 0, rect.w, rect.h);
     return c4;
   }
   function unionRect(a3, b2, width, height) {
@@ -43677,10 +43892,10 @@
       session = await openPainting(source, { fitToLimits: true });
     }
     const tools = createPaintTools(session), dialog = el("dialog", { id: "painting-editor", class: "painting-dialog", "data-busy": "false", "data-paint-dirty": "false", "data-tool": "brush" }), viewport = el("div", { id: "paint-viewport", class: "paint-viewport", tabIndex: 0, "aria-label": "\uADF8\uB9BC \uCE94\uBC84\uC2A4" });
-    const canvas2 = el("canvas", { id: "paint-canvas" }), selectionBox = el("div", { id: "paint-selection", class: "paint-selection", hidden: true }, ["nw", "ne", "sw", "se"].map((h3) => el("button", { class: "paint-handle " + h3, "data-handle": h3, type: "button", "aria-label": "\uC120\uD0DD \uD06C\uAE30 \uC870\uC808 " + h3 })));
-    const surface = el("div", { class: "paint-surface" }, canvas2, selectionBox), cursor = el("div", { class: "paint-cursor", hidden: true });
+    const canvas3 = el("canvas", { id: "paint-canvas" }), selectionBox = el("div", { id: "paint-selection", class: "paint-selection", hidden: true }, ["nw", "ne", "sw", "se"].map((h3) => el("button", { class: "paint-handle " + h3, "data-handle": h3, type: "button", "aria-label": "\uC120\uD0DD \uD06C\uAE30 \uC870\uC808 " + h3 })));
+    const surface = el("div", { class: "paint-surface" }, canvas3, selectionBox), cursor = el("div", { class: "paint-cursor", hidden: true });
     viewport.append(surface, cursor);
-    const panel = el("aside", { class: "paint-panel" }), toolBar = el("nav", { class: "paint-tools", "aria-label": "\uADF8\uB9BC \uB3C4\uAD6C" }), status = el("div", { class: "paint-status" }), message = el("div", { id: "paint-message", class: "paint-message", role: "alert", hidden: true });
+    const panel = el("aside", { class: "paint-panel" }), toolBar = el("nav", { class: "paint-tools", "aria-label": "\uADF8\uB9BC \uB3C4\uAD6C" }), status2 = el("div", { class: "paint-status" }), message = el("div", { id: "paint-message", class: "paint-message", role: "alert", hidden: true });
     let view = { scale: 1, panX: 0, panY: 0 }, busy = false, space = false, drag = null, layerDrag = null, suppressedLayerPointer = null, frame = 0, closed = false, closing = false, fitMode = true, brushPresetId = "", recent = ["#233d33", "#ffffff", "#d7553d", "#3688ba", "#4d8660", "#79549e"];
     let finish3;
     const outcome = new Promise((resolve) => {
@@ -43802,7 +44017,7 @@
     const top = el("header", { class: "paint-top" }, el("div", {}, el("strong", {}, "\uADF8\uB9BC \uC791\uC5C5\uC2E4"), el("small", {}, card.name)), el("div", { class: "paint-top-actions" }, undoButton, redoButton, button("\uCE94\uBC84\uC2A4 \uD06C\uAE30", resizeDialog, { id: "paint-resize" }), button("\uD22C\uBA85 PNG", () => exportPng(false), { id: "paint-export-transparent" }), button("\uD770 \uBC30\uACBD PNG", () => exportPng(true), { id: "paint-export-white" }), applyButton, button("\uB2EB\uAE30", close, { id: "paint-close" })));
     for (const [tool, icon, name, shortcut] of TOOLS) toolBar.append(button(icon, () => setTool(tool), { id: "tool-" + tool, title: name + " \xB7 " + shortcut, "aria-label": name, class: "paint-tool", "data-tool": tool }), el("small", {}, shortcut));
     const zoomInput = el("input", { id: "paint-zoom", type: "number", min: 12.5, max: 1600, step: 12.5, "aria-label": "\uADF8\uB9BC \uBC30\uC728", onchange: (e2) => setZoom(Number(e2.target.value) / 100) });
-    const bottom = el("footer", { class: "paint-bottom" }, status, el("span", { id: "paint-coords" }, "B \uBE0C\uB7EC\uC2DC \xB7 E \uC9C0\uC6B0\uAC1C \xB7 M \uC120\uD0DD \xB7 Space \uC774\uB3D9"), zoomInput, el("span", {}, "%"), button("\uC804\uCCB4 \uB9DE\uCDA4", fit, { id: "paint-fit" }), button("100%", () => setZoom(1), { id: "paint-100" }));
+    const bottom = el("footer", { class: "paint-bottom" }, status2, el("span", { id: "paint-coords" }, "B \uBE0C\uB7EC\uC2DC \xB7 E \uC9C0\uC6B0\uAC1C \xB7 M \uC120\uD0DD \xB7 Space \uC774\uB3D9"), zoomInput, el("span", {}, "%"), button("\uC804\uCCB4 \uB9DE\uCDA4", fit, { id: "paint-fit" }), button("100%", () => setZoom(1), { id: "paint-100" }));
     dialog.append(top, el("div", { class: "paint-grid" }, toolBar, viewport, panel), message, bottom);
     document.body.append(dialog);
     dialog.showModal();
@@ -43816,7 +44031,7 @@
       undoButton.disabled = busy || !session.history.canUndo();
       redoButton.disabled = busy || !session.history.canRedo();
       applyButton.disabled = busy;
-      status.replaceChildren(el("strong", { id: "paint-size" }, session.width + " \xD7 " + session.height + " px"), el("span", { id: "paint-history" }, session.history.count() + "\uB2E8\uACC4 \xB7 " + (session.history.bytes() / 1024 / 1024).toFixed(2) + " / 128 MiB"));
+      status2.replaceChildren(el("strong", { id: "paint-size" }, session.width + " \xD7 " + session.height + " px"), el("span", { id: "paint-history" }, session.history.count() + "\uB2E8\uACC4 \xB7 " + (session.history.bytes() / 1024 / 1024).toFixed(2) + " / 128 MiB"));
       zoomInput.value = (view.scale * 100).toFixed(1);
       for (const [tool] of TOOLS) document.getElementById("tool-" + tool).classList.toggle("selected", tools.getOptions().tool === tool);
     }
@@ -43825,18 +44040,18 @@
     }
     function renderViewport() {
       if (closed) return;
-      if (canvas2.width !== session.width || canvas2.height !== session.height) {
-        canvas2.width = session.width;
-        canvas2.height = session.height;
+      if (canvas3.width !== session.width || canvas3.height !== session.height) {
+        canvas3.width = session.width;
+        canvas3.height = session.height;
       }
-      const ctx = canvas2.getContext("2d");
+      const ctx = canvas3.getContext("2d");
       ctx.imageSmoothingEnabled = false;
-      ctx.clearRect(0, 0, canvas2.width, canvas2.height);
+      ctx.clearRect(0, 0, canvas3.width, canvas3.height);
       ctx.drawImage(compose(), 0, 0);
       surface.style.width = session.width + "px";
       surface.style.height = session.height + "px";
       surface.style.transform = "translate(" + view.panX + "px," + view.panY + "px) scale(" + view.scale + ")";
-      canvas2.style.imageRendering = view.scale >= 1 ? "pixelated" : "auto";
+      canvas3.style.imageRendering = view.scale >= 1 ? "pixelated" : "auto";
       const rect = tools.getSelection();
       selectionBox.hidden = !rect;
       if (rect) {
@@ -44603,7 +44818,7 @@
       });
       return result;
     }
-    function fail2(error, code, message) {
+    function fail3(error, code, message) {
       const next = normalizeError(error, code, message);
       publish({ error: errorInfo(next) });
       return next;
@@ -44748,7 +44963,7 @@
           }
           return entries2.sort((a3, b2) => a3.name.localeCompare(b2.name, "ko") || a3.fileName.localeCompare(b2.fileName));
         } catch (error) {
-          throw fail2(error, "read-failed", kind.label + " \uBAA9\uB85D\uC744 \uC77D\uC9C0 \uBABB\uD588\uC5B4\uC694. \uD3F4\uB354\uB97C \uB2E4\uC2DC \uC5F0\uACB0\uD558\uC138\uC694.");
+          throw fail3(error, "read-failed", kind.label + " \uBAA9\uB85D\uC744 \uC77D\uC9C0 \uBABB\uD588\uC5B4\uC694. \uD3F4\uB354\uB97C \uB2E4\uC2DC \uC5F0\uACB0\uD558\uC138\uC694.");
         }
       });
     }
@@ -44764,7 +44979,7 @@
           if (kind === projectFiles) loads.set(result, { target, fileName: fileName2, text: text2 });
           return result;
         } catch (error) {
-          throw fail2(error, "read-failed", kind.label + " \uB0B4\uC6A9\uC744 \uC77D\uC9C0 \uBABB\uD588\uC5B4\uC694. \uD30C\uC77C \uC0C1\uD0DC\uC640 \uAD8C\uD55C\uC744 \uD655\uC778\uD558\uC138\uC694.");
+          throw fail3(error, "read-failed", kind.label + " \uB0B4\uC6A9\uC744 \uC77D\uC9C0 \uBABB\uD588\uC5B4\uC694. \uD30C\uC77C \uC0C1\uD0DC\uC640 \uAD8C\uD55C\uC744 \uD655\uC778\uD558\uC138\uC694.");
         }
       });
     }
@@ -44906,12 +45121,12 @@
           adopt(next);
           return true;
         } catch (error) {
-          if (attempt === selection) throw fail2(error, "connect-failed", "\uAE30\uC5B5\uD55C \uD3F4\uB354\uB97C \uC5F0\uACB0\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694. \uD3F4\uB354\uAC00 \uC774\uB3D9\uB418\uC5C8\uAC70\uB098 \uC811\uADFC \uAD8C\uD55C\uC774 \uC5C6\uC5B4\uC694.");
+          if (attempt === selection) throw fail3(error, "connect-failed", "\uAE30\uC5B5\uD55C \uD3F4\uB354\uB97C \uC5F0\uACB0\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694. \uD3F4\uB354\uAC00 \uC774\uB3D9\uB418\uC5C8\uAC70\uB098 \uC811\uADFC \uAD8C\uD55C\uC774 \uC5C6\uC5B4\uC694.");
           return false;
         }
       },
       async connect() {
-        if (!state.supported) throw fail2(problem2("unsupported", "\uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C\uB294 \uD3F4\uB354 \uC800\uC7A5\uC744 \uC9C0\uC6D0\uD558\uC9C0 \uC54A\uC544\uC694. Chrome \uB610\uB294 Edge\uC5D0\uC11C \uC5F4\uC5B4 \uC8FC\uC138\uC694."));
+        if (!state.supported) throw fail3(problem2("unsupported", "\uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C\uB294 \uD3F4\uB354 \uC800\uC7A5\uC744 \uC9C0\uC6D0\uD558\uC9C0 \uC54A\uC544\uC694. Chrome \uB610\uB294 Edge\uC5D0\uC11C \uC5F4\uC5B4 \uC8FC\uC138\uC694."));
         const attempt = ++selection;
         let root;
         try {
@@ -44933,7 +45148,7 @@
           return true;
         } catch (error) {
           if (error?.name === "AbortError") return false;
-          if (attempt === selection) throw fail2(error, "connect-failed", "\uD3F4\uB354\uB97C \uC5F0\uACB0\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694. \uD3F4\uB354 \uAD8C\uD55C\uACFC \uC704\uCE58\uB97C \uD655\uC778\uD558\uC138\uC694.");
+          if (attempt === selection) throw fail3(error, "connect-failed", "\uD3F4\uB354\uB97C \uC5F0\uACB0\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694. \uD3F4\uB354 \uAD8C\uD55C\uACFC \uC704\uCE58\uB97C \uD655\uC778\uD558\uC138\uC694.");
           throw normalizeError(error, "connect-failed", "\uD3F4\uB354\uB97C \uC5F0\uACB0\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694.");
         }
       },
@@ -45030,10 +45245,10 @@
           project = parseStored(capturedText, cardFiles);
           stem = fileStem(name ?? project.cards[0].name);
         } catch (error) {
-          throw fail2(error, "invalid-card", "\uCE74\uB4DC \uD30C\uC77C\uC744 \uC800\uC7A5\uD560 \uC218 \uC5C6\uC5B4\uC694: " + error.message);
+          throw fail3(error, "invalid-card", "\uCE74\uB4DC \uD30C\uC77C\uC744 \uC800\uC7A5\uD560 \uC218 \uC5C6\uC5B4\uC694: " + error.message);
         }
         const target = connection || remembered;
-        if (!target) throw fail2(problem2("not-connected", "HTML\uC774 \uC788\uB294 \uD3F4\uB354\uB97C \uBA3C\uC800 \uC5F0\uACB0\uD558\uC138\uC694."));
+        if (!target) throw fail3(problem2("not-connected", "HTML\uC774 \uC788\uB294 \uD3F4\uB354\uB97C \uBA3C\uC800 \uC5F0\uACB0\uD558\uC138\uC694."));
         const permissionResult = permission(target.root, true).then((value) => ({ value }), (error) => ({ error }));
         return enqueue(async () => {
           try {
@@ -45098,10 +45313,10 @@
           text2 = serializeProject(project);
           if (requestedFileName !== void 0 && requestedFileName !== null) checkFileName(requestedFileName);
         } catch (error) {
-          throw fail2(error, "invalid-project", "\uD504\uB85C\uC81D\uD2B8\uB97C \uC800\uC7A5\uD560 \uC218 \uC5C6\uC5B4\uC694: " + error.message);
+          throw fail3(error, "invalid-project", "\uD504\uB85C\uC81D\uD2B8\uB97C \uC800\uC7A5\uD560 \uC218 \uC5C6\uC5B4\uC694: " + error.message);
         }
         const target = connection || remembered, savedBinding = binding;
-        if (!target) throw fail2(problem2("not-connected", "HTML\uC774 \uC788\uB294 \uD3F4\uB354\uB97C \uBA3C\uC800 \uC5F0\uACB0\uD558\uC138\uC694."));
+        if (!target) throw fail3(problem2("not-connected", "HTML\uC774 \uC788\uB294 \uD3F4\uB354\uB97C \uBA3C\uC800 \uC5F0\uACB0\uD558\uC138\uC694."));
         const permissionResult = permission(target.root, true).then((value) => ({ value }), (error) => ({ error }));
         return enqueue(async () => {
           try {
@@ -45145,13 +45360,13 @@
 
   // src/ui/workspace.js
   function createWorkspaceControls(store, onLoaded, onImportFile) {
-    const storage = createWorkspaceStorage(), status = el("small", { id: "workspace-status", class: "workspace-status", role: "status" });
+    const storage = createWorkspaceStorage(), status2 = el("small", { id: "workspace-status", class: "workspace-status", role: "status" });
     let disposed = false, pendingSave = null, library = null, folderDialog = null;
     const unsubscribe = storage.subscribe(refresh);
     function refresh() {
       const s3 = storage.getState();
-      status.textContent = s3.connected ? (s3.fileName || "\uC0C8 \uB371") + " \xB7 " + (s3.projectsPath || s3.cardsPath) : s3.folderName ? "\uAE30\uC5B5\uD55C \uD3F4\uB354: " + s3.folderName + " \xB7 \uB2E4\uC2DC \uC5F0\uACB0 \uAC00\uB2A5" : s3.supported ? "\uC800\uC7A5 \uD3F4\uB354\uB97C \uC5F0\uACB0\uD574 \uC8FC\uC138\uC694" : "\uD3F4\uB354 \uC800\uC7A5 \uBBF8\uC9C0\uC6D0 \xB7 JSON \uB0B4\uBCF4\uB0B4\uAE30 \uAC00\uB2A5";
-      status.title = s3.error?.message || s3.warning || "HTML \uD3F4\uB354\uC5D0\uB294 \uC791\uC5C5\uC2E4 \uB370\uC774\uD130 \uD3F4\uB354\uB97C \uB9CC\uB4E4\uACE0, \uB370\uC774\uD130 \uD3F4\uB354\uB098 \uADF8 \uC548\uCABD\uC744 \uACE0\uB974\uBA74 \uC911\uCCA9 \uC0DD\uC131\uD558\uC9C0 \uC54A\uC544\uC694.";
+      status2.textContent = s3.connected ? (s3.fileName || "\uC0C8 \uB371") + " \xB7 " + (s3.projectsPath || s3.cardsPath) : s3.folderName ? "\uAE30\uC5B5\uD55C \uD3F4\uB354: " + s3.folderName + " \xB7 \uB2E4\uC2DC \uC5F0\uACB0 \uAC00\uB2A5" : s3.supported ? "\uC800\uC7A5 \uD3F4\uB354\uB97C \uC5F0\uACB0\uD574 \uC8FC\uC138\uC694" : "\uD3F4\uB354 \uC800\uC7A5 \uBBF8\uC9C0\uC6D0 \xB7 JSON \uB0B4\uBCF4\uB0B4\uAE30 \uAC00\uB2A5";
+      status2.title = s3.error?.message || s3.warning || "HTML \uD3F4\uB354\uC5D0\uB294 \uC791\uC5C5\uC2E4 \uB370\uC774\uD130 \uD3F4\uB354\uB97C \uB9CC\uB4E4\uACE0, \uB370\uC774\uD130 \uD3F4\uB354\uB098 \uADF8 \uC548\uCABD\uC744 \uACE0\uB974\uBA74 \uC911\uCCA9 \uC0DD\uC131\uD558\uC9C0 \uC54A\uC544\uC694.";
     }
     async function ensureConnected() {
       if (storage.getState().connected) return true;
@@ -45317,7 +45532,7 @@
     storage.restore().catch((error) => {
       if (!disposed) showMessage(error.message);
     });
-    return { storage, status, save, load, connect, ensureConnected, destroy() {
+    return { storage, status: status2, save, load, connect, ensureConnected, destroy() {
       disposed = true;
       unsubscribe();
       if (folderDialog) {
@@ -45630,14 +45845,12 @@
   // release.json
   var release_default = {
     format: "card-print-studio-update",
-    version: "1.3.0",
+    version: "1.3.1",
     releasedAt: "2026-10-18",
     notes: [
-      "\uC774\uBBF8\uC9C0\uB97C \uC9C1\uC811 \uC790\uB974\uAC70\uB098 \uC2A4\uD504\uB77C\uC774\uD2B8 \uC2DC\uD2B8\uB97C \uC5EC\uB7EC \uC870\uAC01\uC73C\uB85C \uB098\uB204\uACE0, \uACF5\uC6A9 \uC5D0\uC14B \uBCF4\uAD00\uD568\uC5D0\uC11C \uB2E4\uB978 \uB371\uC5D0\uB3C4 \uAEBC\uB0B4 \uC4F8 \uC218 \uC788\uC5B4\uC694.",
-      "\uCE74\uB4DC \uADF8\uB9BC\xB7\uC790\uC720 \uC774\uBBF8\uC9C0\xB7\uC774\uD399\uD2B8 \uC785\uC790\xB7\uD0A4\uC6CC\uB4DC \uC544\uC774\uCF58\uC5D0 \uBCF4\uAD00\uD55C \uADF8\uB9BC\uC744 \uBCF5\uC0AC\uD574 \uC801\uC6A9\uD558\uBA70 \uC6D0\uBCF8\uACFC \uD22C\uBA85\uB3C4\uB97C \uC720\uC9C0\uD574\uC694.",
-      "\uC624\uBE0C\uC81D\uD2B8 \uBAA9\uB85D\uC5D0\uC11C \uAC80\uC0C9\xB7\uC5EC\uB7EC \uAC1C \uC120\uD0DD\xB7\uC55E\uB4A4 \uC21C\uC11C \uBCC0\uACBD\xB7\uB9C8\uC6B0\uC2A4 \uC120\uD0DD \uC7A0\uAE08\uC744 \uC0AC\uC6A9\uD560 \uC218 \uC788\uC5B4\uC694.",
-      "\uC774\uD399\uD2B8 \uC791\uC5C5\uC2E4\uC5D0\uC11C \uC120\uD0DD \uB300\uC0C1\uB9CC \uC7AC\uC0DD\uD558\uACE0, \uB098\uBA38\uC9C0\uB294 \uC778\uC1C4 \uC7A5\uBA74\uC5D0 \uBA48\uCDB0 \uACC4\uC0B0 \uACB0\uACFC\uB97C \uC7AC\uC0AC\uC6A9\uD574\uC694. \uBE14\uB8F8\uC758 CPU \uACC4\uC0B0\uB3C4 \uCD5C\uC801\uD654\uD588\uC5B4\uC694.",
-      "\uC18D\uC131 \uC120\uD0DD\uC744 \uD3BC\uCE68 \uBA54\uB274 \uD55C\uACF3\uC5D0 \uBAA8\uC73C\uACE0, \uC0C8 \uB3C5\uB9BD \uC774\uD399\uD2B8\uC758 \uAE30\uBCF8 \uBC1C\uC0DD \uC704\uCE58\uB97C \uC601\uC5ED \uC804\uCCB4\uB85C \uBC14\uAFE8\uC5B4\uC694."
+      "\uBE14\uB8F8\uC758 \uBB34\uAC70\uC6B4 \uD750\uB9BC \uACC4\uC0B0\uC744 GPU\uC5D0\uC11C \uCC98\uB9AC\uD574\uC694. \uC9C0\uC6D0 \uD658\uACBD\uC5D0\uC11C\uB294 \uC790\uB3D9\uC73C\uB85C \uC0AC\uC6A9\uD558\uBA70 \uBBF8\uB9AC\uBCF4\uAE30 \uC0C1\uD0DC\uC5D0 \uBE14\uB8F8 GPU\uB97C \uD45C\uC2DC\uD574\uC694.",
+      "GPU\uB97C \uC0AC\uC6A9\uD560 \uC218 \uC5C6\uAC70\uB098 \uC5F0\uACB0\uC774 \uB04A\uAE30\uBA74 \uAE30\uC874 CPU \uBC29\uC2DD\uC73C\uB85C \uC790\uB3D9 \uC804\uD658\uD574 \uD3B8\uC9D1\uACFC \uC778\uC1C4\uB97C \uACC4\uC18D\uD560 \uC218 \uC788\uC5B4\uC694.",
+      "\uADF8\uB9BC \uC6D0\uBCF8\xB7\uD22C\uBA85\uB3C4\xB7\uC800\uC7A5\uB41C \uC778\uC1C4 \uC7A5\uBA74\uC744 \uC720\uC9C0\uD558\uBA70 \uC120\uD0DD \uB300\uC0C1\uB9CC \uC7AC\uC0DD\uACFC \uBA48\uCD98 \uD6A8\uACFC \uC7AC\uC0AC\uC6A9\uB3C4 \uD568\uAED8 \uC0AC\uC6A9\uD560 \uC218 \uC788\uC5B4\uC694."
     ],
     downloadUrl: "./card-print-studio.html",
     sourceUrl: "https://raw.githubusercontent.com/lolipop000000/card-print-studio/main/dist/update.json"
@@ -45648,10 +45861,10 @@
   var MAX_BYTES = 256 * 1024;
   var UpdateError = class extends Error {
   };
-  var fail = (message) => new UpdateError(message);
+  var fail2 = (message) => new UpdateError(message);
   function versionParts(value) {
     const match = typeof value === "string" && value.length <= 150 && value.match(/^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([\da-zA-Z-]+(?:\.[\da-zA-Z-]+)*))?(?:\+([\da-zA-Z-]+(?:\.[\da-zA-Z-]+)*))?$/);
-    if (!match || match[4]?.split(".").some((s3) => /^\d+$/.test(s3) && s3.length > 1 && s3[0] === "0")) throw fail("\uBC84\uC804 \uD615\uC2DD\uC774 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC544\uC694. 1.2.3 \uB610\uB294 1.2.3-beta.1\uCC98\uB7FC \uC801\uC5B4\uC57C \uD574\uC694.");
+    if (!match || match[4]?.split(".").some((s3) => /^\d+$/.test(s3) && s3.length > 1 && s3[0] === "0")) throw fail2("\uBC84\uC804 \uD615\uC2DD\uC774 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC544\uC694. 1.2.3 \uB610\uB294 1.2.3-beta.1\uCC98\uB7FC \uC801\uC5B4\uC57C \uD574\uC694.");
     return { numbers: match.slice(1, 4).map(BigInt), pre: match[4]?.split(".") || [] };
   }
   function compareVersions(left, right) {
@@ -45670,27 +45883,27 @@
     return 0;
   }
   function httpsUrl(value, label, base) {
-    if (typeof value !== "string" || !value.trim() || value.length > 2048) throw fail(label + "\uAC00 \uBE44\uC5B4 \uC788\uAC70\uB098 \uB108\uBB34 \uAE38\uC5B4\uC694. HTTPS \uC8FC\uC18C\uB97C \uC785\uB825\uD574 \uC8FC\uC138\uC694.");
+    if (typeof value !== "string" || !value.trim() || value.length > 2048) throw fail2(label + "\uAC00 \uBE44\uC5B4 \uC788\uAC70\uB098 \uB108\uBB34 \uAE38\uC5B4\uC694. HTTPS \uC8FC\uC18C\uB97C \uC785\uB825\uD574 \uC8FC\uC138\uC694.");
     let url;
     try {
       url = new URL(value.trim(), base);
     } catch {
-      throw fail(label + " \uD615\uC2DD\uC774 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC544\uC694. https://\uB85C \uC2DC\uC791\uD558\uB294 \uC8FC\uC18C\uB97C \uC785\uB825\uD574 \uC8FC\uC138\uC694.");
+      throw fail2(label + " \uD615\uC2DD\uC774 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC544\uC694. https://\uB85C \uC2DC\uC791\uD558\uB294 \uC8FC\uC18C\uB97C \uC785\uB825\uD574 \uC8FC\uC138\uC694.");
     }
-    if (url.protocol !== "https:" || url.username || url.password || url.hash) throw fail(label + "\uB294 \uB85C\uADF8\uC778 \uC815\uBCF4\uC640 # \uBD80\uBD84\uC774 \uC5C6\uB294 HTTPS \uC8FC\uC18C\uC5EC\uC57C \uD574\uC694.");
+    if (url.protocol !== "https:" || url.username || url.password || url.hash) throw fail2(label + "\uB294 \uB85C\uADF8\uC778 \uC815\uBCF4\uC640 # \uBD80\uBD84\uC774 \uC5C6\uB294 HTTPS \uC8FC\uC18C\uC5EC\uC57C \uD574\uC694.");
     return url.href;
   }
   var normalizeSource = (value) => httpsUrl(value, "\uBC30\uD3EC \uC8FC\uC18C");
   function parseRelease(value, source) {
-    if (!value || typeof value !== "object" || Array.isArray(value) || value.format !== FORMAT3) throw fail("\uCE74\uB4DC \uC791\uC5C5\uC2E4\uC758 \uC0C8 \uBC84\uC804 \uC815\uBCF4 \uD30C\uC77C\uC774 \uC544\uB2C8\uC5D0\uC694. \uC791\uC5C5\uC2E4\uC6A9 update.json \uC8FC\uC18C\uAC00 \uD544\uC694\uD574\uC694.");
+    if (!value || typeof value !== "object" || Array.isArray(value) || value.format !== FORMAT3) throw fail2("\uCE74\uB4DC \uC791\uC5C5\uC2E4\uC758 \uC0C8 \uBC84\uC804 \uC815\uBCF4 \uD30C\uC77C\uC774 \uC544\uB2C8\uC5D0\uC694. \uC791\uC5C5\uC2E4\uC6A9 update.json \uC8FC\uC18C\uAC00 \uD544\uC694\uD574\uC694.");
     versionParts(value.version);
     if (value.releasedAt !== void 0) {
       const date = value.releasedAt;
-      if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date) throw fail("\uBC30\uD3EC \uB0A0\uC9DC\uAC00 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC544\uC694. \uC2E4\uC81C \uB0A0\uC9DC\uB97C YYYY-MM-DD\uB85C \uC801\uC5B4\uC57C \uD574\uC694.");
+      if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date) throw fail2("\uBC30\uD3EC \uB0A0\uC9DC\uAC00 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC544\uC694. \uC2E4\uC81C \uB0A0\uC9DC\uB97C YYYY-MM-DD\uB85C \uC801\uC5B4\uC57C \uD574\uC694.");
     }
     let notes = value.notes ?? [];
     if (typeof notes === "string") notes = notes.split(/\r?\n/).filter((line) => line.trim());
-    if (!Array.isArray(notes) || notes.length > 100 || notes.some((note) => typeof note !== "string" || note.length > 4e3)) throw fail("\uBCC0\uACBD\uC0AC\uD56D\uC740 100\uAC1C \uC774\uD558\uC758 \uAE00 \uBAA9\uB85D\uC774\uC5B4\uC57C \uD558\uBA70 \uD55C \uD56D\uBAA9\uC740 4,000\uC790 \uC774\uD558\uC5EC\uC57C \uD574\uC694.");
+    if (!Array.isArray(notes) || notes.length > 100 || notes.some((note) => typeof note !== "string" || note.length > 4e3)) throw fail2("\uBCC0\uACBD\uC0AC\uD56D\uC740 100\uAC1C \uC774\uD558\uC758 \uAE00 \uBAA9\uB85D\uC774\uC5B4\uC57C \uD558\uBA70 \uD55C \uD56D\uBAA9\uC740 4,000\uC790 \uC774\uD558\uC5EC\uC57C \uD574\uC694.");
     return { version: value.version.replace(/^v/, ""), releasedAt: value.releasedAt || "", notes: [...notes], downloadUrl: httpsUrl(value.downloadUrl, "\uB2E4\uC6B4\uB85C\uB4DC \uC8FC\uC18C", normalizeSource(source)) };
   }
   async function limitedBytes(response, signal, maxBytes, tooLarge) {
@@ -45698,12 +45911,12 @@
     if (declared > maxBytes) {
       await response.body?.cancel().catch(() => {
       });
-      throw fail(tooLarge);
+      throw fail2(tooLarge);
     }
     const reader = response.body?.getReader();
     if (!reader) {
       const bytes2 = new Uint8Array(await response.arrayBuffer());
-      if (bytes2.byteLength > maxBytes) throw fail(tooLarge);
+      if (bytes2.byteLength > maxBytes) throw fail2(tooLarge);
       return bytes2;
     }
     let total = 0;
@@ -45720,7 +45933,7 @@
         total += value.byteLength;
         if (total > maxBytes) {
           await reader.cancel();
-          throw fail(tooLarge);
+          throw fail2(tooLarge);
         }
         chunks.push(value);
       }
@@ -45740,7 +45953,7 @@
     if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
     const control = new AbortController(), cancel = () => control.abort();
     let timedOut = false;
-    const aborted = new Promise((resolve, reject) => control.signal.addEventListener("abort", () => reject(timedOut ? fail((file ? "\uC0C8 HTML \uBC1B\uAE30" : "\uC0C8 \uBC84\uC804 \uD655\uC778") + " \uC2DC\uAC04\uC774 \uCD08\uACFC\uB410\uC5B4\uC694. \uBC30\uD3EC \uC11C\uBC84\uAC00 " + timeoutMs / 1e3 + "\uCD08 \uC548\uC5D0 \uC751\uB2F5\uD558\uC9C0 \uC54A\uC558\uC5B4\uC694.") : new DOMException("Aborted", "AbortError")), { once: true }));
+    const aborted = new Promise((resolve, reject) => control.signal.addEventListener("abort", () => reject(timedOut ? fail2((file ? "\uC0C8 HTML \uBC1B\uAE30" : "\uC0C8 \uBC84\uC804 \uD655\uC778") + " \uC2DC\uAC04\uC774 \uCD08\uACFC\uB410\uC5B4\uC694. \uBC30\uD3EC \uC11C\uBC84\uAC00 " + timeoutMs / 1e3 + "\uCD08 \uC548\uC5D0 \uC751\uB2F5\uD558\uC9C0 \uC54A\uC558\uC5B4\uC694.") : new DOMException("Aborted", "AbortError")), { once: true }));
     signal?.addEventListener("abort", cancel, { once: true });
     const timer = setTimeout(() => {
       timedOut = true;
@@ -45751,7 +45964,7 @@
       if (!response.ok) {
         await response.body?.cancel().catch(() => {
         });
-        throw fail("\uBC30\uD3EC \uC11C\uBC84\uAC00 HTTP " + response.status + "\uB85C \uC751\uB2F5\uD588\uC5B4\uC694." + (response.status === 404 ? " \uC774 \uC8FC\uC18C\uC5D0 " + (file ? "\uC0C8 HTML \uD30C\uC77C" : "\uC0C8 \uBC84\uC804 \uC815\uBCF4 \uD30C\uC77C") + "\uC774 \uC5C6\uC5B4\uC694." : ""));
+        throw fail2("\uBC30\uD3EC \uC11C\uBC84\uAC00 HTTP " + response.status + "\uB85C \uC751\uB2F5\uD588\uC5B4\uC694." + (response.status === 404 ? " \uC774 \uC8FC\uC18C\uC5D0 " + (file ? "\uC0C8 HTML \uD30C\uC77C" : "\uC0C8 \uBC84\uC804 \uC815\uBCF4 \uD30C\uC77C") + "\uC774 \uC5C6\uC5B4\uC694." : ""));
       }
       const finalUrl = response.url ? httpsUrl(response.url, file ? "\uB2E4\uC6B4\uB85C\uB4DC \uC8FC\uC18C" : "\uBC30\uD3EC \uC8FC\uC18C") : url;
       const tooLarge = file ? "\uC0C8 HTML \uD30C\uC77C\uC774 64MB\uB97C \uB118\uC5B4\uC694. \uC791\uC5C5 \uC790\uB8CC\uAC00 \uBE60\uC9C4 \uC791\uC5C5\uC2E4 \uBC30\uD3EC \uD30C\uC77C\uC774 \uD544\uC694\uD574\uC694." : "\uC0C8 \uBC84\uC804 \uC815\uBCF4\uAC00 256KB\uB97C \uB118\uC5B4\uC694. HTML \uD30C\uC77C \uB300\uC2E0 \uC791\uC740 update.json \uC8FC\uC18C\uAC00 \uD544\uC694\uD574\uC694.";
@@ -45761,7 +45974,7 @@
       return await Promise.race([request(), aborted]);
     } catch (error) {
       if (error instanceof UpdateError || error?.name === "AbortError") throw error;
-      throw fail((file ? "\uC0C8 HTML \uD30C\uC77C \uC11C\uBC84" : "\uBC30\uD3EC \uC11C\uBC84") + "\uC5D0 \uC5F0\uACB0\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694. \uC778\uD130\uB137 \uC5F0\uACB0\uC774 \uB04A\uACBC\uAC70\uB098 \uC11C\uBC84\uAC00 \uC791\uC5C5\uC2E4\uC758 \uC678\uBD80 \uC694\uCCAD\uC744 \uD5C8\uC6A9\uD558\uC9C0 \uC54A\uC558\uC5B4\uC694.");
+      throw fail2((file ? "\uC0C8 HTML \uD30C\uC77C \uC11C\uBC84" : "\uBC30\uD3EC \uC11C\uBC84") + "\uC5D0 \uC5F0\uACB0\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694. \uC778\uD130\uB137 \uC5F0\uACB0\uC774 \uB04A\uACBC\uAC70\uB098 \uC11C\uBC84\uAC00 \uC791\uC5C5\uC2E4\uC758 \uC678\uBD80 \uC694\uCCAD\uC744 \uD5C8\uC6A9\uD558\uC9C0 \uC54A\uC558\uC5B4\uC694.");
     } finally {
       clearTimeout(timer);
       signal?.removeEventListener("abort", cancel);
@@ -45776,7 +45989,7 @@
     try {
       value = JSON.parse(new TextDecoder().decode(payload.bytes).replace(/^\uFEFF/, ""));
     } catch {
-      throw fail("\uBC30\uD3EC \uC8FC\uC18C\uAC00 JSON \uBC84\uC804 \uC815\uBCF4\uB97C \uBCF4\uB0B4\uC9C0 \uC54A\uC558\uC5B4\uC694. HTML \uD398\uC774\uC9C0 \uC8FC\uC18C\uAC00 \uC544\uB2CC update.json \uC8FC\uC18C\uAC00 \uD544\uC694\uD574\uC694.");
+      throw fail2("\uBC30\uD3EC \uC8FC\uC18C\uAC00 JSON \uBC84\uC804 \uC815\uBCF4\uB97C \uBCF4\uB0B4\uC9C0 \uC54A\uC558\uC5B4\uC694. HTML \uD398\uC774\uC9C0 \uC8FC\uC18C\uAC00 \uC544\uB2CC update.json \uC8FC\uC18C\uAC00 \uD544\uC694\uD574\uC694.");
     }
     const release = parseRelease(value, payload.url), comparison = compareVersions(release.version, currentVersion);
     return { source: url, release, relation: comparison > 0 ? "available" : comparison === 0 ? "current" : "ahead" };
@@ -45784,7 +45997,7 @@
   async function receiveUpdateFile(release, options = {}) {
     const url = httpsUrl(release?.downloadUrl, "\uB2E4\uC6B4\uB85C\uB4DC \uC8FC\uC18C"), { bytes: bytes2 } = await fetchPayload(url, { ...options, timeoutMs: options.timeoutMs ?? 6e4, maxBytes: 64 * 1024 * 1024, file: true });
     const beginning = new TextDecoder().decode(bytes2.subarray(0, 4096));
-    if (!/<!doctype\s+html\b|<html[\s>]/i.test(beginning)) throw fail("\uB2E4\uC6B4\uB85C\uB4DC \uC8FC\uC18C\uAC00 HTML \uC791\uC5C5\uC2E4 \uD30C\uC77C\uC744 \uBCF4\uB0B4\uC9C0 \uC54A\uC558\uC5B4\uC694. \uBC30\uD3EC \uD30C\uC77C\uC758 \uC8FC\uC18C\uAC00 \uD544\uC694\uD574\uC694.");
+    if (!/<!doctype\s+html\b|<html[\s>]/i.test(beginning)) throw fail2("\uB2E4\uC6B4\uB85C\uB4DC \uC8FC\uC18C\uAC00 HTML \uC791\uC5C5\uC2E4 \uD30C\uC77C\uC744 \uBCF4\uB0B4\uC9C0 \uC54A\uC558\uC5B4\uC694. \uBC30\uD3EC \uD30C\uC77C\uC758 \uC8FC\uC18C\uAC00 \uD544\uC694\uD574\uC694.");
     return new Blob([bytes2], { type: "text/html" });
   }
 
@@ -45827,9 +46040,9 @@
       action.dataset.available = String(state.phase === "available");
       action.textContent = state.phase === "available" ? "\uC0C8 \uBC84\uC804 \uC788\uC74C" : "\uC0C8 \uBC84\uC804";
       if (!view) return;
-      const { status, check: check2, latest, latestVersion, date, notes, download: download2, direct, downloadStatus, storage, checked } = view;
-      status.dataset.state = state.phase;
-      status.textContent = state.message || ({ unconfigured: "\uC544\uC9C1 \uBC30\uD3EC \uC8FC\uC18C\uAC00 \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC558\uC5B4\uC694. \uC544\uB798\uC5D0 \uC0C8 \uBC84\uC804 \uC815\uBCF4 \uC8FC\uC18C\uB97C \uC785\uB825\uD574 \uC8FC\uC138\uC694.", idle: "\uC0C8 \uBC84\uC804 \uD655\uC778\uC744 \uB204\uB974\uBA74 \uBC30\uD3EC \uC8FC\uC18C\uC5D0\uC11C \uBC84\uC804 \uC815\uBCF4\uB97C \uAC00\uC838\uC640\uC694.", checking: "\uC0C8 \uBC84\uC804 \uC815\uBCF4\uB97C \uD655\uC778\uD558\uACE0 \uC788\uC5B4\uC694\u2026", current: "\uD604\uC7AC \uC791\uC5C5\uC2E4\uC774 \uCD5C\uC2E0 \uBC84\uC804\uC774\uC5D0\uC694.", ahead: "\uD604\uC7AC \uC791\uC5C5\uC2E4\uC774 \uBC30\uD3EC\uB41C \uBC84\uC804\uBCF4\uB2E4 \uC0C8\uB85C\uC6CC\uC694." }[state.phase] || "");
+      const { status: status2, check: check2, latest, latestVersion, date, notes, download: download2, direct, downloadStatus, storage, checked } = view;
+      status2.dataset.state = state.phase;
+      status2.textContent = state.message || ({ unconfigured: "\uC544\uC9C1 \uBC30\uD3EC \uC8FC\uC18C\uAC00 \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC558\uC5B4\uC694. \uC544\uB798\uC5D0 \uC0C8 \uBC84\uC804 \uC815\uBCF4 \uC8FC\uC18C\uB97C \uC785\uB825\uD574 \uC8FC\uC138\uC694.", idle: "\uC0C8 \uBC84\uC804 \uD655\uC778\uC744 \uB204\uB974\uBA74 \uBC30\uD3EC \uC8FC\uC18C\uC5D0\uC11C \uBC84\uC804 \uC815\uBCF4\uB97C \uAC00\uC838\uC640\uC694.", checking: "\uC0C8 \uBC84\uC804 \uC815\uBCF4\uB97C \uD655\uC778\uD558\uACE0 \uC788\uC5B4\uC694\u2026", current: "\uD604\uC7AC \uC791\uC5C5\uC2E4\uC774 \uCD5C\uC2E0 \uBC84\uC804\uC774\uC5D0\uC694.", ahead: "\uD604\uC7AC \uC791\uC5C5\uC2E4\uC774 \uBC30\uD3EC\uB41C \uBC84\uC804\uBCF4\uB2E4 \uC0C8\uB85C\uC6CC\uC694." }[state.phase] || "");
       check2.disabled = state.phase === "checking" || receiving;
       check2.textContent = state.phase === "checking" ? "\uD655\uC778 \uC911\u2026" : "\uC0C8 \uBC84\uC804 \uD655\uC778";
       const found = state.result?.release;
@@ -45967,7 +46180,7 @@
           paint2();
         }
       } });
-      const status = el("p", { id: "update-status", class: "update-status", role: "status", "aria-live": "polite" }), checkButton = button("\uC0C8 \uBC84\uC804 \uD655\uC778", () => check({ fromDialog: true }), { id: "updates-check", class: "primary" });
+      const status2 = el("p", { id: "update-status", class: "update-status", role: "status", "aria-live": "polite" }), checkButton = button("\uC0C8 \uBC84\uC804 \uD655\uC778", () => check({ fromDialog: true }), { id: "updates-check", class: "primary" });
       const notes = el("ul", { id: "update-notes" }), latestVersion = el("strong", { id: "update-latest-version" }), date = el("small", {}), latest = el("section", { class: "update-latest" }, el("div", { class: "update-version-row" }, el("span", {}, "\uBC30\uD3EC\uB41C \uBC84\uC804"), latestVersion, date), notes);
       const download2 = el("a", { id: "update-download", class: "update-download", target: "_blank", rel: "noopener noreferrer", download: "card-print-studio.html", hidden: true, onclick: (event) => {
         event.preventDefault();
@@ -45978,7 +46191,7 @@
       dialog.append(
         el("div", { class: "update-heading" }, el("div", {}, el("small", {}, "\uCE74\uB4DC \uC791\uC5C5\uC2E4"), el("h2", { id: "updates-title" }, "\uC791\uC5C5\uC2E4 \uC5C5\uB370\uC774\uD2B8")), button("\uB2EB\uAE30", close, { id: "updates-close" })),
         el("div", { class: "update-current" }, el("div", {}, el("span", {}, "\uD604\uC7AC \uBC84\uC804"), el("strong", { id: "update-current-version" }, release_default.version)), el("small", {}, release_default.releasedAt + " \uBC30\uD3EC")),
-        status,
+        status2,
         checked,
         latest,
         download2,
@@ -46018,7 +46231,7 @@
           backupStatus
         )
       );
-      view = { source, auto, status, check: checkButton, latest, latestVersion, date, notes, download: download2, direct, downloadStatus, storage, checked };
+      view = { source, auto, status: status2, check: checkButton, latest, latestVersion, date, notes, download: download2, direct, downloadStatus, storage, checked };
       const opened = dialog;
       opened.addEventListener("cancel", (event) => {
         event.preventDefault();
@@ -46163,7 +46376,7 @@
     const kind = field("\uC885\uB958", "card-filter-kind", "", (value) => setFilters({ kind: value }), { options: [["", "\uBAA8\uB4E0 \uC885\uB958"], ["monster", "\uBAAC\uC2A4\uD130"], ["item", "\uC544\uC774\uD15C"]], "aria-controls": "card-list" });
     const rank2 = field("\uB4F1\uAE09", "card-filter-rank", "", (value) => setFilters({ rank: value }), { options: [["", "\uBAA8\uB4E0 \uB4F1\uAE09"], ...RANKS.map((value) => [value, value])], "aria-controls": "card-list" });
     const attribute = field("\uC18D\uC131", "card-filter-attribute", "", (value) => setFilters({ attribute: value }), { options: [["", "\uBAA8\uB4E0 \uC18D\uC131"], ...Object.entries(ATTRIBUTES).map(([value, info]) => [value, info.name]), ["none", "\uC18D\uC131 \uC5C6\uB294 \uC544\uC774\uD15C"]], "aria-controls": "card-list" });
-    const status = el("p", { id: "card-library-status", class: "card-library-status", role: "status", "aria-live": "polite" });
+    const status2 = el("p", { id: "card-library-status", class: "card-library-status", role: "status", "aria-live": "polite" });
     const resetFilters = button("\uD544\uD130 \uCD08\uAE30\uD654", () => setFilters({ query: "", kind: "", rank: "", attribute: "" }), { id: "card-reset-filters" });
     const selectVisible = button("\uBCF4\uC774\uB294 \uCE74\uB4DC \uC120\uD0DD", () => {
       library.selectVisible(project());
@@ -46189,7 +46402,7 @@
       el("div", { class: "card-library-filters" }, kind, rank2),
       attribute,
       el("div", { class: "card-library-filter-actions" }, resetFilters),
-      status,
+      status2,
       el("div", { class: "card-library-selection-actions" }, selectVisible, clearSelection),
       el("div", { class: "card-library-bulk" }, el("label", { htmlFor: "card-bulk-quantity" }, "\uC120\uD0DD \uCE74\uB4DC \uC218\uB7C9"), quantity, apply3),
       message
@@ -46217,7 +46430,7 @@
       kind.querySelector("select").value = filters.kind;
       rank2.querySelector("select").value = filters.rank;
       attribute.querySelector("select").value = filters.attribute;
-      status.textContent = "\uD45C\uC2DC " + visible.length + " / " + current.cards.length + "\uC885 \xB7 \uC120\uD0DD " + selected.length + "\uC885";
+      status2.textContent = "\uD45C\uC2DC " + visible.length + " / " + current.cards.length + "\uC885 \xB7 \uC120\uD0DD " + selected.length + "\uC885";
       selectVisible.disabled = !visible.length;
       clearSelection.disabled = !selected.length;
       quantity.disabled = !selected.length;
@@ -46278,7 +46491,7 @@
         feedback.dataset.kind = "error";
       } else showMessage(message);
     }
-    function status(message) {
+    function status2(message) {
       const feedback = dialog?.querySelector("#card-template-feedback");
       if (feedback) {
         feedback.textContent = message;
@@ -46376,7 +46589,7 @@
           if (!active() || choice3.action === "cancel") return;
           if (store.getProject() !== before) throw Error("\uC774\uB984\uC744 \uACE0\uB974\uB294 \uB3D9\uC548 \uB371\uC774 \uBC14\uB00C\uC5C8\uC5B4\uC694. \uD604\uC7AC \uCE74\uB4DC\uB97C \uD655\uC778\uD558\uACE0 \uB2E4\uC2DC \uC800\uC7A5\uD558\uC138\uC694.");
           store.edit("\uB0B4 \uCE74\uB4DC \uC11C\uC2DD \uC800\uC7A5", (draft) => saveCardTemplate(draft, card.id, name.value, { replaceTemplateId: choice3.action === "overwrite" ? choice3.id : null, allowDuplicate: choice3.action === "add" }));
-          status(choice3.action === "overwrite" ? "\uC120\uD0DD\uD55C \uC11C\uC2DD\uC744 \uB36E\uC5B4\uC37C\uC5B4\uC694." : "\uD604\uC7AC \uCE74\uB4DC \uB514\uC790\uC778\uC744 \uC11C\uC2DD\uC73C\uB85C \uC800\uC7A5\uD588\uC5B4\uC694.");
+          status2(choice3.action === "overwrite" ? "\uC120\uD0DD\uD55C \uC11C\uC2DD\uC744 \uB36E\uC5B4\uC37C\uC5B4\uC694." : "\uD604\uC7AC \uCE74\uB4DC \uB514\uC790\uC778\uC744 \uC11C\uC2DD\uC73C\uB85C \uC800\uC7A5\uD588\uC5B4\uC694.");
         } catch (cause) {
           error(cause.message);
         } finally {
@@ -46401,7 +46614,7 @@
             ctx.state.selectedElementIds = [];
           }
           ctx.refresh?.();
-          status("\uC11C\uC2DD\uC744 \uC801\uC6A9\uD588\uC5B4\uC694. \uCE74\uB4DC \uC774\uB984\xB7\uB0B4\uC6A9\xB7\uB300\uD45C \uADF8\uB9BC\uACFC Variant \uC5F0\uACB0\uC740 \uC720\uC9C0\uB3FC\uC694. \uC2E4\uD589 \uCDE8\uC18C\uB85C \uB418\uB3CC\uB9B4 \uC218 \uC788\uC5B4\uC694.");
+          status2("\uC11C\uC2DD\uC744 \uC801\uC6A9\uD588\uC5B4\uC694. \uCE74\uB4DC \uC774\uB984\xB7\uB0B4\uC6A9\xB7\uB300\uD45C \uADF8\uB9BC\uACFC Variant \uC5F0\uACB0\uC740 \uC720\uC9C0\uB3FC\uC694. \uC2E4\uD589 \uCDE8\uC18C\uB85C \uB418\uB3CC\uB9B4 \uC218 \uC788\uC5B4\uC694.");
         } catch (cause) {
           error(cause.message);
         } finally {
@@ -46436,7 +46649,7 @@
           if (!active() || choice3.action === "cancel") return;
           if (store.getProject() !== before) throw Error("\uC774\uB984\uC744 \uBC14\uAFB8\uB294 \uB3D9\uC548 \uB371\uC774 \uBC14\uB00C\uC5C8\uC5B4\uC694. \uC11C\uC2DD\uC744 \uD655\uC778\uD558\uACE0 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694.");
           store.edit("\uCE74\uB4DC \uC11C\uC2DD \uC774\uB984 \uBCC0\uACBD", (draft) => renameCardTemplate(draft, templateId, value, { replaceTemplateId: choice3.action === "overwrite" ? choice3.id : null, allowDuplicate: choice3.action === "add" }));
-          status("\uC11C\uC2DD \uC774\uB984\uC744 \uBC14\uAFE8\uC5B4\uC694.");
+          status2("\uC11C\uC2DD \uC774\uB984\uC744 \uBC14\uAFE8\uC5B4\uC694.");
         } catch (cause) {
           error(cause.message);
         } finally {
@@ -46450,7 +46663,7 @@
         if (busy || !active()) return;
         try {
           store.edit("\uCE74\uB4DC \uC11C\uC2DD \uC0AD\uC81C", (draft) => removeCardTemplate(draft, templateId));
-          status("\uC11C\uC2DD\uC744 \uC0AD\uC81C\uD588\uC5B4\uC694. \uC2E4\uD589 \uCDE8\uC18C\uB85C \uBCF5\uC6D0\uD560 \uC218 \uC788\uC5B4\uC694.");
+          status2("\uC11C\uC2DD\uC744 \uC0AD\uC81C\uD588\uC5B4\uC694. \uC2E4\uD589 \uCDE8\uC18C\uB85C \uBCF5\uC6D0\uD560 \uC218 \uC788\uC5B4\uC694.");
         } catch (cause) {
           error(cause.message);
         }
@@ -46627,7 +46840,7 @@
   // src/ui/recovery.js
   function createRecoveryControls({ store, save, onRestored }) {
     let disposed = false, dialog = null, dismissed = false;
-    const status = el("small", { id: "recovery-status", class: "recovery-status", role: "status" }), noticeText = el("span"), notice = el("div", { id: "recovery-notice", class: "recovery-notice", hidden: true }, noticeText, button("\uBCF5\uAD6C\uBCF8 \uBCF4\uAE30", () => open2()), button("\uB2EB\uAE30", () => {
+    const status2 = el("small", { id: "recovery-status", class: "recovery-status", role: "status" }), noticeText = el("span"), notice = el("div", { id: "recovery-notice", class: "recovery-notice", hidden: true }, noticeText, button("\uBCF5\uAD6C\uBCF8 \uBCF4\uAE30", () => open2()), button("\uB2EB\uAE30", () => {
       dismissed = true;
       notice.hidden = true;
     }, { "aria-label": "\uBCF5\uAD6C \uC548\uB0B4 \uB2EB\uAE30" }));
@@ -46635,9 +46848,9 @@
     const session = createRecoverySession(store, { onChange: refresh });
     function refresh(state) {
       trigger.textContent = "\uC791\uC5C5 \uBCF5\uAD6C" + (state.candidateCount ? " (" + state.candidateCount + ")" : "");
-      status.textContent = state.status === "saving" ? "\uBCF5\uAD6C\uBCF8 \uBCF4\uAD00 \uC911\u2026" : state.status === "saved" ? "\uC784\uC2DC \uBCF4\uAD00 " + new Date(state.updatedAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : state.status === "error" ? "\uC790\uB3D9 \uBCF5\uAD6C \uBCF4\uAD00 \uC2E4\uD328" : "\uC790\uB3D9 \uBCF5\uAD6C \uB300\uAE30";
-      status.dataset.state = state.status;
-      status.title = state.error || "\uBCC0\uACBD\uD55C \uB371\uACFC \uC801\uC6A9\uD55C \uADF8\uB9BC\xB7\uB808\uC774\uC5B4\xB7\uD0A4\uC6CC\uB4DC\uB97C \uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0 \uC784\uC2DC \uBCF4\uAD00\uD574\uC694. \uC6D0\uBCF8 \uD30C\uC77C \uC800\uC7A5\uC740 \uC800\uC7A5 \uBC84\uD2BC\uC744 \uC0AC\uC6A9\uD558\uC138\uC694.";
+      status2.textContent = state.status === "saving" ? "\uBCF5\uAD6C\uBCF8 \uBCF4\uAD00 \uC911\u2026" : state.status === "saved" ? "\uC784\uC2DC \uBCF4\uAD00 " + new Date(state.updatedAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : state.status === "error" ? "\uC790\uB3D9 \uBCF5\uAD6C \uBCF4\uAD00 \uC2E4\uD328" : "\uC790\uB3D9 \uBCF5\uAD6C \uB300\uAE30";
+      status2.dataset.state = state.status;
+      status2.title = state.error || "\uBCC0\uACBD\uD55C \uB371\uACFC \uC801\uC6A9\uD55C \uADF8\uB9BC\xB7\uB808\uC774\uC5B4\xB7\uD0A4\uC6CC\uB4DC\uB97C \uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0 \uC784\uC2DC \uBCF4\uAD00\uD574\uC694. \uC6D0\uBCF8 \uD30C\uC77C \uC800\uC7A5\uC740 \uC800\uC7A5 \uBC84\uD2BC\uC744 \uC0AC\uC6A9\uD558\uC138\uC694.";
       notice.hidden = dismissed || !state.candidateCount;
       noticeText.textContent = "\uC774\uC804\uC5D0 \uBCF4\uAD00\uD55C \uC791\uC5C5 " + state.candidateCount + "\uAC1C\uAC00 \uC788\uC5B4\uC694.";
     }
@@ -46729,7 +46942,7 @@
     window.addEventListener("pagehide", flush);
     document.addEventListener("visibilitychange", visibility);
     refresh(session.getState());
-    return { button: trigger, status, notice, session, destroy() {
+    return { button: trigger, status: status2, notice, session, destroy() {
       disposed = true;
       session.destroy();
       window.removeEventListener("pagehide", flush);
@@ -47107,15 +47320,15 @@
     if (image.naturalWidth !== asset.width || image.naturalHeight !== asset.height) throw new Error("\uADF8\uB9BC\uC758 \uC2E4\uC81C \uD06C\uAE30\uC640 \uC800\uC7A5\uB41C \uD06C\uAE30\uAC00 \uB2E4\uB985\uB2C8\uB2E4. \uC6D0\uBCF8\uC744 \uB2E4\uC2DC \uAC00\uC838\uC624\uC138\uC694.");
     const used = /* @__PURE__ */ new Set(), results = [];
     for (const [index2, region3] of normalized.entries()) {
-      const { x: x3, y: y3, width, height } = region3.rect, canvas2 = document.createElement("canvas");
-      canvas2.width = width;
-      canvas2.height = height;
+      const { x: x3, y: y3, width, height } = region3.rect, canvas3 = document.createElement("canvas");
+      canvas3.width = width;
+      canvas3.height = height;
       try {
-        const ctx = canvas2.getContext("2d");
+        const ctx = canvas3.getContext("2d");
         if (!ctx) throw new Error("\uADF8\uB9BC \uC791\uC5C5 \uACF5\uAC04\uC744 \uB9CC\uB4E4\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4. \uB354 \uC791\uC740 \uC601\uC5ED\uC73C\uB85C \uB098\uB204\uC5B4 \uC800\uC7A5\uD558\uC138\uC694.");
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(image, x3, y3, width, height, 0, 0, width, height);
-        const dataUrl3 = canvas2.toDataURL("image/png");
+        const dataUrl3 = canvas3.toDataURL("image/png");
         if (!dataUrl3.startsWith("data:image/png;base64,")) throw new Error("PNG\uB97C \uB9CC\uB4E4\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4. \uB354 \uC791\uC740 \uC601\uC5ED\uC73C\uB85C \uB098\uB204\uC5B4 \uC800\uC7A5\uD558\uC138\uC694.");
         const base = region3.name || "\uC601\uC5ED-" + String(index2 + 1).padStart(3, "0");
         let name = base, suffix = 2;
@@ -47123,7 +47336,7 @@
         used.add(name);
         results.push({ asset: { id: newId(), mime: "image/png", dataUrl: dataUrl3, width, height, paintingId: null }, name, sourceRect: { ...region3.rect } });
       } finally {
-        canvas2.width = canvas2.height = 1;
+        canvas3.width = canvas3.height = 1;
       }
     }
     return results;
@@ -47139,17 +47352,17 @@
       let mode = "manual", rect = { x: 0, y: 0, ...size }, regions = [], regionCounter = 0, cells = [], selected = /* @__PURE__ */ new Set(), gridSignature = "", zoom = "fit", scale = 1, busy = false, disposed = false, drag = null;
       const previousFocus = document.activeElement, grid = { rows: 1, columns: 1, cellWidth: size.width, cellHeight: size.height, offsetX: 0, offsetY: 0, gapX: 0, gapY: 0 }, rectInputs = {}, gridInputs = {};
       const dialog = el("dialog", { id: "image-cropper", class: "image-crop-dialog", "aria-labelledby": "crop-title", style: "width:min(1160px,calc(100vw - 32px));max-width:none;max-height:calc(100dvh - 32px);overflow:auto;" });
-      const status = el("p", { id: "crop-status", class: "image-crop-status", role: "status", "aria-live": "polite" });
+      const status2 = el("p", { id: "crop-status", class: "image-crop-status", role: "status", "aria-live": "polite" });
       const baseName = el("input", { id: "crop-name", type: "text", maxLength: 100, value: String(name || "\uADF8\uB9BC").replace(/\.(png|jpe?g|webp)$/i, ""), onchange: () => update() });
       const viewport = el("div", { id: "crop-viewport", class: "image-crop-viewport", style: "height:min(58vh,560px);min-height:180px;overflow:auto;position:relative;padding:12px;box-sizing:border-box;" });
       const stage = el("div", { id: "crop-stage", class: "image-crop-stage", style: "position:relative;touch-action:none;user-select:none;flex:none;" });
-      const canvas2 = el("canvas", { "aria-hidden": "true", style: "display:block;width:100%;height:100%;pointer-events:none;" });
+      const canvas3 = el("canvas", { "aria-hidden": "true", style: "display:block;width:100%;height:100%;pointer-events:none;" });
       const previewScale = Math.min(1, 2048 / size.width, 2048 / size.height);
-      canvas2.width = Math.max(1, Math.round(size.width * previewScale));
-      canvas2.height = Math.max(1, Math.round(size.height * previewScale));
-      canvas2.getContext("2d").drawImage(image, 0, 0, canvas2.width, canvas2.height);
+      canvas3.width = Math.max(1, Math.round(size.width * previewScale));
+      canvas3.height = Math.max(1, Math.round(size.height * previewScale));
+      canvas3.getContext("2d").drawImage(image, 0, 0, canvas3.width, canvas3.height);
       const overlay = el("div", { class: "image-crop-overlay", style: "position:absolute;inset:0;pointer-events:none;" });
-      stage.append(canvas2, overlay);
+      stage.append(canvas3, overlay);
       viewport.append(stage);
       const zoomSelect = el("select", { id: "crop-zoom", "aria-label": "\uC774\uBBF8\uC9C0 \uBCF4\uAE30 \uBC30\uC728", onchange: () => setZoom(zoomSelect.value) }, [["fit", "\uB9DE\uCDA4"], ["0.25", "25%"], ["0.5", "50%"], ["1", "100%"], ["2", "200%"], ["4", "400%"], ["8", "800%"]].map(([value, label]) => el("option", { value }, label)));
       const manualButton = button("\uC601\uC5ED \uC790\uB974\uAE30", () => {
@@ -47258,7 +47471,7 @@
           el("div", { class: "image-crop-preview", style: "min-width:0;" }, el("div", { class: "image-crop-zoom" }, el("label", { htmlFor: "crop-zoom" }, "\uBCF4\uAE30"), zoomSelect, button("\uB9DE\uCDA4", () => setZoom("fit"))), viewport),
           el("div", { class: "image-crop-controls" }, el("label", { class: "field", htmlFor: "crop-name" }, el("span", {}, "\uC870\uAC01 \uC774\uB984"), baseName), manualPanel, gridPanel)
         ),
-        status,
+        status2,
         el("div", { class: "dialog-actions" }, button("\uCDE8\uC18C", () => finish3(null), { id: "crop-cancel" }), save)
       );
       function cleanName2() {
@@ -47272,8 +47485,8 @@
         return cells.filter((cell) => selected.has(cellKey(cell))).map((cell) => ({ rect: cell.rect, name: cleanName2() + "-\uD589" + String(cell.row + 1).padStart(2, "0") + "-\uC5F4" + String(cell.column + 1).padStart(2, "0") }));
       }
       function showError(error) {
-        status.dataset.kind = "error";
-        status.textContent = error?.message || "\uC601\uC5ED\uC744 \uC800\uC7A5\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4. \uD06C\uAE30\uB97C \uC904\uC5EC \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694.";
+        status2.dataset.kind = "error";
+        status2.textContent = error?.message || "\uC601\uC5ED\uC744 \uC800\uC7A5\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4. \uD06C\uAE30\uB97C \uC904\uC5EC \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694.";
       }
       function syncRectInputs() {
         for (const key of Object.keys(rectInputs)) rectInputs[key].value = rect[key] ?? "";
@@ -47351,8 +47564,8 @@
           count2 = outputs.length;
           save.disabled = busy;
           add.disabled = busy || regions.length >= IMAGE_CROP_LIMITS.maxCells;
-          status.dataset.kind = "info";
-          status.textContent = busy ? "\uC6D0\uBCF8 \uD574\uC0C1\uB3C4\uC758 PNG\uB97C \uB9CC\uB4E4\uACE0 \uC788\uC2B5\uB2C8\uB2E4\u2026" : `${count2}\uAC1C \uC870\uAC01 \xB7 PNG\uB85C \uC800\uC7A5 \xB7 \uD22C\uBA85\uB3C4 \uC720\uC9C0`;
+          status2.dataset.kind = "info";
+          status2.textContent = busy ? "\uC6D0\uBCF8 \uD574\uC0C1\uB3C4\uC758 PNG\uB97C \uB9CC\uB4E4\uACE0 \uC788\uC2B5\uB2C8\uB2E4\u2026" : `${count2}\uAC1C \uC870\uAC01 \xB7 PNG\uB85C \uC800\uC7A5 \xB7 \uD22C\uBA85\uB3C4 \uC720\uC9C0`;
         } catch (error) {
           save.disabled = true;
           add.disabled = true;
@@ -47370,7 +47583,7 @@
         zoomSelect.value = value;
         stage.style.width = size.width * scale + "px";
         stage.style.height = size.height * scale + "px";
-        canvas2.style.imageRendering = scale > 1 ? "pixelated" : "auto";
+        canvas3.style.imageRendering = scale > 1 ? "pixelated" : "auto";
         if (value === "fit") {
           viewport.scrollLeft = viewport.scrollTop = 0;
         } else {
@@ -47430,7 +47643,7 @@
         observer.disconnect();
         if (dialog.open) dialog.close();
         dialog.remove();
-        canvas2.width = canvas2.height = 1;
+        canvas3.width = canvas3.height = 1;
         if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
         resolve(result);
       }
@@ -47655,9 +47868,9 @@
           else {
             const image = await decodeImage(entry.asset.dataUrl);
             guard(current);
-            const canvas2 = el("canvas", { width: entry.asset.width, height: entry.asset.height });
-            canvas2.getContext("2d").drawImage(image, 0, 0);
-            blob = await new Promise((resolve) => canvas2.toBlob(resolve, "image/png"));
+            const canvas3 = el("canvas", { width: entry.asset.width, height: entry.asset.height });
+            canvas3.getContext("2d").drawImage(image, 0, 0);
+            blob = await new Promise((resolve) => canvas3.toBlob(resolve, "image/png"));
             if (!blob) throw Error("PNG \uD30C\uC77C\uC744 \uB9CC\uB4E4\uC9C0 \uBABB\uD588\uC5B4\uC694.");
           }
           guard(current);
