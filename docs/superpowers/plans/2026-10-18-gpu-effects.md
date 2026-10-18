@@ -56,8 +56,8 @@
 
 - [x] Run the project test command and inspect every failure; fix regressions and rerun affected checks.
 - [x] Obtain independent review with this plan's Review Focus, address actionable findings with regression coverage.
-- [ ] Back up and hash six local delivery files, build a versioned HTML, publish using the existing authorized release workflow, verify public assets and guarded local replacement.
-- [ ] Record measured scope, checks, performance, limitations and delivery hashes. Final response explains activation and the actual accelerated scope.
+- [x] Back up and hash six local delivery files, build a versioned HTML, publish using the existing authorized release workflow, verify public assets and guarded local replacement.
+- [x] Record measured scope, checks, performance, limitations and delivery hashes. Final response explains activation and the actual accelerated scope.
 
 ## Execution notes
 
@@ -72,3 +72,5 @@
 
 - Final full-project attempt: 787 tests / 781 pass / 6 fail. All failures were investigated. Final units 346/346, render checks 79/79 and affected app/paint/recovery/print checks 44/44 passed. Four new regressions bring aggregate unique coverage to 791; this is not represented as one all-green full command. Production hash comparison bounds changes after the full run.
 - Paired floor/fract GPU rounding was reproduced in cardinal directional blur and tiny inner-shadow offsets; weights now derive from the same cell used for fetches. Original strict test, 33 directional cases, 21 shadow cases and independent 500 directional cases passed. The original sprite encoded-PNG discrepancy remains unreproduced/unknown after 50 probes; exact decoded RGBA plus two actual PDF comparisons pass and full diagnostics are retained. Reviewer approved final changes.
+
+- Published v1.4.0, verified all five server asset hashes, exercised live current/update/download UI in isolated Edge, and confirmed unauthenticated latest download. Guarded six-file local delivery matched the release SHA256; personal data and the user tab remained untouched.
