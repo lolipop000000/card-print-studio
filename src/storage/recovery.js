@@ -41,7 +41,10 @@ export function createRecoverySession(store,{storage=createRecoveryStorage(),del
    if(pending)flush().catch(()=>{});documentId=nextDocument;slot=id();
    list().then(entries=>publish({candidateCount:entries.length})).catch(error=>publish({status:'error',error:error.message}));
   }
-  try{pending=capture();clearTimeout(timer);timer=setTimeout(()=>{flush().catch(()=>{});},delay);}catch(error){publish({status:'error',error:error.message});}
+  // A previous write may finish while this revision is still debouncing.
+  // Only a write of the latest snapshot can announce that recovery is saved.
+  revision++;
+  try{pending=capture();clearTimeout(timer);timer=setTimeout(()=>{flush().catch(()=>{});},delay);publish({status:'pending',error:null});}catch(error){publish({status:'error',error:error.message});}
  });
  return {ready,list,flush,getState:()=>({...state}),async read(id){const record=(await storage.list()).find(r=>r.id===id);if(!record)throw Error('선택한 복구본이 삭제되었어요. 목록을 다시 열어 주세요.');return readRecoveryRecord(record);},async remove(id){if(id===slot)throw Error('현재 편집 중인 복구본은 삭제할 수 없어요.');await queue;await storage.remove(id);const entries=await list();publish({candidateCount:entries.length});},destroy(){if(disposed)return;unsubscribe();clearTimeout(timer);flush().catch(()=>{});disposed=true;}};
 }

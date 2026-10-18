@@ -33,8 +33,8 @@ export function drawImageElement(ctx,image,rect,style){
 }
 export function renderCard(ctx,project,target,assets,dpi,options={}){
  // A reused output canvas can change path antialiasing after filtered draws.
- // Use a fresh readback surface for each card and transfer the finished pixels,
- // keeping repeated preview and PDF renders on the same raster path.
+ // Isolate each card on a fresh surface and transfer its finished pixels.
+ // Effects retain their own drawing and analysis surface settings.
  const w=project.settings.cardWidthMm,h=project.settings.cardHeightMm,surface=makeSurface({x:0,y:0,w,h},dpi);
  const report=drawCard(surface.ctx,project,target,assets,dpi,options);
  ctx.canvas.width=surface.canvas.width;ctx.canvas.height=surface.canvas.height;

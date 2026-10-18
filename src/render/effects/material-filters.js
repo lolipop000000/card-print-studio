@@ -1,5 +1,7 @@
 import {makeSurface} from './masks.js';
 import {effectRandom,fract} from './random.js';
+import {applyGpuFilter} from './gpu-filters.js';
+import {recordCpuEffect} from './gpu-runtime.js';
 
 const clamp=(v,min=0,max=1)=>Math.max(min,Math.min(max,v));
 const number=(v,fallback)=>Number.isFinite(v)?v:fallback;
@@ -212,7 +214,9 @@ function duotone(surface,p){
  * through to its own filters. Color and inward materials retain source alpha;
  * extrusion adds a side silhouette and glitch displaces RGBA rows and holes.
  * All dimensions are in mm. */
-export function applyMaterialFilter(surface,layer,{rect=surface.work,timeSec=1.2,seed=1}={}){
+export function applyMaterialFilter(surface,layer,{rect=surface.work,timeSec=1.2,seed=1,backend='auto'}={}){
+ if(backend!=='cpu'){const gpu=applyGpuFilter(surface,layer,{rect,timeSec,seed});if(gpu)return gpu;}
+ if(['innerGlow','innerShadow','bevel','extrude','foil','holographic','glitch','scanlines','grain','duotone'].includes(layer.kind))recordCpuEffect(layer.kind);
  const p=layer.params||{};
  switch(layer.kind){
   case 'innerGlow':return innerGlow(surface,layer,p,timeSec);

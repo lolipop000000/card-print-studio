@@ -1,7 +1,7 @@
-export function makeSurface(work,dpi){
+export function makeSurface(work,dpi,{readback=false}={}){
  const scale=dpi/25.4,canvas=document.createElement('canvas');
  canvas.width=Math.max(1,Math.round(work.w*scale));canvas.height=Math.max(1,Math.round(work.h*scale));
- const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.setTransform(scale,0,0,scale,-work.x*scale,-work.y*scale);
+ const ctx=canvas.getContext('2d',{willReadFrequently:readback});ctx.setTransform(scale,0,0,scale,-work.x*scale,-work.y*scale);
  return {canvas,ctx,work,scale,dpi};
 }
 export function paintSurface(ctx,surface){ctx.drawImage(surface.canvas,surface.work.x,surface.work.y,surface.work.w,surface.work.h);}

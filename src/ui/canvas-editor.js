@@ -22,7 +22,7 @@ export function mountCardCanvas(host,ctx){
   const p=ctx.store.getProject(),target=preview||ctx.target();if(!target)return;
   const width=stage.getBoundingClientRect().width;lastRatio=window.devicePixelRatio||1;
   const dpi=effectPreviewDpi({widthMm:p.settings.cardWidthMm,heightMm:p.settings.cardHeightMm,displayWidth:width,pixelRatio:lastRatio});
-  report=renderCard(canvas.getContext('2d',{willReadFrequently:true}),p,target,ctx.assets,dpi,{timeSec:timeline.getTime(),effectCache});
+  report=renderCard(canvas.getContext('2d',{willReadFrequently:false}),p,target,ctx.assets,dpi,{timeSec:timeline.getTime(),effectCache});
   canvas.dataset.previewDpi=String(dpi);canvas.style.imageRendering=canvas.width+.5<width*lastRatio?'pixelated':'auto';
  }
  function setActive(value){timeline.setActive(value&&!document.hidden);updateTransport();}

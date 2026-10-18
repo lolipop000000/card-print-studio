@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
-import {readFile,mkdir} from 'node:fs/promises';
+import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import path from 'node:path';
 import {build} from 'esbuild';
@@ -10,15 +10,24 @@ import {BLEND_MODES} from '../src/model/blend-modes.js';
 const require=createRequire(import.meta.url),root=fileURLToPath(new URL('../',import.meta.url));
 let playwright;try{playwright=require('playwright');}catch{playwright=require('C:/Users/hyeon/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');}
 const bundles=await Promise.all([
- build({absWorkingDir:root,stdin:{contents:`import * as model from './src/model/visual-effects.js';import * as effects from './src/render/effects/composite.js';import * as masks from './src/render/effects/masks.js';import * as filters from './src/render/effects/filters.js';import * as shapes from './src/render/effects/shape.js';import * as generators from './src/render/effects/generators.js';window.blendApi={...model,...effects,...masks,...filters,...shapes,...generators};`,resolveDir:root},bundle:true,format:'iife',target:'es2022',write:false}),
+ build({absWorkingDir:root,stdin:{contents:`import * as model from './src/model/visual-effects.js';import * as effects from './src/render/effects/composite.js';import * as masks from './src/render/effects/masks.js';import * as filters from './src/render/effects/filters.js';import * as shapes from './src/render/effects/shape.js';import * as generators from './src/render/effects/generators.js';import {getEffectAccelerationStatus} from './src/render/effects/gpu-runtime.js';window.blendApi={...model,...effects,...masks,...filters,...shapes,...generators,getEffectAccelerationStatus};`,resolveDir:root},bundle:true,format:'iife',target:'es2022',write:false}),
  build({absWorkingDir:root,entryPoints:['src/app.js'],bundle:true,format:'iife',target:'es2022',write:false,loader:{'.woff2':'base64'}}),
 ]);
 const css=await readFile(path.join(root,'src/styles.css'),'utf8');
-async function openBlend({app=false}={}){
+async function openBlend({app=false,legacyRaster=false}={}){
  const browser=await playwright.chromium.launch({headless:true,executablePath:process.env.CARD_BROWSER_PATH||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'});
  const context=await browser.newContext({viewport:{width:1440,height:1000},acceptDownloads:true}),page=await context.newPage(),pageErrors=[],httpRequests=[];
  page.setDefaultTimeout(7000);page.on('pageerror',error=>pageErrors.push(error.message));page.on('request',request=>{if(/^https?:/.test(request.url()))httpRequests.push(request.url());});await context.route(/^https?:/,route=>route.abort());
  try{
+  if(legacyRaster)await page.addInitScript(()=>{
+   // Golden bytes belong to the original software rasterizer. Keep that exact
+   // oracle without forcing the production GPU/reference tests onto software.
+   const get=HTMLCanvasElement.prototype.getContext;
+   HTMLCanvasElement.prototype.getContext=function(type,options,...args){
+    if(type==='webgl2')return null;
+    return get.call(this,type,type==='2d'?{...options,willReadFrequently:true}:options,...args);
+   };
+  });
   await page.goto(pathToFileURL(path.join(root,'src/index.html')).href);
   await page.addScriptTag({content:bundles[0].outputFiles[0].text});
   await page.evaluate(()=>{
@@ -87,8 +96,8 @@ async function openBlend({app=false}={}){
  }catch(error){await browser.close();throw error;}
 }
 
-test('normal filter blending retains legacy replacement pixels including translucent holes and alpha removal',async()=>{
- const {browser,page,pageErrors}=await openBlend();try{
+test('legacy CPU normal filter blending retains exact replacement pixels including translucent holes and alpha removal',async()=>{
+ const {browser,page,pageErrors}=await openBlend({legacyRaster:true});try{
   const results=await page.evaluate(()=>{
    const t=blendTest,cases=[['gradient',{}],['blur',{radius:.6}],['erode',{depth:.45,roughness:0}],['halftone',{size:.8,angle:20}]];
    return cases.map(([kind,params])=>{
@@ -99,6 +108,34 @@ test('normal filter blending retains legacy replacement pixels including translu
   for(const value of results){assert.equal(value.sameOld,true,value.kind);assert.equal(value.reference.mismatches,0,JSON.stringify(value));}
   assert.deepEqual(results.map(({kind,hash})=>({kind,hash})),[{kind:'gradient',hash:1552107338},{kind:'blur',hash:2513950633},{kind:'erode',hash:3734849669},{kind:'halftone',hash:967113393}],'Golden hashes captured before changing the effect compositor');assert.deepEqual(pageErrors,[]);
  }finally{await browser.close();}
+});
+
+test('production GPU blending preserves legacy translucent artwork within native raster rounding',async()=>{
+ const outputs=[];
+ for(const legacyRaster of [true,false]){
+  const {browser,page,pageErrors,httpRequests}=await openBlend({legacyRaster});try{
+   outputs.push(await page.evaluate(()=>{
+    const t=blendTest,cases=[['gradient',{}],['blur',{radius:.6}],['erode',{depth:.45,roughness:0}],['halftone',{size:.8,angle:20}]];
+    const results=cases.map(([kind,params])=>{
+     const layer=t.filter(kind,{opacity:.6,params}),render=()=>t.render(t.recipe(layer),{translucent:true}),first=render();
+     return {kind,hash:t.hash(first),stable:t.hash(first)===t.hash(render()),pixels:Array.from(t.pixels(first))};
+    });return {results,status:t.getEffectAccelerationStatus()};
+   }));assert.deepEqual(pageErrors,[]);assert.deepEqual(httpRequests,[]);
+  }finally{await browser.close();}
+ }
+ const [legacy,production]=outputs,comparisons=[];
+ const limits={gradient:{alpha:0,color:1.4},blur:{alpha:3,color:3.2},erode:{alpha:0,color:0},halftone:{alpha:0,color:1.1}};
+ assert.equal(legacy.status.gpuRenders,0);assert.ok(production.status.kinds.halftone.gpu>0);assert.ok(production.status.kinds.erode.gpu>0);assert.ok(production.status.kinds.composite.gpu>0);
+ for(let i=0;i<legacy.results.length;i++){
+  const a=legacy.results[i],b=production.results[i];let alpha=0,premultiplied=0;
+  assert.equal(b.stable,true,b.kind);assert.equal(b.pixels.length,a.pixels.length);
+  for(let k=0;k<b.pixels.length;k+=4){alpha=Math.max(alpha,Math.abs(a.pixels[k+3]-b.pixels[k+3]));for(let c=0;c<3;c++)premultiplied=Math.max(premultiplied,Math.abs(a.pixels[k+c]*a.pixels[k+3]/255-b.pixels[k+c]*b.pixels[k+3]/255));}
+  // Native GPU blur rounds its mask and color stages differently from Skia's
+  // software blur. Invisible RGB at alpha zero is deliberately not compared.
+  const result={kind:b.kind,alpha,premultiplied,legacyHash:a.hash,productionHash:b.hash};comparisons.push(result);
+  assert.ok(alpha<=limits[b.kind].alpha&&premultiplied<=limits[b.kind].color,JSON.stringify(result));
+ }
+ await mkdir(path.join(root,'artifacts/qa'),{recursive:true});await writeFile(path.join(root,'artifacts/qa/effects-gpu-native-raster.json'),JSON.stringify(comparisons,null,2));
 });
 
 test('all 25 non-normal filter modes match an independent native Canvas source/destination reference',async()=>{

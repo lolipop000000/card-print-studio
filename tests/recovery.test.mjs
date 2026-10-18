@@ -11,6 +11,21 @@ test('recovery snapshots include complete project data and never mark manual edi
  store.edit('작업',p=>{p.name='어제 그린 덱';p.paintings.art={id:'art',width:64,height:64,activeLayerId:'layer',layers:[{id:'layer',name:'손그림',visible:true,locked:false,opacity:.7,png:'data:image/png;base64,AA=='}]};p.assets.art={id:'art',mime:'image/png',width:64,height:64,dataUrl:'data:image/png;base64,AA==',paintingId:'art'};p.cards[0].artAssetId='art';p.keywords=[{id:'warm',name:'온기',description:'설명',color:'#ff0000',iconAssetId:'art'}];});
  await s.flush();assert.equal(store.isDirty(),true);assert.equal(storage.map.size,1);assert.deepEqual(recovery.readRecoveryRecord([...storage.map.values()][0]).project,store.getProject());s.destroy();
 });
+
+test('new edits and late older writes cannot report the newest recovery snapshot as saved',async()=>{
+ const storage=memory(),store=createStore(createProject()),states=[],s=session(store,storage,{onChange:state=>states.push(state.status)});await s.ready;
+ try{
+  store.edit('first',p=>p.name='기존 보관본');await s.flush();assert.equal(s.getState().status,'saved');
+  store.edit('new painting',p=>p.name='그림 적용 중');assert.equal(s.getState().status,'pending');
+  const write=storage.put;let release,start;const gate=new Promise(r=>release=r),started=new Promise(r=>start=r);
+  storage.put=async record=>{start();await gate;return write(record);};const older=s.flush();await started;
+  store.edit('latest',p=>p.name='가장 최근 그림');assert.equal(s.getState().status,'pending');
+  release();await older;assert.equal(s.getState().status,'pending','an older completed write cannot mark a newer pending edit saved');
+  assert.equal(JSON.parse([...storage.map.values()][0].text).name,'그림 적용 중');
+  await s.flush();assert.equal(s.getState().status,'saved');assert.equal(JSON.parse([...storage.map.values()][0].text).name,'가장 최근 그림');
+  assert.equal(store.isDirty(),true);assert.ok(states.includes('pending'));
+ }finally{s.destroy();}
+});
 test('new decks get independent recovery slots and other tabs cannot overwrite them',async()=>{
  if(!recovery)return;const storage=memory(),a=createStore(createProject()),b=createStore(createProject());let n=0;const id=()=>String(++n),sa=session(a,storage,{id}),sb=session(b,storage,{id});await Promise.all([sa.ready,sb.ready]);
  a.edit('a',p=>p.name='첫 창');await sa.flush();b.edit('b',p=>p.name='둘째 창');await sb.flush();a.load(createProject());a.edit('new',p=>p.name='새 덱');await sa.flush();

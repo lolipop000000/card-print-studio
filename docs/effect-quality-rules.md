@@ -55,6 +55,7 @@
 - [Unity Bloom](https://docs.unity3d.com/6000.0/Documentation/Manual/urp/post-processing-bloom.html): 밝기 기준·강도·퍼짐·색을 독립 조절한다.
 - [Khronos EXT_color_buffer_float](https://registry.khronos.org/webgl/extensions/EXT_color_buffer_float/): 지원을 확인한 RGBA32F 대상으로 계산하고 RGBA/FLOAT로 읽어 약한 빛을 중간 단계에서 양자화하지 않는다.
 - [WebGL best practices](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/WebGL_best_practices): 선택적 확장과 자원 제한에 맞춰 대체 경로를 두고, 텍스처·프로그램을 재사용한다. 현재 동기 렌더러와 연결할 때는 여섯 단계가 끝난 뒤 한 번만 CPU로 읽는다.
+- [Chrome Canvas2D](https://developer.chrome.com/blog/canvas2d/), [Canvas willReadFrequently 설계](https://github.com/fserb/canvas2D/blob/master/spec/will-read-frequently.md): 그림용 캔버스는 하드웨어 가속이 가능한 설정으로 만들고 자주 읽는 분석용 캔버스는 분리한다. 실제 후단 선택은 브라우저가 담당하므로 설정값만으로 하드웨어 사용을 단정하지 않는다.
 - [Unity Size over Lifetime](https://docs.unity3d.com/6000.0/Documentation/Manual/PartSysSizeOverLifeModule.html): 입자의 수명에 따라 크기를 늘리거나 줄이는 조절 체계를 참고한다.
 - [Adobe Distort effects](https://helpx.adobe.com/after-effects/desktop/apply-effects-and-animation-presets/list-of-effects/distort-effects.html): 거리·간격·방향을 나누는 변형 조절을 참고한다. 이 작업실의 교차 일렁임은 부드러운 교차 사인파이며 난류 노이즈 구현을 뜻하지 않는다.
 
@@ -72,6 +73,13 @@
 37. 선택 대상만 재생은 보기 설정이다. 선택하지 않은 효과의 시간과 계산 이미지를 재사용하며, 스킬 이름의 반복 표시·읽기 보호 마스크·중첩 효과 진단을 누락하지 않는다. 정한 인쇄 시간에서 전체 재생과 300 DPI 픽셀이 일치해야 한다.
 38. 블룸의 CPU 대체 경로는 기존 출력과 RGBA를 정확히 비교한다. GPU는 실제 연산과 결과 사용을 검증하고, 32비트 부동소수점 차이는 알파와 premultiplied 색의 8비트 값 약 한 단계 이내로 비교한다. 같은 GPU 경로의 고정 인쇄 장면은 반복 픽셀이 같아야 한다. 특정 효과의 미세 측정과 앱 전체 FPS를 구별하고, CPU 개선을 GPU 가속으로 표시하지 않는다.
 39. GPU 블룸은 WebGL2와 부동소수점 렌더 대상을 확인하고, 미지원·연결 손실·할당 실패·작업 크기 제한에서 CPU로 전환한다. 복구 뒤에는 새 자원으로 재개한다. 한 컨텍스트와 최대 128 MiB의 흐림 텍스처 두 장을 재사용하며 크기 변경 시 이전 텍스처를 해제한다. 원본·행 방향·투명도를 바꾸지 않으며 외부 의존성을 추가하지 않는다.
+40. 다른 픽셀 필터·윤곽 파동·필터 혼합은 실제 GPU draw와 반환 픽셀 사용을 함께 검사한다. 공용 WebGL2 컨텍스트 하나, 최대 40개 프로그램, 작업 텍스처 128 MiB 한도를 사용한다. 기존 블룸 컨텍스트의 한도와 별개이며 크기 변경·실패·복구 때 자원을 정리한다. 한 효과 성공 뒤 합성에서 실패해도 완성된 CPU 결과를 내며 CPU 대체 사용을 기록한다.
+41. 벡터·이미지·글자·기본 흐림과 컬러 프린지는 GPU 사용이 가능한 Canvas2D로 그린다. 분석용 잦은 읽기 캔버스와 분리한다. 브라우저의 가속 선호 설정이나 장치 탐지를 실제 WebGL 계산 횟수로 세지 않는다. 컬러 프린지의 네이티브 틴트 양자화·경계 샘플링을 보존하고 RGB 채널 분리와 구별한다.
+42. 입자 질감의 시드·mm 크기는 작업 영역의 원점과 투명 여백에 독립적이어야 한다. 좌표의 정수·소수 부분을 분리해 GPU의 32비트 원점 오차가 다른 무늬를 만들지 않게 한다. 고정 프레임은 같은 DPI의 카드·용지·PDF와 반복 출력에서 일치해야 한다. 성능은 준비 비용과 업로드·읽기·최종 표면 생성까지 포함해 측정한다.
+43. 과거 소프트웨어 래스터의 정확한 기준 해시는 해당 CPU 경로에서 유지한다. 가속 Canvas2D 결과는 실제 생산 경로에서 별도로 검사한다. 기존 반투명 기준 장면의 알파/premultiplied 색 한도는 그라데이션 0/1.4, 기본 흐림 3/3.2, 침식 0/0, 하프톤 0/1.1로 둔다. 흐림의 네이티브 마스크·색 반올림 예외를 다른 필터의 한도로 확대하지 않는다. 독립 네이티브 합성 기준의 기존 한도와 고정 프레임·출력 일치 검사는 유지한다. GPU를 끄거나 새 해시로 바꿔 전체 생산 경로 검사를 대체하지 않는다.
+44. 처리 도중 연결 손실 검사에서는 첫 draw·마지막 draw·픽셀 읽기 직후를 각각 끊고 완전한 CPU 결과와 GPU 재개를 확인한다. 인위적 복구 요청은 손실 이벤트 처리가 끝난 다음 실행한다. [WEBGL_lose_context 명세](https://registry.khronos.org/webgl/extensions/WEBGL_lose_context/)에 따라 이벤트 도중의 복구 실패를 실제 렌더러의 복구 실패로 혼동하지 않는다.
+45. 변경 직후 대기 중인 복구본을 보관 완료로 표시하지 않는다. 이전 쓰기·이전 문서의 완료는 최신 변경의 완료 상태를 덮지 못해야 하며, 실제 보관이 끝난 그림·레이어의 새로 열기와 복구를 확인한다.
+46. GPU에서 이중 선형 보간의 정수 셀과 소수 가중치는 같은 반올림 위치에서 구한다. 별도 `floor`·`fract`의 최적화 차이로 축 방향 흐림이나 극소 그림자 오프셋의 샘플이 빠지지 않아야 한다. 양·음 축과 축에 가까운 각도, 반투명 원본을 CPU 기준과 비교한다.
 
 ## 실행 순서
 

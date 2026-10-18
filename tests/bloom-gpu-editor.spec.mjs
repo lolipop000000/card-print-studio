@@ -13,6 +13,8 @@ test('offline effect editor shows CPU fallback honestly when GPU is unavailable'
   await page.locator('#effect-param-threshold').fill('0');await page.locator('#effect-param-threshold').press('Tab');
   await page.waitForFunction(()=>document.getElementById('effect-preview-status')?.dataset.busy==='false'&&document.getElementById('effect-preview-status')?.dataset.bloomBackend==='cpu');
   assert.match(await page.locator('#effect-preview-status').innerText(),/블룸 CPU/);
+  assert.equal(await page.locator('#effect-preview-status').getAttribute('data-effect-backend'),'cpu');
+  assert.match(await page.locator('#effect-preview-status').innerText(),/이펙트 CPU/);
   assert.match(await page.locator('#effect-preview-status').getAttribute('title'),/기본 방식으로 처리/);
   assert.equal(await page.locator('#effect-apply').isEnabled(),true);
   assert.deepEqual(pageErrors,[]);assert.deepEqual(httpRequests,[]);

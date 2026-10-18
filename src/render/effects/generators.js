@@ -4,6 +4,8 @@ import {effectRandom,fract} from './random.js';
 import {unionBounds} from './masks.js';
 import {selectEmissionPoints} from './shape.js';
 import {getSmokeTexture,getMistTexture,getFireTexture,getSparkTexture} from './textures.js';
+import {gpuContour} from './gpu-filters.js';
+import {recordCpuEffect} from './gpu-runtime.js';
 
 const TAU=Math.PI*2,tintCache=new Map();
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
@@ -69,6 +71,9 @@ function boltPath(start,end,amplitude,depth,random,salt){
 function strokeNodes(ctx,nodes,color,width,alpha=1){ctx.save();ctx.globalAlpha*=alpha;ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();nodes.forEach((n,i)=>i?ctx.lineTo(n.x,n.y):ctx.moveTo(n.x,n.y));ctx.stroke();ctx.restore();}
 function contourSurface(shape,rings,color,width){
  const canvas=document.createElement('canvas');canvas.width=shape.width;canvas.height=shape.height;const ctx=canvas.getContext('2d'),data=ctx.createImageData(shape.width,shape.height),c=rgb(color),aa=1/shape.scale;
+ const accelerated=gpuContour(shape,rings,color,width);
+ if(accelerated){data.data.set(accelerated);ctx.putImageData(data,0,0);return canvas;}
+ recordCpuEffect('ripple');
  for(let i=0;i<shape.distance.length;i++){
   const d=shape.distance[i];if(d<0||!Number.isFinite(d))continue;let alpha=0;
   for(const ring of rings){const coverage=clamp((width*.5+aa*.5-Math.abs(d-ring.radius))/aa,0,1)*ring.alpha;alpha=1-(1-alpha)*(1-coverage);}

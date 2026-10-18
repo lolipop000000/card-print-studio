@@ -5,6 +5,8 @@ import {warpTextSources} from './text-warp.js';
 import {drawGenerator} from './generators.js';
 import {analyzeShape} from './shape.js';
 import {applyEffectFilter} from './filters.js';
+import {gpuMixPixels} from './gpu-filters.js';
+import {recordCpuEffect} from './gpu-runtime.js';
 
 export function createEffectCache(){
  const entries=new Map(),outputs=new Map(),outputLimit=64*1024*1024;let outputBytes=0,previous=null;
@@ -98,6 +100,11 @@ function mixFilter(base,filtered,layer,shape,protection,cache,shapeKey,colorExem
  // that erase alpha must still remove pixels instead of drawing over the base.
  const scope=cache.memo('scope:'+shapeKey+':'+base.dpi+':'+layer.scope,()=>scopeWeights(shape,base.work,base.dpi,w,h,layer.scope));
  const protectedBytes=layer.protectText!==false&&protection?protection.ctx.getImageData(0,0,w,h).data:null;
+ const weights=new Float32Array(w*h);
+ for(let i=0;i<weights.length;i++){const k=i*4;weights[i]=layer.opacity*(scope?scope[i]:1)*(protectedBytes?1-.85*protectedBytes[k+3]/255:1)*(colorExemption?1-colorExemption[k+3]/255:1);}
+ const accelerated=gpuMixPixels(w,h,data,b.data,weights);
+ if(accelerated){data.set(accelerated);out.ctx.putImageData(a,0,0);return out;}
+ recordCpuEffect('composite');
  for(let i=0;i<w*h;i++){
   const k=i*4,m=layer.opacity*(scope?scope[i]:1)*(protectedBytes?1-.85*protectedBytes[k+3]/255:1)*(colorExemption?1-colorExemption[k+3]/255:1),aa=data[k+3]/255,ba=b.data[k+3]/255,alpha=aa*(1-m)+ba*m;
   for(let channel=0;channel<3;channel++)data[k+channel]=alpha?Math.round((data[k+channel]*aa*(1-m)+b.data[k+channel]*ba*m)/alpha):0;
@@ -198,7 +205,7 @@ function composeVisualEffects(ctx,{rect,recipe,target,source,dpi,timeSec=1.2,min
  if(frame){
   const out=makeSurface(work,dpi);paintSurface(out.ctx,acc);out.ctx.globalCompositeOperation='destination-in';paintSurface(out.ctx,frameMask(work,dpi,w,h,frame));out.ctx.globalCompositeOperation='source-over';acc=out;geometry=null;
  }
- const analysis=makeSurface(work,Math.min(120,dpi));paintSurface(analysis.ctx,acc);let bounds=alphaBounds(analysis);
+ const analysis=makeSurface(work,Math.min(120,dpi),{readback:true});paintSurface(analysis.ctx,acc);let bounds=alphaBounds(analysis);
  if(geometry&&(geometry.x<work.x||geometry.y<work.y||geometry.x+geometry.w>work.x+work.w||geometry.y+geometry.h>work.y+work.h))bounds=unionBounds(bounds,geometry);
  return {surface:acc,report:{boundsMm:bounds,problems,hasVisibleContent:!!bounds,...result}};
 }

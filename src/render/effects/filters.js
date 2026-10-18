@@ -2,6 +2,8 @@ import {makeSurface} from './masks.js';
 import {effectRandom,fract} from './random.js';
 import {applyMaterialFilter} from './material-filters.js';
 import {applyCreativeFilter} from './creative-filters.js';
+import {applyGpuFilter} from './gpu-filters.js';
+import {recordCpuEffect,recordCanvasEffect} from './gpu-runtime.js';
 
 const clamp=(value,min=0,max=1)=>Math.max(min,Math.min(max,value));
 const number=(value,fallback)=>Number.isFinite(value)?value:fallback;
@@ -178,17 +180,19 @@ function sampleChannel(data,w,h,x,y,channel,out){
  out[0]=premultiplied;out[1]=alpha;
 }
 function chromatic(surface,p){
- const distance=number(p.distance,.3)*surface.scale,strength=clamp(number(p.strength,1));if(distance<=0||strength<=0)return copy(surface);
+ const distance=number(p.distance,.3)*surface.scale,strength=clamp(number(p.strength,1));if(distance<=0||strength<=0){recordCanvasEffect('chromatic');return copy(surface);}
  const output=fresh(surface),source=imageData(surface),pixels=output.ctx.createImageData(source.width,source.height),d=source.data,o=pixels.data,w=source.width,h=source.height,a=number(p.angle,0)*Math.PI/180,dx=Math.cos(a)*distance,dy=Math.sin(a)*distance,red=new Float64Array(2),blue=new Float64Array(2);
  // Transparent work margins never vote in automatic ink detection. Dark ink
  // needs silhouette fringes: translating its zero RGB channels cannot add color.
  let coverage=0,light=0;for(let i=0;i<d.length;i+=4){coverage+=d[i+3];light+=Math.max(d[i],d[i+1],d[i+2])*d[i+3];}
  if(!coverage)return output;
  if(p.mode==='fringe'||(!p.mode||p.mode==='auto')&&light/coverage<=140){
+  recordCanvasEffect('chromatic');
   drawPixels(output,tinted(surface,p.color2||'#168fba'),{x:-dx,y:-dy,alpha:strength});
   drawPixels(output,tinted(surface,p.color||'#ec3868'),{x:dx,y:dy,alpha:strength});
   drawPixels(output,surface);return output;
  }
+ recordCpuEffect('chromatic');
  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
   const at=(y*w+x)*4;sampleChannel(d,w,h,x-dx,y-dy,0,red);sampleChannel(d,w,h,x+dx,y+dy,2,blue);
   // Only occupied color channels contribute alpha. Preserve authored black
@@ -231,7 +235,10 @@ function erode(surface,layer,p,seed){
 
 /** Filters consume the complete accumulator. Scope, opacity and text masks are
  * applied exactly once by the compositor, after this independent full result. */
-export function applyEffectFilter(surface,layer,{rect=surface.work,timeSec=1.2,seed=1}={}){
+export function applyEffectFilter(surface,layer,{rect=surface.work,timeSec=1.2,seed=1,backend='auto'}={}){
+ if(backend!=='cpu'){const gpu=applyGpuFilter(surface,layer,{rect,timeSec,seed});if(gpu)return gpu;}
+ if(['outline','colorAdjust','posterize','halftone','erode'].includes(layer.kind))recordCpuEffect(layer.kind);
+ if(['glow','shadow','gradient','sweep','pixelate','blur','waveDistort'].includes(layer.kind))recordCanvasEffect(layer.kind);
  const p=layer.params||{};
  switch(layer.kind){
   case 'outline':return outline(surface,p);
@@ -246,6 +253,6 @@ export function applyEffectFilter(surface,layer,{rect=surface.work,timeSec=1.2,s
   case 'chromatic':return chromatic(surface,p);
   case 'waveDistort':return waveDistort(surface,layer,p,timeSec);
   case 'erode':return erode(surface,layer,p,seed);
-  default:return applyMaterialFilter(surface,layer,{rect,timeSec,seed})||applyCreativeFilter(surface,layer,{rect,timeSec,seed})||copy(surface);
+  default:return applyMaterialFilter(surface,layer,{rect,timeSec,seed,backend:'cpu'})||applyCreativeFilter(surface,layer,{rect,timeSec,seed,backend:'cpu',bloomBackend:backend==='cpu'?'cpu':'auto'})||copy(surface);
  }
 }

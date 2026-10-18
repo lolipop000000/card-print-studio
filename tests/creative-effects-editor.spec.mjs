@@ -48,6 +48,9 @@ test('image preset saves its resource, survives cancel, applies without replacin
 test('new filter controls persist on text and exact invalid-field feedback keeps the previous value',async()=>{
  const {browser,page,pageErrors}=await openApp();page.setDefaultTimeout(6000);try{
   await page.locator('#card-frame-effects').click();await add(page,'directionalBlur');await fill(page,'#effect-param-angle',-35);await add(page,'displacement');await fill(page,'#effect-param-amount',.7);await page.locator('#effect-param-axis').selectOption('y');
+  await page.waitForFunction(()=>document.getElementById('effect-preview-status')?.dataset.busy==='false');
+  assert.equal(await page.locator('#effect-preview-status').getAttribute('data-effect-backend'),'gpu','Filters without bloom use actual GPU work in the offline editor');
+  assert.match(await page.locator('#effect-preview-status').innerText(),/이펙트 GPU/);
   await fill(page,'#effect-param-amount',8);assert.match(await page.locator('#effect-feedback').innerText(),/흔들림 거리.*8.*0~3/);assert.equal(await page.locator('#effect-param-amount').inputValue(),'0.7');
   await page.locator('#effect-apply').click();const saved=await saveProject(page,'creative-controls.json');assert.deepEqual(saved.cards[0].visualEffects.layers.map(l=>l.kind),['directionalBlur','displacement']);assert.equal(saved.cards[0].visualEffects.layers[1].params.amount,.7);assert.equal(saved.cards[0].visualEffects.layers[1].params.axis,'y');assert.deepEqual(pageErrors,[]);
  }finally{await browser.close();}

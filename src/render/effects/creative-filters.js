@@ -1,6 +1,8 @@
 import {makeSurface} from './masks.js';
 import {effectRandom} from './random.js';
 import {blurBloomOnGpu,recordCpuBloom} from './gpu-bloom.js';
+import {applyGpuFilter} from './gpu-filters.js';
+import {recordCpuEffect} from './gpu-runtime.js';
 
 const clamp=(value,min=0,max=1)=>Math.max(min,Math.min(max,value));
 const number=(value,fallback,min,max)=>clamp(Number.isFinite(value)?value:fallback,min,max);
@@ -156,7 +158,9 @@ function displacement(surface,layer,p,timeSec,seed){
 
 /** Independent full-accumulator filters. The compositor owns opacity, scope,
  * protection and clipping. Unknown kinds let the dispatch chain try its next family. */
-export function applyCreativeFilter(surface,layer,{rect=surface.work,timeSec=1.2,seed=1,bloomBackend='auto'}={}){
+export function applyCreativeFilter(surface,layer,{rect=surface.work,timeSec=1.2,seed=1,bloomBackend='auto',backend='auto'}={}){
+ if(backend!=='cpu'){const gpu=applyGpuFilter(surface,layer,{rect,timeSec,seed});if(gpu)return gpu;}
+ if(['directionalBlur','displacement'].includes(layer.kind))recordCpuEffect(layer.kind);
  const p=layer.params||{};
  switch(layer.kind){
   case 'bloom':return bloom(surface,p,bloomBackend);
