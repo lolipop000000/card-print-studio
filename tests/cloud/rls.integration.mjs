@@ -105,6 +105,7 @@ test('realtime delivers feed changes only',{timeout:45000},async()=>{
   const channel=client.channel(`rls-${table}-${randomUUID()}`).on('system',{},event=>diagnostics.push({status:event.status,message:event.message})).on('postgres_changes',{event:'*',schema:'public',table},event=>{if(table==='public_feed'){if((event.new.item_id??event.old.item_id)===f.realtimeWork.id)events.push(event);}else sensitive.push(event);}).subscribe(status=>{diagnostics.push({table,status});if(status==='SUBSCRIBED')resolve(channel);else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')reject(Error(`${table} subscription ${status}`));});
  });
  const channel=await subscribe('public_feed');
+ await waitUntil(()=>diagnostics.some(event=>event.status==='ok'),'PostgreSQL subscription readiness');
  // These tables are deliberately absent from the publication. Their subscriptions may be rejected.
  const privateChannels=['works','work_drafts','shared_assets'].map(table=>client.channel(`private-${table}-${randomUUID()}`).on('postgres_changes',{event:'*',schema:'public',table},event=>sensitive.push(event)).subscribe());
  try{

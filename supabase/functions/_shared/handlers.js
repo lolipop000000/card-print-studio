@@ -8,6 +8,7 @@ const messages={unauthenticated:'로그인 후 다시 시도하세요.','not-mem
 const fail=(status,code,message=messages[code])=>{throw new ApiError(status,code,message);};
 const writeActions=['profile.setNickname','work.create','work.save','work.setVisibility','work.copy','work.delete','work.restore','asset.create','asset.save','asset.setVisibility','asset.copy','asset.delete','asset.restore'];
 const hashPattern=/^[0-9a-f]{64}$/;
+const millis=value=>value instanceof Date?value.getTime():Date.parse(value);
 const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 function title(value){if(typeof value!=='string'||!value.trim()||Array.from(value).length>120||/[\x00-\x1f\x7f]/.test(value))fail(400,'invalid','제목은 줄바꿈 없는 1~120자로 입력하세요.');return value;}
 function version(value){if(!Number.isSafeInteger(value)||value<1)fail(400,'invalid','기준 버전이 올바르지 않아요.');return value;}
@@ -57,7 +58,7 @@ export function createApi({repo,storage,now=Date.now}){
   if(payload.importToken!==undefined){
    if(typeof payload.importToken!=='string')fail(429,'limit-import');
    const runs=await repo.importRunsSince(ctx.uid,ctx.time-IMPORT.windowMs);
-   const run=runs.find(row=>row.token===payload.importToken&&Date.parse(row.expires_at)>ctx.time);
+   const run=runs.find(row=>row.token===payload.importToken&&millis(row.expires_at)>ctx.time);
    if(!run||counter&&run[counter]>=IMPORT[counter])fail(429,'limit-import');
    return counter?()=>repo.consumeImport(run.token,counter):()=>{};
   }
@@ -84,8 +85,9 @@ export function createApi({repo,storage,now=Date.now}){
   const oldDraft=isWork?await repo.getDraft(row.id):null;
   if(draft){
    if(payload.baseSavedAt!==null&&typeof payload.baseSavedAt!=='string')fail(400,'invalid','초안 기준 시간이 올바르지 않아요.');
-   if((oldDraft?.saved_at??null)!==payload.baseSavedAt)fail(409,'conflict');
-   if(oldDraft&&ctx.time-Date.parse(oldDraft.saved_at)<DRAFT_MIN_INTERVAL_MS)fail(429,'limit-rate');
+   const previous=oldDraft?.saved_at??null;
+   if(previous===null?payload.baseSavedAt!==null:payload.baseSavedAt===null||!Number.isFinite(millis(payload.baseSavedAt))||millis(previous)!==millis(payload.baseSavedAt))fail(409,'conflict');
+   if(oldDraft&&ctx.time-millis(oldDraft.saved_at)<DRAFT_MIN_INTERVAL_MS)fail(429,'limit-rate');
   }else if(row.version!==version(payload.baseVersion))fail(409,'conflict');
   const derived=validation(()=>isWork?validateCloudWork(data):validateCloudAsset(row.kind,data));await known(derived.blobRefs);
   const timestamp=new Date(ctx.time).toISOString();
@@ -108,7 +110,7 @@ export function createApi({repo,storage,now=Date.now}){
    if(!['private','public'].includes(payload.visibility))fail(400,'invalid','공개 여부는 private 또는 public이어야 해요.');patch.visibility=payload.visibility;
   }else if(operation==='delete')patch.deleted_at=patch.updated_at;
   else{
-   if(!row.deleted_at||ctx.time-Date.parse(row.deleted_at)>TRASH_DAYS*86400000)fail(404,'not-found');
+   if(!row.deleted_at||ctx.time-millis(row.deleted_at)>TRASH_DAYS*86400000)fail(404,'not-found');
    patch.deleted_at=null;await limits(ctx,{[kind]:{...row,...patch}});
   }
   const consume=await rate(ctx,action,payload);

@@ -4,6 +4,10 @@
 # working directory name when running `supabase init`.
 project_id = "pp-monster"
 
+[functions.api]
+# The handler verifies the user with Auth and returns the API's JSON errors.
+verify_jwt = false
+
 [api]
 enabled = true
 # Port to use for the API URL.
