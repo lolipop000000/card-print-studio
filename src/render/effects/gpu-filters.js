@@ -5,9 +5,21 @@ import {simpleShaders,distanceHorizontal,distanceVertical,distanceShaders,outlin
 
 const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x)),n=(v,d)=>Number.isFinite(v)?v:d;
 const color=(v,fallback)=>{let s=/^#([\da-f]{3}|[\da-f]{6})$/i.test(v)?v:fallback;if(s.length===4)s='#'+[...s.slice(1)].map(c=>c+c).join('');return [1,3,5].map(i=>parseInt(s.slice(i,i+2),16));};
-const noop='void main(){result=bytes(original(ivec2(gl_FragCoord.xy)));}';
+const noop='void main(){result=bytes(original(ivec2(pixelPosition())));}';
 const pass=(key,body,values={})=>({key,body,values});
 const auxData=(width,height=1)=>({width,height,data:new Float32Array(width*height*4)});
+const pointwiseKinds=new Set(['colorAdjust','posterize','halftone','scanlines','grain','duotone','foil','holographic']);
+function occupiedRegion(data,width,height){
+ let left=width,top=height,right=-1,bottom=-1;
+ for(let y=0;y<height;y++)for(let x=0;x<width;x++)if(data[(y*width+x)*4+3]){left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=y;}
+ if(right<left)return {x:0,y:0,width:1,height:1};
+ return {x:left,y:top,width:right-left+1,height:bottom-top+1};
+}
+function regionPixels(data,width,region){
+ const out=new Uint8ClampedArray(region.width*region.height*4);
+ for(let y=0;y<region.height;y++){const start=((region.y+y)*width+region.x)*4;out.set(data.subarray(start,start+region.width*4),y*region.width*4);}
+ return out;
+}
 function reflectTable(p,foil){
  const out=auxData(2048),base=color(p.color,'#d49b39'),light=color(p.color2,'#fff1b3'),scaled=k=>base.map(v=>clamp(v*k,0,255));
  const stops=[[0,scaled(.28)],[.14,scaled(.65)],[.3,base],[.38,light],[.425,[255,255,242]],[.47,scaled(.42)],[.57,base],[.72,light],[.86,scaled(.66)],[1,scaled(.28)]];let stop=0;
@@ -24,6 +36,7 @@ function reflectTable(p,foil){
 export function applyGpuFilter(surface,layer,{rect=surface.work,timeSec=1.2,seed=1}={}){
  const kind=layer.kind,p=layer.params||{},s=surface.scale,w=surface.canvas.width,h=surface.canvas.height;
  if(!simpleShaders[kind]&&!distanceShaders[kind]&&!['outline','innerShadow','foil','holographic'].includes(kind))return null;
+ const source=surface.ctx.getImageData(0,0,w,h);
  const time=layer.motion?.enabled?n(timeSec,1.2)*n(layer.motion.speed,1):0;
  let passes=[],aux=null,levels=0,values={};let neutral=false;
  switch(kind){
@@ -65,7 +78,7 @@ export function applyGpuFilter(surface,layer,{rect=surface.work,timeSec=1.2,seed
   }
   case 'chromatic':{
    const distance=n(p.distance,.3)*s,strength=clamp(n(p.strength,1)),angle=n(p.angle,0)*Math.PI/180;neutral=distance<=0||!strength;
-   let fringe=p.mode==='fringe';if(!p.mode||p.mode==='auto'){const data=surface.ctx.getImageData(0,0,w,h).data;let coverage=0,light=0;for(let i=0;i<data.length;i+=4){coverage+=data[i+3];light+=Math.max(data[i],data[i+1],data[i+2])*data[i+3];}fringe=coverage>0&&light/coverage<=140;}
+   let fringe=p.mode==='fringe';if(!p.mode||p.mode==='auto'){const data=source.data;let coverage=0,light=0;for(let i=0;i<data.length;i+=4){coverage+=data[i+3];light+=Math.max(data[i],data[i+1],data[i+2])*data[i+3];}fringe=coverage>0&&light/coverage<=140;}
    // Native source-in tinting and fractional Canvas draws quantize each stage.
    // Preserve that authored fringe path on GPU-eligible drawing surfaces.
    if(fringe&&!neutral)return null;
@@ -106,8 +119,14 @@ export function applyGpuFilter(surface,layer,{rect=surface.work,timeSec=1.2,seed
  }
  if(neutral){passes=[pass('copy',noop)];levels=0;aux=null;}
  else if(!passes.length)passes=[pass(kind==='foil'||kind==='holographic'?'reflective':kind,simpleShaders[kind]||simpleShaders.reflective,values)];
- const source=surface.ctx.getImageData(0,0,w,h),result=runGpuEffect({kind,width:w,height:h,data:source.data,passes,aux,levels});if(!result)return null;
- const output=makeSurface({...surface.work},surface.dpi),pixels=output.ctx.createImageData(w,h);pixels.data.set(result);output.ctx.putImageData(pixels,0,0);return output;
+ // Pointwise kernels cannot create pixels outside the input alpha. Keep their
+ // original pixel/world coordinates while transferring just occupied pixels.
+ // Sampling, distance and generator jobs retain the complete original surface.
+ let region={x:0,y:0,width:w,height:h};
+ if(pointwiseKinds.has(kind)&&w*h>16384){const occupied=occupiedRegion(source.data,w,h);if(occupied.width*occupied.height<w*h*.75)region=occupied;}
+ const cropped=region.width!==w||region.height!==h,data=cropped?regionPixels(source.data,w,region):source.data;
+ const result=runGpuEffect({kind,width:region.width,height:region.height,data,passes,aux,levels,pixelOrigin:[region.x,region.y],sourceSize:[w,h]});if(!result)return null;
+ const output=makeSurface({...surface.work},surface.dpi),pixels=output.ctx.createImageData(region.width,region.height);pixels.data.set(result);output.ctx.putImageData(pixels,region.x,region.y);return output;
 }
 
 const contourShader=`void main(){ivec2 p=ivec2(gl_FragCoord.xy);float distance=texelFetch(auxiliary,p,0).r,alpha=0.;if(distance>=0.&&!isinf(distance)){for(int i=0;i<int(u0.z);i++){vec4 pair=i<2?u2:i<4?u3:i<6?u4:i<8?u5:i<10?u6:u7;vec2 ring=i%2==0?pair.xy:pair.zw;float coverage=clamp((u0.x*.5+u0.y*.5-abs(distance-ring.x))/u0.y,0.,1.)*ring.y;alpha=1.-(1.-alpha)*(1.-coverage);}}result=bytes(vec4(u1.rgb,floor(alpha*255.+.5)));}`;

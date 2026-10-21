@@ -44,9 +44,13 @@ function imageLayout(width,height,p){
  const start=Math.floor(number(p.frameStart,0,0,total-1)),remaining=total-start,count=p.frameCount>0?Math.floor(number(p.frameCount,remaining,1,remaining)):remaining;
  return {x:left*width,y:top*height,w:width*(1-left-right)/columns,h:height*(1-top-bottom)/rows,columns,start,count};
 }
-function spriteFrame(layout,p,sprite,single,moving){
+function spriteFrame(layout,p,sprite,single,moving,random){
  let offset=0;
- if(moving&&layout.count>1){
+ if(layout.count>1&&(p.frameMode==='random'||p.frameMode==='randomLoop')){
+  const tick=p.frameMode==='randomLoop'&&moving?Math.floor(Math.max(0,sprite.age)*number(p.frameRate,12,0,60)):0;
+  const salt=(sprite.cycle??0)+':sprite:frame'+(p.frameMode==='randomLoop'?':'+tick:'');
+  offset=Math.min(layout.count-1,Math.floor(number(random?.(sprite.index??0,salt),0,0,1)*layout.count));
+ }else if(moving&&layout.count>1){
   const steps=Math.floor(Math.max(0,sprite.age)*number(p.frameRate,12,0,60));
   if(p.frameMode==='life')offset=single?Math.min(layout.count-1,steps):Math.min(layout.count-1,Math.floor(sprite.phase*layout.count));
   else if(p.frameMode==='loop')offset=steps%layout.count;
@@ -138,7 +142,7 @@ export function drawSpriteEmitter(ctx,layer,{time=1.2,height,point,random,includ
   const salt=cycle+':sprite:',variation=name=>(random(index,salt+name)-.5)*randomness;
   const heading=direction+mix(count>1?index/(count-1)-.5:0,random(index,salt+'heading')-.5,randomness)*spread*Math.PI,dx=Math.cos(heading),dy=Math.sin(heading);
   const distance=travel*phase*(1+variation('travel')*.5),sway=drift*.2*Math.sin(phase*TAU+variation('drift')*TAU)*Math.sin(phase*Math.PI);
-  particles.push({phase,age,alpha,radius,x:origin.x+dx*distance-dy*sway,y:origin.y+dy*distance+dx*sway+gravity*age*age*.5,angle:rotation+variation('rotation')*TAU+spin*TAU*age,fill:lifetimeColor(first,last,phase)});
+  particles.push({index,cycle,phase,age,alpha,radius,x:origin.x+dx*distance-dy*sway,y:origin.y+dy*distance+dx*sway+gravity*age*age*.5,angle:rotation+variation('rotation')*TAU+spin*TAU*age,fill:lifetimeColor(first,last,phase)});
  }
  particles.sort((a,b)=>b.phase-a.phase);
  ctx.save();
@@ -150,7 +154,7 @@ export function drawSpriteEmitter(ctx,layer,{time=1.2,height,point,random,includ
    try{
     ctx.globalAlpha*=sprite.alpha;ctx.translate(sprite.x,sprite.y);ctx.rotate(sprite.angle);
     if(shape==='image'){
-     const frame=spriteFrame(layout,p,sprite,single,moving),tinted=p.tint==='tint'||p.tint==='lifetime',source=tinted?cachedTint(image,p.tint==='tint'?fixedColor:sprite.fill,localTints,frame):image;
+     const frame=spriteFrame(layout,p,sprite,single,moving,random),tinted=p.tint==='tint'||p.tint==='lifetime',source=tinted?cachedTint(image,p.tint==='tint'?fixedColor:sprite.fill,localTints,frame):image;
      const {w,h:hh,left,top,quad:corners}=spriteRectangle(sprite,frame,transform);
      ctx.scale(mirrorX,mirrorY);
      if(tinted||frame.x===0&&frame.y===0&&frame.w===width&&frame.h===imageHeight)ctx.drawImage(source,left,top,w,hh);

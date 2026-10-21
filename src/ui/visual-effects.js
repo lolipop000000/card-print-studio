@@ -16,6 +16,10 @@ import {mountEffectPreview} from './effect-preview.js';
 import {readTargetTextStyle,writeTargetTextStyle} from '../model/text-style.js';
 import {textStyleFields} from './text-style-fields.js';
 import {syncSkillElements} from '../render/templates.js';
+import {getTextRanges,textFieldForElement} from '../model/text-ranges.js';
+import {resolveSkillEffect} from '../model/skill-references.js';
+import {openImageCropper} from './image-crop.js';
+import {packSpriteSheet} from '../model/sprite-sheet.js';
 
 function targetLabel(card,e,index){
  const b=e.binding;
@@ -38,7 +42,17 @@ export function openVisualEffectsEditor(ctx,initialTarget){
   let value='skill-name:'+skill.id;while(definitions.has(value))value='_'+value;
   definitions.set(value,{cardId:card.id,back:false,elementId:null,skillId:skill.id});targets.push([value,'이름만 · '+(skill.name||'이름 없음')]);
  }
- const targetValue=t=>[...definitions].find(([,d])=>t.skillId?d.skillId===t.skillId:!d.skillId&&d.elementId===(t.elementId||null))?.[0];
+ for(const [index,element] of card.elements.entries()){
+  const info=textFieldForElement(card,element);if(!info)continue;
+  const resolved=info.field==='effect'&&info.owner!==card?resolveSkillEffect(card,info.owner):null;
+  const text=resolved?.text??info.owner[info.field]??'',ranges=resolved?.textRanges?.[info.field]??getTextRanges(info.owner,info.field);
+  for(const range of ranges){
+    let value='text-range:'+element.id+':'+range.id;while(definitions.has(value))value='_'+value;
+   definitions.set(value,{cardId:initialTarget.cardId,back:!!initialTarget.back,elementId:element.id,textRangeId:range.id});
+   targets.push([value,'선택 글자 · “'+text.slice(range.start,range.end)+'” · '+targetLabel(card,element,index)]);
+  }
+ }
+ const targetValue=t=>[...definitions].find(([,d])=>t.textRangeId?d.textRangeId===t.textRangeId&&d.elementId===t.elementId:t.skillId?d.skillId===t.skillId:!d.skillId&&!d.textRangeId&&d.elementId===(t.elementId||null))?.[0];
  const initialValue=targetValue(initialTarget);
  const initialFrame=getEffectFrameSec(p),drafts=new Map(),past=[],future=[];
  const stagedAssets=new Map(),stagedImages=new Map(),assetNames=new Map(),previewAssets=new Map(ctx.assets);let pendingImage=null,pendingImports=0;
@@ -54,13 +68,13 @@ export function openVisualEffectsEditor(ctx,initialTarget){
  const time=el('input',{id:'effect-time',type:'range',min:0,max:6,step:.01,value:initialFrame,'aria-label':'미리보기 시간 (초)',oninput:event=>{timeline.pause();timeline.seek(Number(event.target.value));updateTransport();}});
  const timeLabel=el('output',{htmlFor:'effect-time'}),frameLabel=el('span',{id:'effect-frame-label'});
  const play=button('재생',()=>{timeline.isPlaying()?timeline.pause():timeline.play();updateTransport();},{id:'effect-play','aria-pressed':false});
- const timeline=createEffectTimeline({initialSec:initialFrame,reducedMotion:matchMedia('(prefers-reduced-motion: reduce)').matches,onFrame:()=>{draw();updateTransport();}});
+ const timeline=createEffectTimeline({initialSec:initialFrame,reducedMotion:matchMedia('(prefers-reduced-motion: reduce)').matches,onFrame:()=>{draw();updateTransport();},onStateChange:playing=>{if(!playing&&!disposed)scheduleDraw();}});
  const targetPicker=field('효과를 붙일 대상','effect-target',initialValue,value=>switchTarget(value),{options:targets});
  const undoButton=button('↶ 실행 취소',()=>moveHistory(false),{id:'effect-undo',disabled:true,onpointerdown:event=>{if(pendingControl())event.preventDefault();},title:'Ctrl+Z / ⌘Z'});
  const redoButton=button('↷ 다시 실행',()=>moveHistory(true),{id:'effect-redo',disabled:true,onpointerdown:event=>{if(pendingControl())event.preventDefault();},title:'Ctrl+Shift+Z / Ctrl+Y / ⌘⇧Z'});
  const zoom=field('확대','effect-preview-zoom','1',value=>setZoom(value),{options:[['0.5','50%'],['0.75','75%'],['1','100%'],['1.5','150%'],['2','200%'],['3','300%'],['4','400%'],['6','600%'],['8','800%']]});
  const compare=button('원본 비교 · 누르기',()=>{},{id:'effect-compare','aria-pressed':false,title:'누르는 동안 선택한 대상의 이펙트를 빼고 봅니다. 저장 내용은 바뀌지 않아요.',onpointerdown:event=>{event.preventDefault();showOriginal(true);},onpointerup:()=>showOriginal(false),onpointercancel:()=>showOriginal(false),onkeydown:event=>{if([' ','Enter'].includes(event.key)){event.preventDefault();showOriginal(true);}},onkeyup:event=>{if([' ','Enter'].includes(event.key)){event.preventDefault();showOriginal(false);}},onblur:()=>showOriginal(false)});
- const focus=button('선택 대상 확대',()=>{setZoom('2');const e=previewTarget.elements.find(e=>target.skillId?e.binding?.field==='skill.name'&&e.binding.skillId===target.skillId:e.id===target.elementId);if(!e)return;const viewport=canvas.parentElement,scale=canvas.getBoundingClientRect().width/p.settings.cardWidthMm;viewport.scrollTo({left:canvas.offsetLeft+(e.rect.x+e.rect.w/2)*scale-viewport.clientWidth/2,top:canvas.offsetTop+(e.rect.y+e.rect.h/2)*scale-viewport.clientHeight/2});},{id:'effect-focus-target'});
+ const focus=button('선택 대상 확대',()=>{setZoom('2');const e=previewTarget.elements.find(e=>target.skillId?e.binding?.field==='skill.name'&&e.binding.skillId===target.skillId:e.id===target.elementId),rect=renderGeometry?.rect??e?.rect;if(!rect)return;const viewport=canvas.parentElement,scale=canvas.getBoundingClientRect().width/p.settings.cardWidthMm;viewport.scrollTo({left:canvas.offsetLeft+(rect.x+rect.w/2)*scale-viewport.clientWidth/2,top:canvas.offsetTop+(rect.y+rect.h/2)*scale-viewport.clientHeight/2});},{id:'effect-focus-target'});
  function setZoom(value){previewView?.setZoom(value);}
  function showOriginal(value){if(disposed||comparing===value)return;comparing=value;compare.setAttribute('aria-pressed',value);draw();}
  function releaseComparison(){showOriginal(false);}
@@ -135,10 +149,12 @@ export function openVisualEffectsEditor(ctx,initialTarget){
  }
  function updateImportControls(){
   for(const id of ['effect-apply','effect-save-preset','effect-sprite-import','effect-sprite-library']){const control=dialog.querySelector('#'+id);if(control)control.disabled=pendingImports>0;}
+  const sprite=recipe.layers.find(layer=>layer.id===selected&&layer.kind==='sprite'),assetId=sprite?.params.assetId,hasImage=stagedAssets.has(assetId)||!!ctx.store.getProject().assets[assetId];
+  for(const id of ['effect-sprite-edit','effect-sprite-crop-sheet']){const control=dialog.querySelector('#'+id);if(control)control.disabled=pendingImports>0||!hasImage;}
   const update=dialog.querySelector('#effect-update-preset');if(update)update.disabled=pendingImports>0||!savedId;
  }
  function chooseSpriteImage(layerId){if(pendingImports)return;pendingImage={key:currentKey,layerId,documentId};imageFile.value='';imageFile.click();}
- function stageSpriteImage(destination,asset,image,name){
+ function stageSpriteImage(destination,asset,image,name,spritePatch={}){
   if(disposed)return;
   if(ctx.store.getDocumentId()!==destination.documentId)return message('덱이 바뀌어 이미지를 붙이지 않았어요. 사용할 덱에서 다시 선택하세요.');
   const draft=drafts.get(destination.key),current=destination.key===currentKey,draftRecipe=current?recipe:draft?.recipe;
@@ -148,7 +164,7 @@ export function openVisualEffectsEditor(ctx,initialTarget){
   if(image.naturalWidth!==asset.width||image.naturalHeight!==asset.height)throw new Error('선택한 그림의 크기가 맞지 않습니다. 보관함에 원본을 다시 가져오세요.');
   stagedAssets.set(asset.id,asset);stagedImages.set(asset.id,image);assetNames.set(asset.id,name);
   editDraft(()=>{
-   const next=clone(draftRecipe),layer=next.layers.find(l=>l.id===destination.layerId);layer.params.assetId=asset.id;layer.params.shape='image';
+   const next=clone(draftRecipe),layer=next.layers.find(l=>l.id===destination.layerId);Object.assign(layer.params,spritePatch,{assetId:asset.id,shape:'image'});
    if(current){recipe=next;selected=layer.id;}else{draft.recipe=next;draft.selected=layer.id;}
   });
   prepare();renderFields();scheduleDraw();updateTransport();
@@ -170,6 +186,21 @@ export function openVisualEffectsEditor(ctx,initialTarget){
   try{
    const asset=await importAsset(file),image=await decodeImage(asset.dataUrl);
    stageSpriteImage(destination,asset,image,file.name);
+  }catch(error){if(!disposed)message(error.message);}
+  finally{pendingImports--;if(!disposed){updateImportControls();updateTransport();}}
+ }
+ async function processSpriteImage(layerId,grid=false){
+  if(pendingImports||disposed)return;
+  const layer=recipe.layers.find(l=>l.id===layerId&&l.kind==='sprite'),asset=stagedAssets.get(layer?.params.assetId)||ctx.store.getProject().assets[layer?.params.assetId];if(!asset)return;
+  timeline.pause();updateTransport();
+  const destination={key:currentKey,layerId,documentId},params=clone(layer.params);pendingImports++;updateImportControls();updateTransport();
+  try{
+   const results=await openImageCropper({asset,name:assetNames.get(asset.id)||'입자 그림',initialMode:grid?'grid':'manual',initialGrid:{rows:params.sheetRows??1,columns:params.sheetColumns??1}});
+   if(!results||disposed)return;
+   const full=!grid&&results.length===1&&results[0].sourceRect.x===0&&results[0].sourceRect.y===0&&results[0].asset.width===asset.width&&results[0].asset.height===asset.height;
+   const packed=full?{asset:results[0].asset}:await packSpriteSheet(results,{columns:params.sheetColumns??1});
+   const patch=full?{}:{sheetColumns:packed.sheetColumns,sheetRows:packed.sheetRows,frameCount:packed.frameCount,frameStart:0,cropLeft:0,cropRight:0,cropTop:0,cropBottom:0};
+   stageSpriteImage(destination,packed.asset,await decodeImage(packed.asset.dataUrl),grid?'편집한 스프라이트 시트':'편집한 입자 그림',patch);
   }catch(error){if(!disposed)message(error.message);}
   finally{pendingImports--;if(!disposed){updateImportControls();updateTransport();}}
  }
@@ -201,16 +232,18 @@ export function openVisualEffectsEditor(ctx,initialTarget){
  }
  function draw(){
   clearTimeout(timer);if(disposed||!previewTarget)return;
-  const started=performance.now(),accelerationBefore=getBloomAccelerationStatus(),effectsBefore=getEffectAccelerationStatus(),dpi=previewView?.dpi()||(quality.checked?300:200);
+  const started=performance.now(),accelerationBefore=getBloomAccelerationStatus(),effectsBefore=getEffectAccelerationStatus(),active=timeline.isPlaying()||transform?.isDragging(),dpi=previewView?.dpi({active})||(quality.checked?300:200);
   if(dpi!==lastDpi){cache.clear();lastDpi=dpi;}
   const report=renderCard(canvas.getContext('2d',{willReadFrequently:false}),comparing?comparisonProject:previewProject,comparing?comparisonTarget:previewTarget,previewAssets,dpi,{timeSec:timeline.getTime(),playbackTarget:selectedPlayback.checked?target:null,frozenTimeSec:draftFrame,effectCache:cache,onEffectGeometry:entry=>{
    if(comparing)return;
-   if(target.skillId){
+   if(target.textRangeId){
+    if(entry.textRangeId===target.textRangeId&&(!renderGeometry||entry.elementId===target.elementId))renderGeometry=entry;
+   }else if(target.skillId){
     const title=previewTarget.elements.find(e=>e.binding?.field==='skill.name'&&e.binding.skillId===target.skillId);
     if(entry.skillId===target.skillId&&(!renderGeometry||entry.elementId===title?.id))renderGeometry=entry;
-   }else if(!entry.skillId&&entry.elementId===(target.elementId||null))renderGeometry=entry;
+   }else if(!entry.skillId&&!entry.textRangeId&&entry.elementId===(target.elementId||null))renderGeometry=entry;
   }});
-  previewView?.afterDraw(dpi);transform?.refresh();
+  previewView?.afterDraw(dpi,{active,durationMs:performance.now()-started});transform?.refresh();
   const problems=ctx.state.ignoreOutputWarnings?[]:report.problems.filter(p=>target.skillId?p.skillId===target.skillId:p.elementId===target.elementId||!target.elementId&&!p.elementId);
   message(problems.slice(0,2).map(p=>(p.severity==='warning'?'안내: ':'인쇄 확인: ')+p.message).join(' '));
   const acceleration=getBloomAccelerationStatus(),gpu=acceleration.gpuRenders>accelerationBefore.gpuRenders,cpu=acceleration.cpuRenders>accelerationBefore.cpuRenders;
@@ -228,11 +261,16 @@ export function openVisualEffectsEditor(ctx,initialTarget){
    editDraft(()=>{recipe=next;if(typeof id==='string'&&next.layers.some(l=>l.id===id))selected=id;if(!recipe.layers.some(l=>l.id===selected))selected=recipe.layers[0]?.id;});
    prepare();renderFields();scheduleDraw();updateTransport();
   }});
+  const sprite=recipe.layers.find(layer=>layer.id===selected&&layer.kind==='sprite');
+  if(sprite?.params.shape==='image')fields.append(el('section',{class:'inspector-group'},el('h3',{},'입자 원본 편집'),
+   button('이미지 자르기·배경 제거',()=>processSpriteImage(sprite.id),{id:'effect-sprite-edit',class:'wide',disabled:pendingImports>0||!sprite.params.assetId}),
+   button('스프라이트 시트 자르기',()=>processSpriteImage(sprite.id,true),{id:'effect-sprite-crop-sheet',class:'wide',disabled:pendingImports>0||!sprite.params.assetId}),
+   el('p',{class:'hint'},'선택한 조각은 한 시트로 묶어요. 여러 컷 재생에서 반복이나 랜덤 소환을 고를 수 있어요.')));
   if(targetType==='text')fields.prepend(el('section',{class:'inspector-group'},el('h3',{},'글자 꾸미기'),
-   ...textStyleFields(textStyle,(key,value)=>{editDraft(()=>textStyle={...textStyle,[key]:value});prepare();renderFields();scheduleDraw();updateTransport();},{idPrefix:'effect-text',minFontPt:p.settings.minFontPt,inline:!!target.skillId}),
+   ...textStyleFields(textStyle,(key,value)=>{editDraft(()=>textStyle={...textStyle,[key]:value});prepare();renderFields();scheduleDraw();updateTransport();},{idPrefix:'effect-text',minFontPt:p.settings.minFontPt,inline:!!target.skillId||!!target.textRangeId}),
    field('글자 색','effect-text-color',textColor||'#253d32',value=>{editDraft(()=>textColor=value);prepare();scheduleDraw();updateTransport();},{type:'color'}),
    button('기본 글자 색 사용',()=>{editDraft(()=>textColor=undefined);prepare();renderFields();scheduleDraw();updateTransport();},{id:'effect-text-color-reset',disabled:textColor===undefined}),
-   target.skillId?el('p',{class:'hint'},'이 스킬의 제목 이름과 설명 속 같은 이름에 함께 적용돼요.'):null));
+   target.textRangeId?el('p',{class:'hint'},'선택한 글자 구간에만 적용돼요. 스킬 이름에 지정하면 설명 속 같은 스킬 이름에도 함께 적용돼요.'):target.skillId?el('p',{class:'hint'},'이 스킬의 제목 이름과 설명 속 같은 이름에 함께 적용돼요.'):null));
   });
   for(const input of fields.querySelectorAll('input[type=number],input[type=color]'))input.dataset.effectCommitted=input.value;
   updateHistoryControls();

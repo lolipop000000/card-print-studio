@@ -1,10 +1,10 @@
 /** Local preview clock. Only explicit freeze/apply actions write the project. */
-export function createEffectTimeline({onFrame,initialSec=1.2,maxFps=24,reducedMotion=false,
+export function createEffectTimeline({onFrame,onStateChange=()=>{},initialSec=1.2,maxFps=24,reducedMotion=false,
  requestFrame=fn=>requestAnimationFrame(fn),cancelFrame=id=>cancelAnimationFrame(id),now=()=>performance.now()}){
  let time=Number.isFinite(initialSec)?Math.max(0,initialSec):1.2,playing=false,active=true,destroyed=false,pending=null,startMs=0,startSec=time,lastPaint=0;
  const interval=1000/maxFps;
  function cancel(){if(pending!==null)cancelFrame(pending);pending=null;}
- function pause(){playing=false;cancel();}
+ function pause(){const changed=playing;playing=false;cancel();if(changed&&!destroyed)onStateChange(false);}
  function tick(timestamp){
   pending=null;if(destroyed||!active||!playing)return;
   const elapsed=timestamp-lastPaint;
@@ -15,12 +15,12 @@ export function createEffectTimeline({onFrame,initialSec=1.2,maxFps=24,reducedMo
   if(!destroyed&&active&&playing)pending=requestFrame(tick);
  }
  return {
-  play(){if(destroyed||!active||playing)return;playing=true;startMs=lastPaint=now();startSec=time;pending=requestFrame(tick);},
+  play(){if(destroyed||!active||playing)return;playing=true;startMs=lastPaint=now();startSec=time;pending=requestFrame(tick);onStateChange(true);},
   pause,
   seek(seconds){if(destroyed||!Number.isFinite(seconds))return;time=Math.max(0,seconds);if(playing){startMs=lastPaint=now();startSec=time;}onFrame(time);},
   getTime:()=>time,isPlaying:()=>playing,
   setActive(value){active=!!value;if(!active)pause();},
-  destroy(){if(destroyed)return;pause();destroyed=true;}
+  destroy(){if(destroyed)return;destroyed=true;pause();}
  };
 }
 

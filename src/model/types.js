@@ -7,10 +7,12 @@
  * @typedef {{keywordId:string,display:'inline'|'badge'|'both'}} KeywordReference
  * @typedef {{id:string,skillId:string,start:number,end:number}} SkillReference
  * @typedef {{fontPt?:number,fontWeight?:number,fontStyle?:'normal'|'italic',letterSpacingMm?:number,lineHeight?:number,align?:'left'|'center'|'right',underline?:boolean,color?:string,visualEffects?:Object}} SkillNameStyle
- * @typedef {{id:string,name:string,effect:string,dice:DiceCondition|null,keywords?:KeywordReference[],skillReferences?:SkillReference[],nameStyle?:SkillNameStyle}} Skill
+ * @typedef {{id:string,start:number,end:number,style:SkillNameStyle}} TextRange
+ * @typedef {Record<string,TextRange[]>} TextRanges
+ * @typedef {{id:string,name:string,effect:string,dice:DiceCondition|null,keywords?:KeywordReference[],nameKeywords?:KeywordReference[],skillReferences?:SkillReference[],nameStyle?:SkillNameStyle,textRanges?:TextRanges}} Skill
  * @typedef {{field:string,skillId?:string}} Binding
- * @typedef {{id:string,type:string,rect:RectMm,binding:Binding|null,style:Object,content?:string,assetId?:string,dice?:DiceCondition}} Element
- * @typedef {{id:string,kind:'monster'|'item',name:string,quantity:number,artAssetId:string|null,template:string,autoSkillLayout?:boolean,keywords?:KeywordReference[],elements:Element[],rank?:Rank,attribute?:Attribute,attributes?:Attribute[],baseHp?:number,hpReduction?:number,passives?:Skill[],actives?:Skill[],effect?:string}} Card
+ * @typedef {{id:string,type:string,rect:RectMm,binding:Binding|null,style:Object,content?:string,assetId?:string,dice?:DiceCondition,textRanges?:TextRanges}} Element
+ * @typedef {{id:string,kind:'monster'|'item',name:string,quantity:number,artAssetId:string|null,template:string,autoSkillLayout?:boolean,keywords?:KeywordReference[],nameKeywords?:KeywordReference[],textRanges?:TextRanges,elements:Element[],rank?:Rank,attribute?:Attribute,attributes?:Attribute[],baseHp?:number,hpReduction?:number,passives?:Skill[],actives?:Skill[],effect?:string}} Card
  * @typedef {{id:string,mime:string,dataUrl:string,width:number,height:number,paintingId:string|null}} Asset
  * @typedef {{id:string,width:number,height:number,activeLayerId:string,layers:Array<{id:string,name:string,visible:boolean,locked:boolean,opacity:number,blendMode?:string,png:string}>}} SavedPainting
  * @typedef {{format:'card-print-studio',version:1,name:string,settings:Object,keywords?:Keyword[],cards:Card[],back:{elements:Element[]},assets:Object,paintings:Object,print:Object}} Project

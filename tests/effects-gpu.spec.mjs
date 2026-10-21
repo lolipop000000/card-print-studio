@@ -150,10 +150,10 @@ test('complete native particle and GPU filter stacks preserve alpha and frozen f
   }
   const [cpu,gpu]=outputs;let alpha=0,premul=0;
   for(let i=0;i<gpu.pixels.length;i+=4){alpha=Math.max(alpha,Math.abs(cpu.pixels[i+3]-gpu.pixels[i+3]));for(let k=0;k<3;k++)premul=Math.max(premul,Math.abs(cpu.pixels[i+k]*cpu.pixels[i+3]/255-gpu.pixels[i+k]*gpu.pixels[i+3]/255));}
-  results.push({dpi,alpha,premul,cpuStable:cpu.repeat,gpuStable:gpu.repeat,gpuCalls:gpu.status.gpuRenders,cpuCalls:gpu.status.cpuRenders,ripple:gpu.status.kinds.ripple?.gpu,mixing:gpu.status.kinds.composite?.gpu});
+  results.push({dpi,alpha,premul,cpuStable:cpu.repeat,gpuStable:gpu.repeat,gpuCalls:gpu.status.gpuRenders,cpuCalls:gpu.status.cpuRenders,ripple:gpu.status.kinds.ripple?.gpu,mixing:gpu.status.kinds.composite?.gpu||0});
  }
  await writeFile(`${qa}/effects-gpu-stacks.json`,JSON.stringify(results,null,2));
- for(const r of results){assert.equal(r.cpuStable,true);assert.equal(r.gpuStable,true);assert.ok(r.gpuCalls>0&&r.ripple>0&&r.mixing>0,JSON.stringify(r));assert.equal(r.cpuCalls,0);assert.ok(r.alpha<=3&&r.premul<=3.1,JSON.stringify(r));}
+ for(const r of results){assert.equal(r.cpuStable,true);assert.equal(r.gpuStable,true);assert.ok(r.gpuCalls>0&&r.ripple>0,JSON.stringify(r));assert.equal(r.mixing,0,'full replacement filters need no extra mixing transfer');assert.equal(r.cpuCalls,0);assert.ok(r.alpha<=3&&r.premul<=3.1,JSON.stringify(r));}
 });
 
 test('GPU pixel filters preserve tiny, partial-alpha, neutral and 300 DPI inputs',async()=>{

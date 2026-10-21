@@ -26,7 +26,7 @@ test('sprite crop and sheet constraints report the conflicting values without re
 });
 
 test('sprite optional numeric and enum controls reject invalid values at the public validation boundary',()=>{
- for(const [key,value] of [['renderMode','stamp'],['cropLeft',1],['cropBottom',NaN],['scaleX',0],['scaleY',8.1],['mirror','horizontal'],['anchorX',-1],['anchorY',2],['sheetColumns',1.5],['sheetRows',17],['frameStart',-1],['frameCount',257],['frameMode','random'],['frameRate',61],['sizeStart',8.1]]){
+ for(const [key,value] of [['renderMode','stamp'],['cropLeft',1],['cropBottom',NaN],['scaleX',0],['scaleY',8.1],['mirror','horizontal'],['anchorX',-1],['anchorY',2],['sheetColumns',1.5],['sheetRows',17],['frameStart',-1],['frameCount',257],['frameMode','unknown'],['frameRate',61],['sizeStart',8.1]]){
   const problems=validateVisualEffects(recipe({[key]:value}));assert.ok(problems.length,key+'='+String(value));
  }
 });

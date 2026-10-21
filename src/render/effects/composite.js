@@ -87,6 +87,9 @@ function scopeWeights(shape,work,dpi,width,height,scope){
  }return result;
 }
 function mixFilter(base,filtered,layer,shape,protection,cache,shapeKey,colorExemption){
+ // A complete replacement already has the final Canvas pixels. Sending those
+ // pixels through another upload/readback only repeats the same alpha result.
+ if(normalizeBlendMode(layer.blendMode)===DEFAULT_BLEND_MODE&&layer.opacity===1&&(!layer.scope||layer.scope==='all')&&(!protection||layer.protectText===false)&&!colorExemption)return filtered;
  const out=makeSurface(base.work,base.dpi),w=out.canvas.width,h=out.canvas.height,a=base.ctx.getImageData(0,0,w,h),data=a.data;
  let b=filtered.ctx.getImageData(0,0,w,h);const mode=normalizeBlendMode(layer.blendMode);
  if(mode!==DEFAULT_BLEND_MODE){

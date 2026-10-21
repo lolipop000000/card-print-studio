@@ -1,5 +1,6 @@
-import {newId} from './types.js';
+import {newId,clone} from './types.js';
 import {valueLabel} from './problem-details.js';
+import {replaceText,editedTextRange,rebaseTextRanges,normalizeTextRanges} from './text-ranges.js';
 
 export const cardSkills=card=>[...(card?.passives||[]),...(card?.actives||[])];
 const id=value=>typeof value==='string'&&value.length>0&&value.length<200&&!['__proto__','constructor','prototype'].includes(value);
@@ -36,18 +37,24 @@ export function validateSkillReferences(skill,extra={}){
 /** Resolve names without changing the user's stored effect or unrelated prose. */
 export function resolveSkillEffect(card,skill){
  const source=skill?.effect||'',refs=skill?.skillReferences||[];
- if(!refs.length)return {text:source,skillReferences:[],missing:[]};
+ let textRanges=skill?.textRanges?clone(skill.textRanges):undefined;
+ if(!refs.length)return {text:source,skillReferences:[],missing:[],...(textRanges?{textRanges}:{})};
  const skills=new Map(cardSkills(card).map(s=>[s.id,s])),resolved=[],missing=[];let text='',at=0;
  for(const ref of refs){
   text+=source.slice(at,ref.start);const target=skills.get(ref.skillId),label=target?.name||source.slice(ref.start,ref.end),start=text.length;
+  if(textRanges?.effect&&label!==source.slice(ref.start,ref.end)){
+   const edit=editedTextRange(source.slice(ref.start,ref.end),label),end=start+ref.end-ref.start;
+   textRanges.effect=textRanges.effect.flatMap(range=>range.start<=start&&range.end>=end?rebaseTextRanges([range],start,end,label):rebaseTextRanges([range],start+edit.start,start+edit.end,edit.text));
+  }
   text+=label;resolved.push({id:ref.id,skillId:ref.skillId,start,end:text.length});if(!target)missing.push(ref);at=ref.end;
  }
- return {text:text+source.slice(at),skillReferences:resolved,missing};
+ text+=source.slice(at);if(textRanges?.effect)textRanges.effect=normalizeTextRanges(textRanges.effect,text);
+ return {text,skillReferences:resolved,missing,...(textRanges?{textRanges}:{})};
 }
 
 export function materializeSkillEffect(card,skill){
  if(!skill.skillReferences?.length)return;
- const resolved=resolveSkillEffect(card,skill);skill.effect=resolved.text;skill.skillReferences=resolved.skillReferences;
+ const resolved=resolveSkillEffect(card,skill);skill.effect=resolved.text;skill.skillReferences=resolved.skillReferences;if(resolved.textRanges)skill.textRanges=resolved.textRanges;
 }
 
 /** One replacement handles typing, insertion and keyword changes consistently. */
@@ -58,25 +65,10 @@ export function replaceSkillText(skill,start,end,text){
   if(ref.start>=end)return [{...ref,start:ref.start+delta,end:ref.end+delta}];
   return [];
  });
- skill.effect=skill.effect.slice(0,start)+text+skill.effect.slice(end);return start+text.length;
-}
-function editedRange(before,after,selection){
- if(selection&&Number.isInteger(selection.start)&&Number.isInteger(selection.end)){
-  let {start,end}=selection;const removed=before.length-after.length;
-  if(start===end&&removed>0&&selection.inputType?.startsWith('delete')){
-   if(selection.inputType.endsWith('Backward'))start-=removed;else if(selection.inputType.endsWith('Forward'))end+=removed;
-  }
-  const length=after.length-before.length+end-start;
-  if(start>=0&&end>=start&&end<=before.length&&length>=0&&after.slice(0,start)===before.slice(0,start)&&after.slice(start+length)===before.slice(end))return {start,end,text:after.slice(start,start+length)};
- }
- let start=0;while(start<before.length&&start<after.length&&before[start]===after[start])start++;
- let end=before.length,nextEnd=after.length;while(end>start&&nextEnd>start&&before[end-1]===after[nextEnd-1]){end--;nextEnd--;}
- if(!boundary(before,start)||!boundary(after,start))start--;
- if(!boundary(before,end)){end++;nextEnd++;}
- return {start,end,text:after.slice(start,nextEnd)};
+ return replaceText(skill,'effect',start,end,text);
 }
 export function editSkillEffect(card,skill,text,selection){
- materializeSkillEffect(card,skill);const edit=editedRange(skill.effect,text,selection);replaceSkillText(skill,edit.start,edit.end,edit.text);
+ materializeSkillEffect(card,skill);const edit=editedTextRange(skill.effect,text,selection);replaceSkillText(skill,edit.start,edit.end,edit.text);
 }
 export function insertSkillReference(card,skill,skillId,start,end){
  const target=cardSkills(card).find(s=>s.id===skillId);if(!target)throw Error('참조할 스킬이 없어요.');
@@ -85,12 +77,12 @@ export function insertSkillReference(card,skill,skillId,start,end){
 }
 /** Keyword matching applies only to authored prose outside explicit references. */
 export function rewritePlainSkillText(skill,rewrite){
- if(!skill.skillReferences?.length){skill.effect=rewrite(skill.effect);return;}
- let text='',at=0;const refs=[];
- for(const ref of skill.skillReferences){
-  text+=rewrite(skill.effect.slice(at,ref.start));const start=text.length;text+=skill.effect.slice(ref.start,ref.end);refs.push({...ref,start,end:text.length});at=ref.end;
+ const segments=[];let at=0;
+ for(const ref of skill.skillReferences||[]){segments.push([at,ref.start]);at=ref.end;}segments.push([at,skill.effect.length]);
+ for(const [start,end] of segments.reverse()){
+  const before=skill.effect.slice(start,end),after=rewrite(before);if(before===after)continue;
+  const edit=editedTextRange(before,after);replaceSkillText(skill,start+edit.start,start+edit.end,edit.text);
  }
- skill.effect=text+rewrite(skill.effect.slice(at));skill.skillReferences=refs;
 }
 export function remapSkillReferences(skill,mapSkillId,mapReferenceId=mapSkillId){
  if(skill.skillReferences!==undefined)skill.skillReferences=skill.skillReferences.map(ref=>({...ref,id:mapReferenceId(ref.id),skillId:mapSkillId(ref.skillId)}));

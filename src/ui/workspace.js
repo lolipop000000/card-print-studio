@@ -1,6 +1,6 @@
 import {createWorkspaceStorage} from '../storage/workspace.js';
 import {el,button,showMessage,typing} from './dom.js';
-import {confirmReplacement,prepareProjectFile} from './files.js';
+import {confirmReplacement,prepareProjectFile,saveProjectFile} from './files.js';
 
 export function createWorkspaceControls(store,onLoaded,onImportFile){
  const storage=createWorkspaceStorage(),status=el('small',{id:'workspace-status',class:'workspace-status',role:'status'});
@@ -34,6 +34,7 @@ export function createWorkspaceControls(store,onLoaded,onImportFile){
   pendingSave=(async()=>{
    try{
     const state=storage.getState();
+    if(!state.supported&&!state.connected){await saveProjectFile(store);showMessage('JSON 파일로 저장했어요. 불러오기에서 다시 열 수 있어요.','success');return !store.isDirty();}
     if(!state.connected&&!state.folderName&&!await ensureConnected())return false;
     const result=await storage.save(store.getProject());
     if(disposed)return false;

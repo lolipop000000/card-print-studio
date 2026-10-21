@@ -9,7 +9,7 @@ import {openHarness} from './helpers/browser.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url));
 const bundle=await build({absWorkingDir:root,stdin:{contents:"import {createProject,serializeProject,parseProject} from './src/model/project.js';import {createVisualEffects,makeVisualEffectLayer} from './src/model/visual-effects.js';import {loadAssets} from './src/model/assets.js';import {renderCard} from './src/render/card.js';import {createPdf} from './src/printing/pdf.js';import {planSheets} from './src/printing/layout.js';window.spritePrintApi={createProject,serializeProject,parseProject,createVisualEffects,makeVisualEffectLayer,loadAssets,renderCard,createPdf,planSheets};",resolveDir:root},bundle:true,format:'iife',write:false,target:'es2022',loader:{'.woff2':'base64'}});
 
-test('cropped and transformed sprite sheets use the identical saved PNG frame in two real 300dpi PDFs',async()=>{
+test('cropped, transformed and random sprite sheets use the identical saved PNG frame in two real 300dpi PDFs',async()=>{
  const {browser,page,pageErrors,httpRequests}=await openHarness();try{
   await page.addScriptTag({content:bundle.outputFiles[0].text});
   const result=await page.evaluate(async()=>{
@@ -17,6 +17,7 @@ test('cropped and transformed sprite sheets use the identical saved PNG frame in
    for(const [index,color] of ['#e53c27','#27b756','#3152d8','#e2bb28'].entries()){const x=index%2*16,y=Math.floor(index/2)*8;g.fillStyle=color;g.fillRect(x,y,16,8);g.clearRect(x+4,y+2,3,3);g.clearRect(x+12,y,4,2);}
    p.assets.atlas={id:'atlas',mime:'image/png',width:32,height:16,dataUrl:atlas.toDataURL(),paintingId:null};card.template='custom';card.autoSkillLayout=false;card.quantity=1;card.passives=[];card.actives=[];
    const recipe={...a.createVisualEffects(),layers:[a.makeVisualEffectLayer('sprite',{id:'atlas-decoration',placement:'front',params:{shape:'image',assetId:'atlas',renderMode:'single',sizeStart:.2,scaleX:1.4,scaleY:.6,anchorX:.2,anchorY:.8,mirror:'both',cropLeft:.25,sheetColumns:3,sheetRows:2,frameMode:'pingpong',frameStart:1,frameCount:4,frameRate:3,rotation:20,spin:.3}}),a.makeVisualEffectLayer('sprite',{id:'atlas-particles',placement:'front',params:{shape:'image',assetId:'atlas',count:4,life:2,sizeStart:.07,sizeEnd:.07,travel:.08,randomness:0,spin:0,alphaEnd:1,fadeIn:0,fadeOut:0,cropLeft:.5,sheetColumns:2,sheetRows:2,frameMode:'life'}})]};
+   for(const [index,frameMode] of ['random','randomLoop'].entries())recipe.layers.push(a.makeVisualEffectLayer('sprite',{id:'atlas-'+frameMode,placement:'front',origin:{x:[.1,.7][index],y:.15,w:.2,h:.7},params:{shape:'image',assetId:'atlas',count:3,life:2,sizeStart:.08,sizeEnd:.08,travel:.1,randomness:0,spin:0,alphaEnd:1,fadeIn:0,fadeOut:0,sheetColumns:2,sheetRows:2,frameMode,frameRate:7}}));
    card.elements=[{id:'atlas-effect',type:'effect',binding:null,rect:{x:18,y:25,w:24,h:16},style:{visualEffects:recipe}}];p.print.duplex=false;p.print.effectFrameSec=2.1;
    const loaded=a.parseProject(a.serializeProject(p)),assets=await a.loadAssets(loaded),sourceBefore=JSON.stringify([loaded.assets,loaded.paintings]),canvas=document.createElement('canvas');
    const draw=options=>{a.renderCard(canvas.getContext('2d'),loaded,loaded.cards[0],assets,300,options);return canvas.toDataURL();};

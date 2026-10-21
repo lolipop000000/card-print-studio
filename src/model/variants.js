@@ -2,8 +2,9 @@ import {clone,newId} from './types.js';
 import {remapSkillReferences} from './skill-references.js';
 import {applyLegacyVisualEffectPatch} from './visual-effects.js';
 import {valueLabel,cardProblemLabel} from './problem-details.js';
+import {textRangeOwners,remapTextRanges} from './text-ranges.js';
 
-export const VARIANT_FIELDS=['name','attribute','attributes','rank','baseHp','hpReduction','artAssetId','passives','actives','effect','keywords','template','autoSkillLayout','elements','visualEffects'];
+export const VARIANT_FIELDS=['name','attribute','attributes','rank','baseHp','hpReduction','artAssetId','passives','actives','effect','keywords','nameKeywords','textRanges','template','autoSkillLayout','elements','visualEffects'];
 const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const safe=k=>!['__proto__','constructor','prototype'].includes(k);
@@ -19,17 +20,24 @@ function difference(base,value,before,previous){
  if(previous&&Object.hasOwn(previous,'value'))return {value:clone(value)};
  if(object(base)&&object(value)){
   const old=object(before)?before:{},fields={};
-  // Effect text and its reference offsets must inherit as one content value.
-  const atomic=typeof value.effect==='string'&&[base,value,old].some(v=>Object.hasOwn(v,'skillReferences'));
+  // A string and its annotations inherit together, so parent offsets never land on a child's prose.
+  const atomic=['name','effect','content'].filter(key=>typeof value[key]==='string'&&[base,value,old].some(v=>v.textRanges?.[key]!==undefined||key==='effect'&&Object.hasOwn(v,'skillReferences')));
   for(const key of new Set([...Object.keys(base),...Object.keys(value),...Object.keys(old)])){
-   if(atomic&&(key==='effect'||key==='skillReferences'))continue;
+   if(atomic.includes(key)||key==='textRanges'&&atomic.length||key==='skillReferences'&&atomic.includes('effect'))continue;
    const patch=difference(ownValue(base,key),ownValue(value,key),ownValue(old,key),ownValue(previous?.fields,key));if(patch)fields[key]=patch;
   }
-  if(atomic){
-   const content=v=>({effect:v.effect,...(Object.hasOwn(v,'skillReferences')?{skillReferences:v.skillReferences}:{})});
+  for(const key of atomic){
+   const content=v=>({text:v[key],ranges:v.textRanges?.[key],...(key==='effect'?{references:v.skillReferences}:{})});
    if(!equal(content(base),content(value))){
-    if(equal(content(old),content(value))){for(const key of ['effect','skillReferences'])if(previous?.fields?.[key])fields[key]=clone(previous.fields[key]);}
-    else {fields.effect={value:value.effect};fields.skillReferences=Object.hasOwn(value,'skillReferences')?{value:clone(value.skillReferences)}:{remove:true};}
+    if(equal(content(old),content(value))){
+     if(previous?.fields?.[key])fields[key]=clone(previous.fields[key]);
+     if(key==='effect'&&previous?.fields?.skillReferences)fields.skillReferences=clone(previous.fields.skillReferences);
+     const saved=previous?.fields?.textRanges?.fields?.[key];if(saved)(fields.textRanges??={fields:{}}).fields[key]=clone(saved);
+    }else {
+     fields[key]={value:value[key]};
+     if(key==='effect'&&[base,value,old].some(v=>Object.hasOwn(v,'skillReferences')))fields.skillReferences=Object.hasOwn(value,'skillReferences')?{value:clone(value.skillReferences)}:{remove:true};
+     (fields.textRanges??={fields:{}}).fields[key]=value.textRanges?.[key]===undefined?{remove:true}:{value:clone(value.textRanges[key])};
+    }
    }
   }
   return Object.keys(fields).length?{fields}:null;
@@ -50,11 +58,14 @@ function difference(base,value,before,previous){
  }
  return {value:clone(value)};
 }
+function dropUnpairedTextRanges(value,fields){
+ for(const key of ['name','effect','content'])if(fields[key]&&value.textRanges?.[key]&&!fields.textRanges?.remove&&!Object.hasOwn(fields.textRanges||{},'value')&&!fields.textRanges?.fields?.[key])delete value.textRanges[key];
+}
 function applyDifference(base,patch){
  if(patch.legacyEffect)return applyLegacyVisualEffectPatch(base,patch.legacyEffect,applyDifference);
  if(Object.hasOwn(patch,'value'))return clone(patch.value);
  if(patch.remove)return undefined;
- if(patch.fields){if(!object(base))return base;const value=clone(base);for(const [key,change] of Object.entries(patch.fields)){const next=applyDifference(ownValue(value,key),change);if(next===undefined)delete value[key];else value[key]=next;}if(typeof base.effect==='string'&&patch.fields.effect&&!patch.fields.skillReferences&&Object.hasOwn(base,'skillReferences'))delete value.skillReferences;return value;}
+ if(patch.fields){if(!object(base))return base;const value=clone(base);for(const [key,change] of Object.entries(patch.fields)){const next=applyDifference(key==='textRanges'&&change.fields?(ownValue(value,key)||{}):ownValue(value,key),change);if(next===undefined)delete value[key];else value[key]=next;}if(typeof base.effect==='string'&&patch.fields.effect&&!patch.fields.skillReferences&&Object.hasOwn(base,'skillReferences'))delete value.skillReferences;dropUnpairedTextRanges(value,patch.fields);return value;}
  const change=patch.list,removed=new Set(change.removed),value=(Array.isArray(base)?base:[]).filter(v=>!removed.has(v.id)).map(v=>Object.hasOwn(change.edits,v.id)?applyDifference(v,change.edits[v.id]):clone(v));
  for(const item of change.added)if(!value.some(v=>v.id===item.id))value.push(clone(item));
  if(change.order){const order=new Map(change.order.map((id,i)=>[id,i]));value.sort((a,b)=>(order.get(a.id)??Infinity)-(order.get(b.id)??Infinity));}
@@ -63,6 +74,7 @@ function applyDifference(base,patch){
 function inheritedCard(parent,card){
  const value=clone(parent),mapping=card.variant.ids;
  const mapId=source=>Object.hasOwn(mapping,source)?mapping[source]:(mapping[source]=newId());
+ for(const owner of textRangeOwners(value))remapTextRanges(owner,mapId);
  for(const skill of [...value.passives||[],...value.actives||[]]){skill.id=mapId(skill.id);remapSkillReferences(skill,mapId);}
  for(const element of value.elements){
   const source=element.id;
@@ -82,7 +94,15 @@ export function createVariant(project,parentId,{label='Variant',quantity=1}={}){
 export function resetVariantOverride(card,field){
  if(!card.variant)return;
  if(field==='attribute'||field==='attributes'){delete card.variant.overrides.attribute;delete card.variant.overrides.attributes;}
- else if(field)delete card.variant.overrides[field];else card.variant.overrides={};
+ else if(field){
+  delete card.variant.overrides[field];
+  if(['name','effect'].includes(field)){
+   const patch=card.variant.overrides.textRanges;
+   if(patch?.value)card.variant.overrides.textRanges={fields:Object.fromEntries(Object.entries(patch.value).filter(([key])=>key!==field).map(([key,value])=>[key,{value}]))};
+   else if(patch?.fields)delete patch.fields[field];
+   const remaining=card.variant.overrides.textRanges;if(remaining?.remove||remaining?.fields&&!Object.keys(remaining.fields).length)delete card.variant.overrides.textRanges;
+  }
+ }else card.variant.overrides={};
 }
 export function orderedCards(project){
  const result=[],seen=new Set(),visit=card=>{if(seen.has(card.id))return;seen.add(card.id);result.push(card);for(const child of project.cards)if(child.variant?.parentId===card.id)visit(child);};
@@ -110,7 +130,15 @@ export function syncVariants(project,before){
   if(!old?.variant||!parent||old.variant.parentId!==card.variant.parentId||!equal(old.variant.overrides,card.variant.overrides))continue;
   const inherited=inheritedCard(parent,card),skillEdit=!equal(old.passives,card.passives)||!equal(old.actives,card.actives)||!equal(old.keywords,card.keywords);
   const attributeEdit=attributeEdits.get(card.id);
+  const hasTextRanges=[inherited,card,old].some(c=>c.textRanges!==undefined),textFields=['name','effect','textRanges'];
+  if(hasTextRanges&&textFields.some(key=>!equal(old[key],card[key]))){
+   const pick=c=>Object.fromEntries(textFields.filter(key=>c[key]!==undefined).map(key=>[key,c[key]]));
+   const saved={fields:Object.fromEntries(textFields.filter(key=>card.variant.overrides[key]).map(key=>[key,card.variant.overrides[key]]))};
+   const patch=difference(pick(inherited),pick(card),pick(old),saved);
+   for(const key of textFields){if(patch?.fields?.[key])card.variant.overrides[key]=patch.fields[key];else delete card.variant.overrides[key];}
+  }
   for(const field of VARIANT_FIELDS){
+   if(hasTextRanges&&textFields.includes(field))continue;
    if(field==='attribute'&&attributeEdit==='array'||field==='attributes'&&attributeEdit==='scalar')continue;
    if(equal(old[field],card[field]))continue;
    if(field==='elements'&&(card.template!=='custom'||card.autoSkillLayout&&(skillEdit||!equal(before.settings,project.settings)&&!old.variant.overrides.elements)))continue;
@@ -127,7 +155,8 @@ export function syncVariants(project,before){
   const parent=cards.get(meta.parentId);if(!parent)throw Error('Variant의 원본 카드가 없습니다.');
   active.add(card.id);resolve(parent);
   const value=inheritedCard(parent,card);
-  for(const [field,patch] of Object.entries(meta.overrides)){const next=applyDifference(value[field],patch);if(next===undefined)delete value[field];else value[field]=next;}
+  for(const [field,patch] of Object.entries(meta.overrides)){const next=applyDifference(field==='textRanges'&&patch.fields?(value[field]||{}):value[field],patch);if(next===undefined)delete value[field];else value[field]=next;}
+  dropUnpairedTextRanges(value,meta.overrides);
   // Legacy scalar overrides must replace an inherited modern selection too.
   if(meta.overrides.attribute&&!meta.overrides.attributes)delete value.attributes;
   normalizeAttributes(value);

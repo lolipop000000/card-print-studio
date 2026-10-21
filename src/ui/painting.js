@@ -7,6 +7,7 @@ import {createPaintTools,PAINT_BRUSH_MIN,PAINT_BRUSH_MAX} from '../painting/tool
 import {PAINT_BLEND_MODES,DEFAULT_PAINT_BLEND_MODE,normalizePaintBlendMode,paintBlendModeLabel} from '../painting/blend-modes.js';
 import {BRUSH_PRESETS,brushPresetOptions} from '../painting/brush-presets.js';
 import {screenToPixel,zoomAt} from '../painting/viewport.js';
+import {mountTouchViewport} from './touch-viewport.js';
 const TOOLS=[['brush','✎','브러시','B'],['eraser','▱','지우개','E'],['select','▧','사각 선택','M'],['pan','✥','화면 이동','H'],['fill','▰','채우기','G'],['gradient','◩','그라데이션','D'],['eyedropper','⌖','스포이트','I'],['line','╱','직선','L'],['rect','□','사각형','R'],['ellipse','○','타원','O']];
 export async function openPaintingEditor(root,store,cardId){
  const p=store.getProject(),card=p.cards.find(c=>c.id===cardId);if(!card)throw Error('그림을 그릴 카드를 선택하세요.');
@@ -23,7 +24,7 @@ export async function openPaintingEditor(root,store,cardId){
  let view={scale:1,panX:0,panY:0},busy=false,space=false,drag=null,layerDrag=null,suppressedLayerPointer=null,frame=0,closed=false,closing=false,fitMode=true,brushPresetId='',recent=['#233d33','#ffffff','#d7553d','#3688ba','#4d8660','#79549e'];
  let finish;
  const outcome=new Promise(resolve=>{
-  finish=result=>{if(closed)return;closed=true;cancelLayerDrag();unsub();cancelAnimationFrame(frame);window.removeEventListener('keydown',key);window.removeEventListener('keyup',keyUp);window.removeEventListener('resize',resize);window.removeEventListener('pointermove',moveLayerDrag);window.removeEventListener('pointerup',endLayerDrag);window.removeEventListener('pointercancel',cancelLayerPointer);dialog.close();dialog.remove();resolve(result);};
+  finish=result=>{if(closed)return;closed=true;touchView.destroy();cancelLayerDrag();unsub();cancelAnimationFrame(frame);window.removeEventListener('keydown',key);window.removeEventListener('keyup',keyUp);window.removeEventListener('resize',resize);window.removeEventListener('pointermove',moveLayerDrag);window.removeEventListener('pointerup',endLayerDrag);window.removeEventListener('pointercancel',cancelLayerPointer);dialog.close();dialog.remove();resolve(result);};
  });
  const note=text=>{message.hidden=!text;message.textContent=text;};
  const dirty=()=>session.history.isDirty()||tools.isFloating()||tools.isGesture();
@@ -165,12 +166,12 @@ export async function openPaintingEditor(root,store,cardId){
   cursor.hidden=space||!['brush','eraser'].includes(options.tool);Object.assign(cursor.style,{left:view.panX+x*view.scale+'px',top:view.panY+y*view.scale+'px',width:size*view.scale+'px',height:size*view.scale+'px',borderRadius:square?'0':'50%'});
  }
  function down(event){
-  if(busy||event.button>1)return;event.preventDefault();viewport.focus({preventScroll:true});const at=point(event),rect=tools.getSelection(),handle=event.target.closest?.('[data-handle]')?.dataset.handle;
+  if(busy||event.button>1)return;event.preventDefault();viewport.focus({preventScroll:true});const at=point(event),rect=tools.getSelection(),floating=tools.isFloating(),handle=event.target.closest?.('[data-handle]')?.dataset.handle;
   try{
    renderCursor(event,at);
    if(space||tools.getOptions().tool==='pan'||event.button===1)drag={kind:'pan',x:event.clientX,y:event.clientY,panX:view.panX,panY:view.panY};
-   else if(handle&&rect){tools.transform({});drag={kind:'resize',handle,rect:{...rect},at};}
-   else if(rect&&(tools.isFloating()||tools.getOptions().tool==='select')&&at.x>=rect.x&&at.y>=rect.y&&at.x<=rect.x+rect.w&&at.y<=rect.y+rect.h){tools.transform({});drag={kind:'move',rect:{...rect},at};}
+   else if(handle&&rect){tools.transform({});drag={kind:'resize',handle,rect:{...rect},floating,at};}
+   else if(rect&&(floating||tools.getOptions().tool==='select')&&at.x>=rect.x&&at.y>=rect.y&&at.x<=rect.x+rect.w&&at.y<=rect.y+rect.h){tools.transform({});drag={kind:'move',rect:{...rect},floating,at};}
    else{tools.begin(at,pressure(event));drag={kind:'tool'};}
    viewport.setPointerCapture(event.pointerId);renderAll();
   }catch(e){note(e.message);drag=null;}
@@ -187,7 +188,14 @@ export async function openPaintingEditor(root,store,cardId){
   requestRender();
  }
  async function up(event){if(!drag)return;const current=drag;drag=null;if(viewport.hasPointerCapture(event.pointerId))viewport.releasePointerCapture(event.pointerId);if(current.kind==='tool')await run(()=>tools.end());else renderAll();}
- function cancel(event){if(!drag)return;const current=drag;drag=null;tools.cancel();if(current.kind==='pan'){view.panX=current.panX;view.panY=current.panY;}else if(current.kind!=='tool')tools.cancelSelection();renderAll();if(viewport.hasPointerCapture(event.pointerId))viewport.releasePointerCapture(event.pointerId);}
+ function restoreDrag(){
+  tools.cancel();
+  if(drag?.kind==='pan'){view.panX=drag.panX;view.panY=drag.panY;}
+  else if(drag&&drag.kind!=='tool'){if(drag.floating)tools.transform(drag.rect);else tools.cancelSelection();}
+  drag=null;
+ }
+ function cancel(event){if(!drag)return;restoreDrag();renderAll();if(viewport.hasPointerCapture(event.pointerId))viewport.releasePointerCapture(event.pointerId);}
+ const touchView=mountTouchViewport({viewport,onStart:()=>{if(busy)return false;restoreDrag();cursor.hidden=true;renderAll();return true;},onChange:({factor,from,to})=>{if(busy)return;const box=viewport.getBoundingClientRect();fitMode=false;view=zoomAt(view,{x:from.x-box.left,y:from.y-box.top},view.scale*factor);view.panX+=to.x-from.x;view.panY+=to.y-from.y;renderViewport();}});
  viewport.addEventListener('pointerdown',down);viewport.addEventListener('pointermove',move);viewport.addEventListener('pointerup',up);viewport.addEventListener('pointercancel',cancel);viewport.addEventListener('pointerleave',()=>cursor.hidden=true);
  viewport.addEventListener('wheel',event=>{event.preventDefault();if(busy)return;const r=viewport.getBoundingClientRect();fitMode=false;view=zoomAt(view,{x:event.clientX-r.left,y:event.clientY-r.top},view.scale*Math.exp(-event.deltaY*.0015));renderViewport();},{passive:false});
  function key(event){

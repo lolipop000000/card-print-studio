@@ -2,6 +2,7 @@ import {clone,newId} from './types.js';
 import {valueLabel} from './problem-details.js';
 import {BLEND_MODES,DEFAULT_BLEND_MODE} from './blend-modes.js';
 import {SPRITE_CONTROL_FIELDS,spriteControlDefaults,validateSpriteControls} from './sprite-controls.js';
+import {textRangeTarget,textRangeOwners} from './text-ranges.js';
 
 const numeric=(label,value,min,max,step=.05,unit='')=>({type:'number',label,value,min,max,step,unit});
 const color=(label,value)=>({type:'color',label,value});
@@ -39,6 +40,9 @@ export const VISUAL_EFFECT_CATALOG={
  lightning:{name:'번개',placement:'behind',animated:true,generative:true,fields:{color:color('색','#b9e9ff'),width:numeric('두께',.3,.05,3,.05,'mm'),branches:numeric('갈라짐',3,0,8,1),frequency:numeric('발생 빈도',2,.2,8,.1)}},
  ripple:{name:'파동',hint:'끝 크기가 시작보다 작으면 안으로 줄어들어요. 0으로 끝낼 수도 있어요.',placement:'behind',animated:true,generative:true,fields:{color:color('색','#79d9ff'),width:numeric('두께',.35,.05,3,.05,'mm'),start:numeric('시작 크기',.05,0,1),end:numeric('끝 크기',.9,0,2),frequency:numeric('발생 빈도',1,.2,8,.1),count:{...count,value:3},life,fade:{...numeric('끝 사라짐',1,.2,4,.1),optional:true}}},
  particle:{name:'반짝이는 입자',placement:'behind',animated:true,generative:true,fields:{shape:choice('모양','star',[['star','별'],['snow','눈'],['dot','점']]),color:color('색','#fff3b6'),count,size:numeric('크기',.04,.005,.3,.005),spread:numeric('퍼짐',.7,0,2),life:{...life,value:3.5},direction}},
+ starlight:{name:'4각 별빛',hint:'네 방향으로 길게 뻗는 빛나는 별이에요. 반짝임을 0으로 하면 밝기를 고정하고, 회전은 따로 조절해요.',placement:'front',animated:true,generative:true,fields:{
+  color:color('빛 색','#b8dfff'),coreColor:color('중심 색','#ffffff'),count:numeric('개수',12,0,160,1),size:numeric('빛 크기',.12,0,2,.01,'대상 높이 비율'),rays:numeric('별 안쪽 두께',.22,.03,.65,.01),stretch:numeric('세로 길이',1.45,.25,4,.05,'배'),glow:numeric('빛 번짐',.65,0,2,.05),life:numeric('빛 수명',2.8,.1,30,.1,'초'),twinkle:numeric('반짝임 속도',1,0,4,.05,'회/초'),rotation:numeric('시작 회전',0,-180,180,5,'°'),spin:numeric('회전 속도',.1,-3,3,.05,'회전/초'),randomness:numeric('배치 변화',0,0,1,.05)
+ }},
  aura:{name:'오라·광선',placement:'behind',animated:true,generative:true,fields:{color:color('색','#b693ff'),length:numeric('광선 길이',.5,.05,2),count:{...count,value:20}}},
  sweep:{name:'빛 스윕',placement:'surface',animated:true,filter:true,fields:{color:color('색','#ffffff'),width:numeric('빛띠 폭',.3,.05,1),angle:numeric('각도',-25,-80,80,5,'°'),strength:numeric('강도',.8,0,1)}},
  pixelate:{name:'픽셀화',animated:false,filter:true,fields:{size:numeric('칸 크기',.6,.2,3,.1,'mm')}},
@@ -74,6 +78,7 @@ export const VISUAL_EFFECT_CATALOG={
  textWarp:{name:'글자 형태 왜곡',placement:'source',animated:false,textOnly:true,fields:{arc:numeric('아치',0,-1,1),wave:numeric('물결 높이',0,0,1),wavelength:numeric('물결 간격',.5,.1,2),skewDeg:numeric('기울임',0,-45,45,1,'°'),scaleX:numeric('가로 배율',1,.25,3),scaleY:numeric('세로 배율',1,.25,3)}}
 };
 export const VISUAL_EFFECT_PRESETS={
+ fourPointStarlight:{name:'4각 별빛 반짝임',category:'빛·움직임',layers:[{kind:'starlight',placement:'front',emit:{face:'area',openOnly:false},params:{color:'#86c9ff',coreColor:'#ffffff',count:12,size:.1,stretch:1.5,glow:.85,twinkle:1,spin:.04,randomness:0}}]},
  radiantBloom:{name:'눈부신 빛',category:'빛·움직임',layers:[{kind:'gradient',scope:'inside',params:{color:'#fffbea',color2:'#ffbb68'}},{kind:'outline',scope:'outside',opacity:.9,params:{color:'#79502b',width:.14}},{kind:'bloom',params:{threshold:.35,knee:.5,radius:1.5,strength:1.7,color:'#ffe6b0'}}]},
  luminousRunes:{name:'떠오르는 빛의 문양',category:'빛·움직임',layers:[{kind:'sprite',placement:'front',params:{shape:'rune',color:'#607db5',color2:'#9154b3',count:18,sizeStart:.12,sizeEnd:.22,travel:.9,life:3,spin:.12,randomness:0}},{kind:'bloom',params:{threshold:.3,radius:.7,strength:1.5}}]},
  lightStreak:{name:'빛의 잔상',category:'빛·움직임',layers:[{kind:'gradient',scope:'inside',params:{color:'#80b5de',color2:'#395d9e'}},{kind:'directionalBlur',opacity:.65,params:{distance:1.2,angle:-25,samples:11,strength:.75}},{kind:'bloom',params:{threshold:.4,radius:.7,strength:.7}}]},
@@ -93,7 +98,13 @@ export const VISUAL_EFFECT_PRESETS={
  flame:{name:'타오르는 불꽃',layers:[{kind:'flame'}]},
  smoke:{name:'피어오르는 연기',layers:[{kind:'smoke'}]},
  burning:{name:'불타는 카드',layers:[{kind:'smoke'},{kind:'flame'},{kind:'ember'}]},
- burningText:{name:'불타는 글자',layers:[{kind:'smoke'},{kind:'flame'}]},
+ burningText:{name:'불타며 이글거리는 글자',category:'글자·질감',layers:[
+  {kind:'gradient',params:{color:'#fff5b5',color2:'#f16c18',angle:90}},
+  {kind:'glow',params:{color:'#ff7f24',radius:.5,strength:.65}},
+  {kind:'flame',params:{count:60,height:.52,size:.075,width:.1,life:1.8}},
+  {kind:'ember',params:{count:14,size:.015,tail:.07}},
+  {kind:'displacement',params:{amount:.1,wavelength:2,axis:'x'}}
+ ]},
  frost:{name:'서리 오라',layers:[{kind:'aura',params:{color:'#70cfff'}},{kind:'particle',params:{color:'#659cbc',shape:'snow'},placement:'front'},{kind:'glow',scope:'outside',params:{color:'#85dfff'}}]},
  poison:{name:'독안개',layers:[{kind:'smoke',params:{color:'#9759cc'}},{kind:'mist',params:{color:'#ac6ed4'}},{kind:'glow',scope:'outside',params:{color:'#9a48de'}}]},
  lightningAura:{name:'번개 오라',layers:[{kind:'aura',params:{color:'#79beff'}},{kind:'lightning'},{kind:'glow',scope:'outside',params:{color:'#b0d8ff'}}]},
@@ -432,16 +443,18 @@ export function upgradeProjectVisualEffects(project){
   if(card.visualEffects!==undefined)card.visualEffects=upgradeVisualEffects(card.visualEffects,'frame');
   for(const element of card.elements)upgradeElement(element);
   for(const skill of [...(card.passives||[]),...(card.actives||[])])if(skill.nameStyle?.visualEffects!==undefined)skill.nameStyle.visualEffects=upgradeVisualEffects(skill.nameStyle.visualEffects,'text');
+  for(const owner of textRangeOwners(card))for(const ranges of Object.values(owner.textRanges||{}))for(const range of ranges)if(range.style?.visualEffects!==undefined)range.style.visualEffects=upgradeVisualEffects(range.style.visualEffects,'text');
  }
- for(const element of project.back?.elements||[])upgradeElement(element);
+ for(const element of project.back?.elements||[]){upgradeElement(element);for(const ranges of Object.values(element.textRanges||{}))for(const range of ranges)if(range.style?.visualEffects!==undefined)range.style.visualEffects=upgradeVisualEffects(range.style.visualEffects,'text');}
  for(const preset of project.visualEffectPresets||[])preset.recipe=upgradeVisualEffects(preset.recipe);
  return project;
 }
 
 export const getEffectFrameSec=project=>bounded(project.print?.effectFrameSec,0,Infinity)?project.print.effectFrameSec:1.2;
 export const hasEffectMotion=recipe=>!!recipe?.layers.some(layer=>layer.enabled&&layer.motion.enabled&&(VISUAL_EFFECT_CATALOG[layer.kind]?.animated||layer.kind==='textWarp'&&layer.params.wave>0));
-function effectTarget(project,{cardId,back=false,elementId=null,skillId=null},{write=false}={}){
+function effectTarget(project,{cardId,back=false,elementId=null,skillId=null,textRangeId=null},{write=false}={}){
  const card=back?project.back:project.cards.find(c=>c.id===cardId);if(!card)throw Error('이펙트를 적용할 카드를 찾을 수 없어요.');
+ if(textRangeId!==null){const selected=textRangeTarget(project,{cardId,back,elementId,textRangeId});return {card,owner:selected.range.style,type:'text'};}
  if(skillId!==null){
   const skill=!back&&[...(card.passives||[]),...(card.actives||[])].find(s=>s.id===skillId);if(!skill)throw Error('이펙트를 적용할 기술을 찾을 수 없어요.');
   if(write)skill.nameStyle??={};return {card,owner:skill.nameStyle||{},type:'text',skill};
@@ -452,14 +465,14 @@ function effectTarget(project,{cardId,back=false,elementId=null,skillId=null},{w
 }
 export function readTargetEffects(project,target){const selected=effectTarget(project,target);return upgradeVisualEffects(selected.owner.visualEffects||createVisualEffects(),selected.type);}
 export function writeTargetEffects(project,target,recipe){
- const selected=effectTarget(project,target,{write:true});selected.owner.visualEffects=upgradeVisualEffects(recipe,selected.type);if(target.elementId&&!target.skillId&&selected.card.kind)selected.card.template='custom';
+ const selected=effectTarget(project,target,{write:true});selected.owner.visualEffects=upgradeVisualEffects(recipe,selected.type);if(target.elementId&&!target.skillId&&!target.textRangeId&&selected.card.kind)selected.card.template='custom';
 }
 export function readTargetTextColor(project,target){const selected=effectTarget(project,target);return selected.type==='text'?selected.owner.color:undefined;}
 export function writeTargetTextColor(project,target,color){
  if(color!==undefined&&(typeof color!=='string'||!/^#[0-9a-f]{6}$/i.test(color)))throw Error('글자 색을 올바르게 선택하세요.');
  const selected=effectTarget(project,target,{write:true});if(selected.type!=='text')throw Error('글자 색은 텍스트에만 적용할 수 있어요.');
  if(color===undefined)delete selected.owner.color;else selected.owner.color=color;
- if(target.elementId&&!target.skillId&&selected.card.kind)selected.card.template='custom';
+ if(target.elementId&&!target.skillId&&!target.textRangeId&&selected.card.kind)selected.card.template='custom';
 }
 export function saveVisualEffectPreset(project,name,recipe,id=null){
  const label=typeof name==='string'?name.trim():'';if(!label||label.length>120||/[\r\n]/.test(label))throw Error('내 이펙트 이름을 1~120자로 입력하세요.');

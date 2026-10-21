@@ -12,20 +12,20 @@ export const SPRITE_CONTROL_FIELDS={
  mirror:choice('뒤집기','none',[['none','안 뒤집기'],['x','좌우'],['y','상하'],['both','좌우 + 상하']]),
  anchorX:{...numeric('가로 회전축',.5,0,1,.05,'%'),displayScale:100},anchorY:{...numeric('세로 회전축',.5,0,1,.05,'%'),displayScale:100},
  sheetColumns:numeric('시트 가로 칸',1,1,16,1),sheetRows:numeric('시트 세로 칸',1,1,16,1),
- frameMode:choice('프레임 재생','fixed',[['fixed','선택한 한 컷'],['life','수명에 맞춰 한 번'],['loop','계속 반복'],['pingpong','앞뒤로 반복']]),
+ frameMode:choice('프레임 재생','fixed',[['fixed','선택한 한 컷'],['random','소환마다 랜덤 한 컷'],['life','수명에 맞춰 한 번'],['loop','계속 반복'],['pingpong','앞뒤로 반복'],['randomLoop','랜덤 컷 계속 재생']]),
  frameStart:numeric('시작 프레임',0,0,255,1,'0부터'),frameCount:numeric('사용할 프레임 수',0,0,256,1,'0 = 남은 전체'),frameRate:numeric('프레임 속도',12,0,60,1,'컷/초')
 };
 for(const key of ['scaleX','scaleY','mirror','anchorX','anchorY'])SPRITE_CONTROL_FIELDS[key]=grouped('크기·회전 중심',SPRITE_CONTROL_FIELDS[key]);
 for(const key of ['sheetColumns','sheetRows','frameMode','frameStart','frameCount','frameRate'])SPRITE_CONTROL_FIELDS[key]=grouped('여러 컷 재생',SPRITE_CONTROL_FIELDS[key]);
 export const spriteControlDefaults=()=>Object.fromEntries(Object.entries(SPRITE_CONTROL_FIELDS).map(([key,field])=>[key,field.value]));
 export const SPRITE_CONTROL_HINT='한 장 고정 장식은 발생 영역의 중앙에 놓여요. 자르기는 원본을 바꾸지 않으며, 가로·세로 크기와 회전축은 따로 조절할 수 있어요.';
-export const SPRITE_SHEET_HINT='시트는 한 이미지에 여러 컷이 들어 있는 자료용이에요. 자른 영역을 가로·세로 칸으로 나누고 왼쪽 위부터 0번으로 읽어요. 프레임 수 0은 시작 컷부터 끝까지예요. 고정 장식의 수명 재생은 프레임 속도로 한 번 재생하고, 움직임을 끄면 시작 컷으로 고정돼요.';
+export const SPRITE_SHEET_HINT='한 이미지의 여러 컷을 가로·세로 칸으로 나누고 왼쪽 위부터 0번으로 읽어요. 프레임 수 0은 시작 컷부터 끝까지예요. 소환마다 랜덤 한 컷은 입자마다 다른 컷을 골라 유지하고, 랜덤 컷 계속 재생은 속도에 맞춰 바꿔요. 같은 시드와 시간의 결과는 항상 같아요. 고정 장식의 수명 재생은 속도에 맞춰 한 번 재생하고, 움직임을 끄면 한 컷으로 고정돼요.';
 const imageFields=new Set(['assetId','tint','cropLeft','cropRight','cropTop','cropBottom','sheetColumns','sheetRows','frameMode','frameStart','frameCount','frameRate']);
 const lifetimeFields=new Set(['color2','count','sizeEnd','alphaEnd','fadeIn','fadeOut','life','direction','travel','spread','drift','gravity','randomness']);
 export function isSpriteFieldVisible(key,params={}){
  if(imageFields.has(key)&&params.shape!=='image')return false;
  if(lifetimeFields.has(key)&&params.renderMode==='single')return false;
- if(key==='frameRate')return ['loop','pingpong'].includes(params.frameMode)||params.renderMode==='single'&&params.frameMode==='life';
+ if(key==='frameRate')return ['loop','pingpong','randomLoop'].includes(params.frameMode)||params.renderMode==='single'&&params.frameMode==='life';
  return true;
 }
 /** Cross-field checks complement the catalogue's individual number/enum checks. */

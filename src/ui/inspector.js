@@ -12,6 +12,8 @@ import {createVisualEffects,writeTargetEffects} from '../model/visual-effects.js
 import {textStyleFields} from './text-style-fields.js';
 import {renderElementAlignmentControls} from './element-alignment.js';
 import {renderObjectList} from './object-list.js';
+import {rangeTextField,textRangeControls} from './text-ranges.js';
+import {editText,remapTextRanges} from '../model/text-ranges.js';
 function group(title,...children){return el('section',{class:'inspector-group'},el('h3',{},title),children);}
 function attributeControls(card,editCard){
  const selectedAttributes=cardAttributes(card),item=card.kind==='item',label=item?'아이템에 부여한 속성':'몬스터 속성';
@@ -51,9 +53,13 @@ export function renderInspector(host,ctx){
  if(target){const objects=el('div',{class:'object-panel'});renderObjectList(objects,ctx);host.append(objects);}
  const editCard=(label,fn)=>ctx.edit(label,d=>{const c=d.cards.find(c=>c.id===ctx.state.activeCardId);if(!c)return;fn(c,d);});
  const set=(key,value)=>editCard('카드 '+key,(c,d)=>{c[key]=value;if(key==='effect')Object.assign(c,syncSkillElements(c,d.settings,d.keywords||[]));});
+ const cardTextChange=fn=>editCard('카드 글자 수정',(c,d)=>{fn(c,c);Object.assign(c,syncSkillElements(c,d.settings,d.keywords||[]));});
+ const boundId=(field,skillId)=>card?.elements.find(e=>e.binding?.field===field&&(e.binding.skillId||null)===(skillId||null))?.id;
  if(!ctx.state.back&&card){
   host.append(group('카드 정보',
-   field('카드 이름','card-name',card.name,v=>set('name',v)),
+   rangeTextField('카드 이름','card-name',card,'name',cardTextChange),
+   textRangeControls(ctx,{card,owner:card,field:'name',inputId:'card-name',elementId:boundId('name'),change:cardTextChange}),
+   keywordControls(ctx,card,cardTextChange,'card-name',{field:'name'}),
    boundTextControls(card,'name',null,editCard,p.settings.minFontPt,'card-name-style','카드 이름 글자 꾸미기'),
    field('인쇄 수량','card-quantity',card.quantity,v=>set('quantity',v),{type:'number',min:1,step:1})
   ));
@@ -79,11 +85,14 @@ export function renderInspector(host,ctx){
       el('div',{class:'skill-top'},el('span',{},label+' '+(index+1)),el('div',{class:'mini-actions'},
        button('↑',()=>reorder(-1),{'aria-label':'기술 위로',disabled:index===0}),
        button('↓',()=>reorder(1),{'aria-label':'기술 아래로',disabled:index===card[key].length-1}),
-       button('⧉',()=>editCard('기술 복제',c=>{const copy=clone(sk);copy.id=newId();remapSkillReferences(copy,id=>id===sk.id?copy.id:id,()=>newId());c[key].splice(index+1,0,copy);Object.assign(c,syncSkillElements(c,p.settings,p.keywords||[]));}),{'aria-label':'기술 복제'}),
+       button('⧉',()=>editCard('기술 복제',c=>{const copy=clone(sk);copy.id=newId();remapSkillReferences(copy,id=>id===sk.id?copy.id:id,()=>newId());remapTextRanges(copy,()=>newId());c[key].splice(index+1,0,copy);Object.assign(c,syncSkillElements(c,p.settings,p.keywords||[]));}),{'aria-label':'기술 복제'}),
        button('×',()=>editCard('기술 삭제',(c,d)=>{preserveSkillReferenceNames(c,sk.id,d);c[key].splice(index,1);Object.assign(c,syncSkillElements(c,p.settings,p.keywords||[]));}),{'aria-label':'기술 삭제'}))),
-      field('기술 이름','skill-'+sk.id+'-name',sk.name,v=>change(s=>s.name=v),{class:'skill-name'}),
+      rangeTextField('기술 이름','skill-'+sk.id+'-name',sk,'name',change,{class:'skill-name'}),
+      textRangeControls(ctx,{card,owner:sk,field:'name',inputId:'skill-'+sk.id+'-name',elementId:boundId('skill.name',sk.id),change}),
+      keywordControls(ctx,sk,change,'skill-'+sk.id+'-name',{field:'name'}),
       boundTextControls(card,'skill.name',sk.id,editCard,p.settings.minFontPt,'skill-'+sk.id+'-name-style','기술 이름 글자 꾸미기'),
       skillEffectField(card,sk,change,'skill-'+sk.id+'-effect',ctx.store),
+      textRangeControls(ctx,{card,owner:sk,field:'effect',inputId:'skill-'+sk.id+'-effect',elementId:boundId('skill.effect',sk.id),change}),
       boundTextControls(card,'skill.effect',sk.id,editCard,p.settings.minFontPt,'skill-'+sk.id+'-effect-style','효과 설명 글자 꾸미기'),
       skillReferenceControls(card,sk,change,'skill-'+sk.id+'-effect',ctx.store),
        button('스킬 이름만 이펙트',()=>ctx.openVisualEffects({cardId:card.id,back:false,skillId:sk.id,elementId:null}),{class:'skill-name-effects wide'}),
@@ -98,7 +107,7 @@ export function renderInspector(host,ctx){
     });
     host.append(group(label,list,button('+ '+label+' 추가',()=>editCard(label+' 추가',c=>{c[key].push({id:newId(),name:'새 '+label,effect:'',dice:null,keywords:[]});Object.assign(c,syncSkillElements(c,p.settings,p.keywords||[]));}),{id:key==='passives'?'add-passive':'add-active',class:'wide dashed'})));
    }
-  }else {host.append(group('아이템 효과',attributeControls(card,editCard),field('효과 설명','item-effect',card.effect,v=>set('effect',v),{textarea:true}),boundTextControls(card,'item.effect',null,editCard,p.settings.minFontPt,'item-effect-style','효과 설명 글자 꾸미기'),keywordControls(ctx,card,fn=>editCard('아이템 키워드',(c,d)=>{fn(c);Object.assign(c,syncSkillElements(c,d.settings,d.keywords||[]));}),'item-effect')));}
+  }else {host.append(group('아이템 효과',attributeControls(card,editCard),rangeTextField('효과 설명','item-effect',card,'effect',cardTextChange,{textarea:true}),textRangeControls(ctx,{card,owner:card,field:'effect',inputId:'item-effect',elementId:boundId('item.effect'),change:cardTextChange}),boundTextControls(card,'item.effect',null,editCard,p.settings.minFontPt,'item-effect-style','효과 설명 글자 꾸미기'),keywordControls(ctx,card,cardTextChange,'item-effect')));}
   host.append(group('시각 이펙트',button('선택한 대상 이펙트 만들기',()=>{
    const selected=card.elements.find(e=>e.id===ctx.state.selectedElementId&&['text','image','effect'].includes(e.type))||card.elements.find(e=>e.binding?.field==='name')||card.elements.find(e=>['text','image','effect'].includes(e.type));
    if(selected)ctx.openVisualEffects({cardId:card.id,back:false,elementId:selected.id});
@@ -111,7 +120,7 @@ export function renderInspector(host,ctx){
  if(selected){
   const update=(key,value)=>ctx.editTarget('요소 속성',t=>{
    const automatic=t.autoSkillLayout??t.template!=='custom',e=t.elements.find(e=>e.id===selected.id);
-   if(key.startsWith('rect.'))e.rect[key.slice(5)]=value;else if(key.startsWith('style.'))e.style[key.slice(6)]=value;else e[key]=value;
+   if(key==='content')editText(e,'content',value);else if(key.startsWith('rect.'))e.rect[key.slice(5)]=value;else if(key.startsWith('style.'))e.style[key.slice(6)]=value;else e[key]=value;
    if(t.kind){t.template='custom';t.autoSkillLayout=automatic;
     const bound=e.binding?.skillId||e.binding?.field?.startsWith('item.');
     if(bound&&key.startsWith('rect.'))t.autoSkillLayout=false;
@@ -120,7 +129,7 @@ export function renderInspector(host,ctx){
   });
   const body=[el('div',{class:'two-fields'},...['x','y','w','h'].map(k=>field(({x:'X 위치',y:'Y 위치',w:'가로',h:'세로'})[k]+' (mm)','element-'+k,selected.rect[k],v=>update('rect.'+k,v),{type:'number',step:.1,min:['w','h'].includes(k)?.1:undefined})))];
   body.push(el('p',{class:'hint'},'방향키 1px · Shift 10px (인쇄 300dpi 기준)'),renderElementAlignmentControls(ctx,selectedItems));
-  if(selected.type==='text'){if(!selected.binding)body.unshift(field('텍스트','element-content',selected.content||'',v=>update('content',v),{textarea:true}));else body.unshift(el('p',{class:'hint'},'카드 정보와 연결된 글자예요. 내용은 카드 정보에서 수정하세요.'));}
+  if(selected.type==='text'){if(!selected.binding){const change=fn=>ctx.editTarget('자유 글자 수정',t=>fn(t.elements.find(e=>e.id===selected.id)));body.unshift(rangeTextField('텍스트','element-content',selected,'content',change,{textarea:true}),textRangeControls(ctx,{card:target,owner:selected,field:'content',inputId:'element-content',elementId:selected.id,change,back:ctx.state.back}));}else body.unshift(el('p',{class:'hint'},'카드 정보와 연결된 글자예요. 내용은 카드 정보에서 수정하세요.'));}
   if(['rank','attribute','dice','keywords'].includes(selected.type))body.push(field('글자 크기 (pt)','element-font',selected.style.fontPt??9,v=>update('style.fontPt',Math.max(p.settings.minFontPt,v)),{type:'number',min:p.settings.minFontPt,step:.5}),field('글자 / 선 색','element-color',selected.style.color||'#253d32',v=>update('style.color',v),{type:'color'}));
   if(selected.type==='text')body.push(...textStyleFields(selected.style,(key,value)=>update('style.'+key,value),{idPrefix:'element',minFontPt:p.settings.minFontPt,includeColor:true}));
   if(selected.type==='image')body.push(el('label',{class:'check'},el('input',{id:'image-transparent',type:'checkbox',checked:!selected.style.fill||selected.style.fill==='transparent',onchange:e=>update('style.fill',e.target.checked?'transparent':'#eef0e8')}),'투명 배경 유지'));

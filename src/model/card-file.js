@@ -3,14 +3,15 @@ import {clone,newId} from './types.js';
 import {remapSkillReferences} from './skill-references.js';
 import {DEFAULT_BLEND_MODE} from './blend-modes.js';
 import {syncVariants} from './variants.js';
+import {textRangeOwners,remapTextRanges} from './text-ranges.js';
 
 export const cardNameKey=name=>String(name??'').normalize('NFC').trim();
 
 const FORMAT='card-print-studio-card';
 const skills=card=>[...(card.passives||[]),...(card.actives||[])];
-const keywordRefs=card=>[...(card.keywords||[]),...skills(card).flatMap(skill=>skill.keywords||[])];
+const keywordRefs=card=>[card,...skills(card)].flatMap(owner=>[...(owner.keywords||[]),...(owner.nameKeywords||[])]);
 function assetIds(card,keywords){
- const recipes=[card.visualEffects,card.nameStyle?.visualEffects,...card.elements.map(element=>element.style?.visualEffects),...skills(card).map(skill=>skill.nameStyle?.visualEffects)];
+ const recipes=[card.visualEffects,card.nameStyle?.visualEffects,...card.elements.map(element=>element.style?.visualEffects),...skills(card).map(skill=>skill.nameStyle?.visualEffects),...textRangeOwners(card).flatMap(owner=>Object.values(owner.textRanges||{}).flatMap(ranges=>ranges.map(range=>range.style?.visualEffects)))];
  const effectAssets=recipes.flatMap(recipe=>(recipe?.layers||[]).map(layer=>layer.params?.assetId));
  return new Set([card.artAssetId,...card.elements.map(element=>element.assetId),...keywords.map(keyword=>keyword.iconAssetId),...effectAssets].filter(Boolean));
 }
@@ -89,12 +90,13 @@ export function importCardFile(project,text,{replaceCardId=null}={}){
   const copy={...asset,id:assetMap.get(id),paintingId:asset.paintingId?paintingIds.get(asset.paintingId):null};importedAssets[copy.id]=copy;
  }
  for(const keyword of newKeywords)if(keyword.iconAssetId)keyword.iconAssetId=assetMap.get(keyword.iconAssetId);
- const mapKeywords=target=>{for(const ref of target.keywords||[])ref.keywordId=keywordIds.get(ref.keywordId);};
+ const mapKeywords=target=>{for(const ref of [...(target.keywords||[]),...(target.nameKeywords||[])])ref.keywordId=keywordIds.get(ref.keywordId);};
  const mapEffects=recipe=>{for(const layer of recipe?.layers||[]){layer.id=fresh();if(layer.params?.assetId)layer.params.assetId=assetMap.get(layer.params.assetId);}};
  card.id=fresh();if(card.artAssetId)card.artAssetId=assetMap.get(card.artAssetId);mapKeywords(card);mapEffects(card.visualEffects);mapEffects(card.nameStyle?.visualEffects);
  for(const skill of skills(card)){
   skill.id=mapSkill(skill.id);remapSkillReferences(skill,mapSkill,()=>fresh());mapKeywords(skill);mapEffects(skill.nameStyle?.visualEffects);
  }
+ for(const owner of textRangeOwners(card))remapTextRanges(owner,()=>fresh(),mapEffects);
  const sx=project.settings.cardWidthMm/source.settings.cardWidthMm,sy=project.settings.cardHeightMm/source.settings.cardHeightMm;
  for(const element of card.elements){
   element.id=fresh();if(element.binding?.skillId)element.binding.skillId=mapSkill(element.binding.skillId);

@@ -1,14 +1,14 @@
 // Kernels use straight byte color, with explicit premultiplication only for
 // sampling/compositing. CPU fallback remains the behavioral reference.
 export const simpleShaders={
- colorAdjust:`void main(){ivec2 p=ivec2(gl_FragCoord.xy);vec4 v=original(p);if(v.a>0.){vec3 c=vec3(dot(v.rgb,u0.xyz),dot(v.rgb,u1.xyz),dot(v.rgb,u2.xyz));float light=dot(c,vec3(.2126,.7152,.0722));v.rgb=(light+(c-light)*u3.x)*u3.y;}result=bytes(v);}`,
- posterize:`void main(){vec4 v=original(ivec2(gl_FragCoord.xy));if(v.a>0.)v.rgb=floor(v.rgb*u0.x/255.+.5)*255./u0.x;result=bytes(v);}`,
- halftone:`void main(){ivec2 p=ivec2(gl_FragCoord.xy);vec4 v=original(p);vec2 pos=vec2(p)+.5+u0.yz;vec2 uv=vec2(pos.x*u1.x+pos.y*u1.y,-pos.x*u1.y+pos.y*u1.x)/u0.x;vec2 q=(fract(uv)-.5)*u0.x;float radius=u0.x*.5*sqrt(max(0.,1.-dot(v.rgb,vec3(.2126,.7152,.0722))/255.));v.a*=clamp(radius+.5-length(q),0.,1.);result=bytes(v);}`,
- duotone:`void main(){vec4 v=original(ivec2(gl_FragCoord.xy));if(v.a>0.){float light=dot(v.rgb,vec3(.2126,.7152,.0722))/255.;v.rgb=mix(v.rgb,mix(u0.rgb,u1.rgb,light),u0.a);}result=bytes(v);}`,
- scanlines:`void main(){ivec2 p=ivec2(gl_FragCoord.xy);vec4 v=original(p);vec2 pos=(vec2(p)+.5)/u0.x+u1.xy;float axis=(-pos.x*u0.z+pos.y*u0.y)/u1.z+u1.w,edge=abs(fract(axis+.5)-.5)*u1.z;float coverage=u2.x>=u1.z?1.:clamp((min(u1.z,u2.x)*.5-edge)/u2.y+.5,0.,1.);if(v.a>0.)v.rgb=mix(v.rgb,u3.rgb,coverage*u2.z);result=bytes(v);}`,
+ colorAdjust:`void main(){ivec2 p=ivec2(pixelPosition());vec4 v=original(p);if(v.a>0.){vec3 c=vec3(dot(v.rgb,u0.xyz),dot(v.rgb,u1.xyz),dot(v.rgb,u2.xyz));float light=dot(c,vec3(.2126,.7152,.0722));v.rgb=(light+(c-light)*u3.x)*u3.y;}result=bytes(v);}`,
+ posterize:`void main(){vec4 v=original(ivec2(pixelPosition()));if(v.a>0.)v.rgb=floor(v.rgb*u0.x/255.+.5)*255./u0.x;result=bytes(v);}`,
+ halftone:`void main(){ivec2 p=ivec2(pixelPosition());vec4 v=original(p);vec2 pos=vec2(p)+.5+u0.yz;vec2 uv=vec2(pos.x*u1.x+pos.y*u1.y,-pos.x*u1.y+pos.y*u1.x)/u0.x;vec2 q=(fract(uv)-.5)*u0.x;float radius=u0.x*.5*sqrt(max(0.,1.-dot(v.rgb,vec3(.2126,.7152,.0722))/255.));v.a*=clamp(radius+.5-length(q),0.,1.);result=bytes(v);}`,
+ duotone:`void main(){vec4 v=original(ivec2(pixelPosition()));if(v.a>0.){float light=dot(v.rgb,vec3(.2126,.7152,.0722))/255.;v.rgb=mix(v.rgb,mix(u0.rgb,u1.rgb,light),u0.a);}result=bytes(v);}`,
+ scanlines:`void main(){ivec2 p=ivec2(pixelPosition());vec4 v=original(p);vec2 pos=(vec2(p)+.5)/u0.x+u1.xy;float axis=(-pos.x*u0.z+pos.y*u0.y)/u1.z+u1.w,edge=abs(fract(axis+.5)-.5)*u1.z;float coverage=u2.x>=u1.z?1.:clamp((min(u1.z,u2.x)*.5-edge)/u2.y+.5,0.,1.);if(v.a>0.)v.rgb=mix(v.rgb,u3.rgb,coverage*u2.z);result=bytes(v);}`,
  grain:`uint hash(ivec2 p){uint key=(uint(u2.x)<<16)|uint(u2.y);uint h=uint(p.x)*0x1f123bb5u^uint(p.y)*0x5f356495u^key;h^=h>>16;h*=0x7feb352du;h^=h>>15;h*=0x846ca68bu;h^=h>>16;return h;}
  float noise(ivec2 p){return float(hash(p))/4294967296.;}
- void main(){ivec2 p=ivec2(gl_FragCoord.xy);vec4 v=original(p);if(v.a>0.){vec2 x=texelFetch(auxiliary,ivec2(p.x,0),0).rg,y=texelFetch(auxiliary,ivec2(p.y,0),0).ba;ivec2 a=ivec2(x.x,y.x);vec2 f=vec2(x.y,y.y);float n=mix(mix(noise(a),noise(a+ivec2(1,0)),f.x),mix(noise(a+ivec2(0,1)),noise(a+ivec2(1)),f.x),f.y),value=(n*2.-1.)*100.*u1.z;v.rgb+=value;}result=bytes(v);}`,
+ void main(){ivec2 p=ivec2(pixelPosition());vec4 v=original(p);if(v.a>0.){vec2 x=texelFetch(auxiliary,ivec2(p.x,0),0).rg,y=texelFetch(auxiliary,ivec2(p.y,0),0).ba;ivec2 a=ivec2(x.x,y.x);vec2 f=vec2(x.y,y.y);float n=mix(mix(noise(a),noise(a+ivec2(1,0)),f.x),mix(noise(a+ivec2(0,1)),noise(a+ivec2(1)),f.x),f.y),value=(n*2.-1.)*100.*u1.z;v.rgb+=value;}result=bytes(v);}`,
  directionalBlur:`void main(){vec2 p=floor(gl_FragCoord.xy);vec4 base=premul(original(ivec2(p))),sum=vec4(0.);int count=int(u0.w);for(int i=0;i<count;i++){vec2 shift=(float(i)/float(count-1)-.5)*u0.xy;sum+=sampleAt(p-shift);}result=bytes(unassociate(base*(1.-u0.z)+sum*(u0.z/float(count))));}`,
  displacement:`void main(){ivec2 p=ivec2(gl_FragCoord.xy);vec2 shift=vec2(texelFetch(auxiliary,ivec2(p.y,0),0).r,texelFetch(auxiliary,ivec2(p.x,0),0).g);result=bytes(unassociate(sampleAt(vec2(p)-shift)));}`,
  glitch:`void main(){ivec2 p=ivec2(gl_FragCoord.xy);float shift=texelFetch(auxiliary,ivec2(p.y,0),0).r;result=bytes(unassociate(sampleAt(vec2(float(p.x)+shift,float(p.y)))));}`,
@@ -19,7 +19,7 @@ export const simpleShaders={
  float front=v.a/255.,back=side*u0.w*(1.-front),alpha=front+back;if(back>0.)v=vec4((v.rgb*front+u1.rgb*(1.-progress*.14)*back)/alpha,alpha*255.);result=bytes(v);}`,
  reflective:`float cycle(float x){int i=int(floor(fract(x)*2048.));return texelFetch(auxiliary,ivec2(i,0),0).a;}
  vec3 table(float x){return texelFetch(auxiliary,ivec2(int(floor(fract(x)*2048.)),0),0).rgb;}
- void main(){ivec2 p=ivec2(gl_FragCoord.xy);vec4 v=original(p);if(v.a<=0.){result=vec4(0.);return;}vec2 pos=u0.xy+vec2(p)/u0.z;float u=pos.x*u1.x+pos.y*u1.y,z=-pos.x*u1.y+pos.y*u1.x,light=dot(v.rgb,vec3(.2126,.7152,.0722))/255.,size=u0.w,time=u1.z,phase=u1.w;
+ void main(){ivec2 p=ivec2(pixelPosition());vec4 v=original(p);if(v.a<=0.){result=vec4(0.);return;}vec2 pos=u0.xy+vec2(p)/u0.z;float u=pos.x*u1.x+pos.y*u1.y,z=-pos.x*u1.y+pos.y*u1.x,light=dot(v.rgb,vec3(.2126,.7152,.0722))/255.,size=u0.w,time=u1.z,phase=u1.w;
  if(u2.y>0.){float band=fract(u/size+phase+.045*cycle(z/(size*2.))+time*.17),groove=.95+.05*cycle((z+u*.08)/.19),shade=(.66+.45*light)*groove;v.rgb=mix(v.rgb,table(band)*shade,u2.x);}
  else{float interference=u/size+.19*cycle(z/(size*.72)+phase)+phase+time*.13,wave=.5+.5*cycle((u-z*.65)/size*1.7+phase-time*.11),shine=max(0.,cycle((u*.61+z)/size*1.55+phase+time*.16)),square=shine*shine,flash=square*square*square*square*.82,shade=(.44+.6*wave)*(.64+.36*light);vec3 color=table(interference)*shade;v.rgb=mix(v.rgb,mix(color,vec3(255.),flash),u2.x);}result=bytes(v);}`
 };

@@ -1,5 +1,6 @@
 import {drawParticleGenerator} from './particle-generators.js';
 import {drawSpriteEmitter} from './sprite-emitter.js';
+import {drawStarlight} from './starlight.js';
 import {effectRandom,fract} from './random.js';
 import {unionBounds} from './masks.js';
 import {selectEmissionPoints} from './shape.js';
@@ -135,6 +136,8 @@ export function drawGenerator(ctx,layer,{rect,seed,timeSec=1.2,shape,edgePoints,
   const softness=height*.04*(p.softness??.8);
   if(softness)ctx.filter='blur('+softness*Math.hypot(ctx.getTransform().a,ctx.getTransform().b)+'px)';
   for(const m of particles){const texture=tint(getMistTexture(m.variant),p.color??'#b7d3d8','mist:'+m.variant+':'+p.color);if(sprite(ctx,texture,m.x,m.y,m.width,m.width*.45,m.rotation,m.alpha))include(m.x,m.y,m.width*.56+softness*3);}
+ }else if(layer.kind==='starlight'){
+  drawStarlight(ctx,layer,{time:t,height,point,random,include});
  }else if(layer.kind==='ember'||layer.kind==='particle'){
   const particles=[];
   for(let j=0;j<(p.count??40);j++){

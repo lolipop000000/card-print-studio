@@ -14,6 +14,28 @@ async function upload(page,file){
 }
 async function discard(page){await page.locator('#effect-close').click();await page.getByRole('button',{name:'변경 버리기',exact:true}).click();}
 
+test('sprite image editing preserves a full sheet, packs selected cells, and supports undo',async()=>{
+ const {browser,page,pageErrors,httpRequests}=await openApp();page.setDefaultTimeout(8000);try{
+  await page.locator('#card-frame-effects').click();await add(page,'sprite');await page.locator('#effect-param-shape').selectOption('image');const original=await upload(page,await image(page));
+  const start=Number(await page.locator('#effect-time').inputValue());await page.locator('#effect-play').click();await page.waitForFunction(start=>Number(document.getElementById('effect-time').value)>start+.3,start);await page.locator('#effect-play').click();
+  assert.equal(await page.locator('#effect-sprite-edit').count(),1,'Sprite editing controls must not multiply with preview frames');assert.equal(await page.locator('#effect-sprite-crop-sheet').count(),1);
+  await page.locator('#effect-sprite-sheet>summary').click();
+  for(const field of ['sheetColumns','sheetRows'])await fill(page,'#effect-param-'+field,2);
+  await page.locator('#effect-param-frameMode').selectOption('randomLoop');await fill(page,'#effect-param-frameRate',7);
+  await page.locator('#effect-sprite-edit').click();assert.equal(await page.locator('#crop-remove-background').isVisible(),true);await page.locator('#crop-save').click();
+  await page.waitForFunction(id=>document.getElementById('effect-param-assetId')?.value!==id,original);
+  assert.equal(await page.locator('#effect-param-sheetColumns').inputValue(),'2');assert.equal(await page.locator('#effect-param-frameMode').inputValue(),'randomLoop');
+  await page.locator('#effect-undo').click();assert.equal(await page.locator('#effect-param-assetId').inputValue(),original);
+  await page.locator('#effect-sprite-crop-sheet').click();assert.equal(await page.locator('#crop-grid-rows').inputValue(),'2');assert.equal(await page.locator('#crop-grid-columns').inputValue(),'2');
+  await page.locator('#crop-cell-1-1').click();await page.locator('#crop-save').click();await page.waitForFunction(id=>document.getElementById('effect-param-assetId')?.value!==id,original);
+  assert.equal(await page.locator('#effect-param-frameCount').inputValue(),'3');assert.equal(await page.locator('#effect-param-frameMode').inputValue(),'randomLoop');
+  await page.locator('#effect-apply').click();const saved=await saveProject(page,'sprite-image-edited.json'),layer=saved.cards[0].visualEffects.layers[0],asset=saved.assets[layer.params.assetId];
+  assert.notEqual(asset.id,original);assert.deepEqual([asset.width,asset.height,layer.params.sheetColumns,layer.params.sheetRows,layer.params.frameCount],[64,32,2,2,3]);
+  const emptyAlpha=await page.evaluate(async dataUrl=>{const img=new Image();img.src=dataUrl;await img.decode();const c=document.createElement('canvas');c.width=img.width;c.height=img.height;const g=c.getContext('2d');g.drawImage(img,0,0);const bytes=g.getImageData(32,16,32,16).data;return bytes.some((v,i)=>i%4===3&&v!==0);},asset.dataUrl);assert.equal(emptyAlpha,false);
+  assert.deepEqual(pageErrors,[]);assert.deepEqual(httpRequests,[]);
+ }finally{await browser.close();}
+});
+
 test('staged sprite images undo and redo without touching the project, and cancel discards imports',async()=>{
  const {browser,page,pageErrors,httpRequests}=await openApp();page.setDefaultTimeout(6000);try{
   const before=await saveProject(page,'sprite-import-before.json'),file=await image(page);await page.locator('#card-frame-effects').click();

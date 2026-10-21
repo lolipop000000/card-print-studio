@@ -31,6 +31,8 @@ import {createRecoveryControls} from './ui/recovery.js';
 import {createAssetLibraryControls} from './ui/asset-library.js';
 import {openImageCropper} from './ui/image-crop.js';
 import {placeImageAsset} from './model/asset-placement.js';
+import {textRangeOwners,remapTextRanges} from './model/text-ranges.js';
+import {mountMobileWorkspace} from './ui/mobile-workspace.js';
 
 export function mountEditor(root,store){
  let ignoreOutputWarnings=false;try{ignoreOutputWarnings=localStorage.getItem('card-print-studio:ignore-output-warnings:v1')==='true';}catch{}
@@ -144,6 +146,7 @@ export function mountEditor(root,store){
    for(const sk of [...c.passives||[],...c.actives||[]]){const previous=sk.id;sk.id=newId();mapping.set(previous,sk.id);}
    for(const sk of [...c.passives||[],...c.actives||[]])remapSkillReferences(sk,id=>mapping.get(id)??id,()=>newId());
    for(const e of c.elements){e.id=newId();if(e.binding?.skillId)e.binding.skillId=mapping.get(e.binding.skillId);}
+   for(const owner of textRangeOwners(c))remapTextRanges(owner,()=>newId());
    state.activeCardId=c.id;state.back=false;setElementSelection(state,[]);ctx.edit('카드 복제',d=>d.cards.push(c));
   },{id:'duplicate-card'}),button('카드 삭제',()=>{const id=state.activeCardId;ctx.edit('카드 삭제',d=>{d.cards=d.cards.filter(c=>c.id!==id);});setElementSelection(state,[]);refresh();},{id:'delete-card',class:'danger'})),
   el('div',{class:'library-bottom'},button('카드만 저장',()=>cardFiles.save(),{id:'save-card'}),button('카드 불러오기',()=>cardFiles.open(),{id:'load-card'})),
@@ -176,6 +179,9 @@ export function mountEditor(root,store){
  root.append(top,recovery.notice,el('div',{class:'workspace-grid'},sidebar,center,inspector),message,projectFile,artFile,cardFiles.input);
  const cardCanvas=mountCardCanvas(canvasHost,ctx);ctx.cardCanvas=cardCanvas;ctx.paperRoot=paperRoot;
  const paperView=mountPaperView(paperRoot,store);ctx.onPaper=()=>{if(state.mode==='paper')paperView.refresh();};
+ let phoneFitted=false;
+ const mobileWorkspace=mountMobileWorkspace(root,{onChange:()=>{refresh();if(mobileWorkspace.isPhone()&&mobileWorkspace.isPreviewVisible()&&!phoneFitted){cardCanvas.fit();phoneFitted=true;}}});
+ const phoneFitFrame=requestAnimationFrame(()=>{if(mobileWorkspace.isPhone()&&mobileWorkspace.isPreviewVisible()){cardCanvas.fit();phoneFitted=true;}});
  const fileDrop=mountJsonFileDrop(root,{getContext:()=>store.getProject(),onProject:importProjectFile,onCard:(file,isCurrent)=>cardFiles.importFile(file,isCurrent),onError:message=>showMessage(message)});
  ctx.addElement=type=>{
   const id=newId(),s=store.getProject().settings;
@@ -188,7 +194,7 @@ export function mountEditor(root,store){
   const ids=new Set(selected.map(e=>e.id));ctx.editTarget('요소 묶음 이동',t=>{const moved=t.elements.filter(e=>ids.has(e.id));for(const e of moved){e.rect.x+=delta.dx;e.rect.y+=delta.dy;}if(t.kind){t.template='custom';if(moved.some(e=>e.binding?.skillId||e.binding?.field?.startsWith('item.')))t.autoSkillLayout=false;}});
  };
  ctx.duplicateElement=()=>{
-  const selected=selectedElements(state,ctx.target());if(!selected.length)return;const delta=groupDelta(selected,2,2,store.getProject().settings),copies=selected.map(element=>{const copy=clone(element);copy.id=newId();copy.rect.x+=delta.dx;copy.rect.y+=delta.dy;return copy;});
+  const selected=selectedElements(state,ctx.target());if(!selected.length)return;const delta=groupDelta(selected,2,2,store.getProject().settings),copies=selected.map(element=>{const copy=clone(element);copy.id=newId();remapTextRanges(copy,()=>newId());copy.rect.x+=delta.dx;copy.rect.y+=delta.dy;return copy;});
   ctx.editTarget('요소 복제',t=>{t.elements.push(...copies);if(t.kind){t.template='custom';if(copies.some(e=>e.binding?.skillId||e.binding?.field?.startsWith('item.')))t.autoSkillLayout=false;}});setElementSelection(state,copies.map(e=>e.id),ctx.target());refresh();
  };
  ctx.deleteElement=()=>{
@@ -203,7 +209,7 @@ export function mountEditor(root,store){
   document.getElementById('undo').disabled=!store.canUndo();document.getElementById('redo').disabled=!store.canRedo();
   for(const [node,active] of [[cardTab,state.mode==='card'],[paperTab,state.mode==='paper'],[frontTab,!state.back],[backTab,state.back]]){node.classList.toggle('active',active);node.setAttribute('aria-pressed',active);}
   cardArea.hidden=state.mode!=='card';paperRoot.hidden=state.mode!=='paper';
-  cardCanvas.setActive(state.mode==='card'&&!state.paintOpen&&!state.effectOpen&&!document.querySelector('dialog[open]'));
+  cardCanvas.setActive(state.mode==='card'&&mobileWorkspace.isPreviewVisible()&&!state.paintOpen&&!state.effectOpen&&!document.querySelector('dialog[open]'));
   cardTemplates.refresh?.();cardLibrary.refresh();renderCards(cardList,ctx);ctx.renderInspector();cardCanvas.refresh();ctx.onPaper?.();
   const tick=++generation;loadAssets(p).then(cache=>{if(tick!==generation)return;ctx.assets=cache;ctx.refreshVisualEffects?.();renderCards(cardList,ctx);cardCanvas.refresh();ctx.onPaper?.();}).catch(e=>showMessage(e.message));
  }
@@ -220,7 +226,7 @@ export function mountEditor(root,store){
  const unload=event=>{if(store.isDirty()||document.querySelector('[data-paint-dirty="true"],[data-effect-dirty="true"]')){event.preventDefault();event.returnValue='';}};
  window.addEventListener('keydown',key);window.addEventListener('beforeunload',unload);
  refresh();root.dataset.ready='true';updates.checkAtStartup();
- return Object.assign(ctx,{getActiveCardId:()=>state.activeCardId,destroy(){assetLibrary.destroy();recovery.destroy();cardTemplates.destroy();cardLibrary.destroy();updates.destroy();fileDrop.destroy();cardFiles.destroy();workspaceFiles.destroy();ctx.closeVisualEffects?.({force:true});ctx.closeKeywords?.();unsubscribe();window.removeEventListener('keydown',key);window.removeEventListener('beforeunload',unload);cardCanvas.destroy();paperView.destroy();root.replaceChildren();}});
+ return Object.assign(ctx,{getActiveCardId:()=>state.activeCardId,destroy(){cancelAnimationFrame(phoneFitFrame);mobileWorkspace.destroy();assetLibrary.destroy();recovery.destroy();cardTemplates.destroy();cardLibrary.destroy();updates.destroy();fileDrop.destroy();cardFiles.destroy();workspaceFiles.destroy();ctx.closeVisualEffects?.({force:true});ctx.closeKeywords?.();unsubscribe();window.removeEventListener('keydown',key);window.removeEventListener('beforeunload',unload);cardCanvas.destroy();paperView.destroy();root.replaceChildren();}});
 }
 async function boot(){const root=document.getElementById('app');try{await ensureFont();const p=createProject();p.cards[0]=applyTemplate(p.cards[0],p.settings,'monster-standard');mountEditor(root,createStore(p,{prepare:d=>{d.cards=d.cards.map(c=>c.variant&&c.autoSkillLayout?syncSkillElements(c,d.settings,d.keywords||[]):c);}}));}catch(e){root.textContent='작업실을 열지 못했어요: '+e.message;}}
 boot();

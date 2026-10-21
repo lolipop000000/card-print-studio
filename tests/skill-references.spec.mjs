@@ -65,12 +65,14 @@ test('replacing a selected skill name with identical Korean composition unlinks 
 
 
 test('switching a keyword badge to inline inserts plain text outside skill reference labels',async()=>{
- const {browser,page}=await openApp();try{
+ const {browser,page,pageErrors}=await openApp();try{
  await skills(page);await insert(page);await page.locator('#keyword-manager').click();await page.locator('#keyword-add').click();await fill(page,'#keyword-name','강타');await page.locator('#keyword-close').click();
- await page.locator('#actives select[aria-label="추가할 키워드"]').selectOption({label:'강타'});await page.locator('#actives .keyword-add-badge').click();await fill(page,'#passives .skill-name','회오리');
+ assert.equal(await page.locator('#actives select[aria-label="추가할 키워드"]').count(),1,'the body picker remains distinct from the title picker');
+ await page.locator('#actives select[aria-label="추가할 키워드"]').selectOption({label:'강타'});await page.locator('#actives .keyword-add-badge').click();assert.deepEqual(pageErrors,[]);await fill(page,'#passives .skill-name','회오리');
  await page.locator('#actives .keyword-display').selectOption('inline');assert.equal(await page.locator('#actives .skill-effect').inputValue(),'다시 회오리 발동 강타');
  let p=await saveProject(page,'skill-references-keyword-inline.json');assert.deepEqual(p.cards[0].actives[0].skillReferences.map(r=>[r.start,r.end]),[[3,6]]);assert.equal(p.cards[0].actives[0].keywords[0].display,'inline');
  await page.locator('#actives .keyword-display').selectOption('badge');await page.locator('#actives .keyword-display').selectOption('inline');assert.equal(await page.locator('#actives .skill-effect').inputValue(),'다시 회오리 발동 강타');
+ assert.deepEqual(pageErrors,[]);
  }finally{await browser.close();}
 });
 

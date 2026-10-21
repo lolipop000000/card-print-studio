@@ -60,7 +60,9 @@ test('side, Shift corner and rotation handles update only the selected generator
   await page.locator('#effect-undo').click();await drag(page,'se',first.w*30*scale*.5,first.h*24*scale*.1,{shift:true});changed=await origin(page);near(changed.w,first.w*1.5,'Shift corner width');near(changed.h,first.h*1.5,'Shift preserves aspect');
   await page.locator('#effect-undo').click();const start=await handlePoint(page,'rotate'),canvas=await page.locator('#effect-preview').boundingBox(),scaleY=canvas.height/88;const pivot={x:canvas.x+(10+(first.x+first.w/2)*30)*scale,y:canvas.y+(15+(first.y+first.h/2)*24)*scaleY};
   const deltaMm={x:(start.x-pivot.x)/scale,y:(start.y-pivot.y)/scaleY};
-  await page.mouse.move(start.x,start.y);await page.mouse.down();await page.mouse.move(pivot.x-deltaMm.y*scale,pivot.y+deltaMm.x*scaleY,{steps:8});await page.mouse.up();near(Number(await page.locator('#effect-rotation').inputValue()),90,'rotation around origin centre');
+  await page.mouse.move(start.x,start.y);await page.mouse.down();await page.mouse.move(pivot.x-deltaMm.y*scale,pivot.y+deltaMm.x*scaleY,{steps:8});
+  const movingBox=await page.locator('#effect-preview').boundingBox();near(movingBox.height,canvas.height,'adaptive quality must keep the gesture display size stable');
+  await page.mouse.up();near(Number(await page.locator('#effect-rotation').inputValue()),90,'rotation around origin centre');
   await page.locator('#effect-apply').click();const applied=await save(page,'handles.json');assert.deepEqual(applied.cards[0].elements[0].style.visualEffects.layers[1],second);assert.deepEqual(errors,[]);
  }finally{await browser.close();}
 });

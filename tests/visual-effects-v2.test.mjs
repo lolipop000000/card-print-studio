@@ -29,7 +29,8 @@ function textElement(id,recipe){return {id,type:'text',rect:{x:4,y:4,w:40,h:10},
 test('new recipes are v2 with generator, filter and text-warp fields separated',()=>{
  const recipe=fx.createVisualEffects('burningText',{seed:27});
  assert.equal(recipe.version,2);assert.equal(recipe.seed,27);
- assert.deepEqual(recipe.layers.filter(l=>['flame','smoke'].includes(l.kind)).map(l=>[l.kind,l.placement,l.emit.face,l.emit.openOnly]),[['smoke','behind','up',true],['flame','behind','up',true]]);
+ assert.deepEqual(recipe.layers.filter(l=>['flame','smoke'].includes(l.kind)).map(l=>[l.kind,l.placement,l.emit.face,l.emit.openOnly]),[['flame','behind','up',true]]);
+ assert.ok(recipe.layers.some(l=>l.kind==='gradient'));assert.ok(recipe.layers.some(l=>l.kind==='displacement'));
  for(const [key] of Object.entries(fx.VISUAL_EFFECT_PRESETS))assert.deepEqual(fx.validateVisualEffects(fx.createVisualEffects(key),'any'),[],key);
  const generator=fx.makeVisualEffectLayer('flame'),filter=fx.makeVisualEffectLayer('pixelate'),warp=fx.makeVisualEffectLayer('textWarp');
  assert.equal(generator.placement,'behind');assert.equal(generator.protectText,true);assert.equal('scope' in generator,false);assert.equal('emitter' in generator,false);

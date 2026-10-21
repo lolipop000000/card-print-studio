@@ -118,6 +118,7 @@ export function mountEffectTransform({canvas,viewport,toolbar,scope,getState,onB
   event.preventDefault();event.stopPropagation();const amount=event.shiftKey?10:1;changeOnce((layer,g)=>nudgeEffectLayer(layer,g,direction[0]*amount,direction[1]*amount));
  }
  const blur=()=>finish(false),observer=new ResizeObserver(refresh);observer.observe(canvas);observer.observe(viewport);
+ viewport.addEventListener('touchviewportstart',blur);
  overlay.addEventListener('pointerdown',down);overlay.addEventListener('pointermove',move);overlay.addEventListener('pointerup',up);overlay.addEventListener('pointercancel',cancelled);overlay.addEventListener('lostpointercapture',cancelled);scope.addEventListener('keydown',keydown,true);window.addEventListener('blur',blur);window.addEventListener('resize',refresh);
- return {refresh,cancel:()=>finish(false),isDragging:()=>!!gesture,destroy(){if(destroyed)return;finish(false);destroyed=true;observer.disconnect();scope.removeEventListener('keydown',keydown,true);window.removeEventListener('blur',blur);window.removeEventListener('resize',refresh);overlay.remove();toggle.remove();alignment.remove();hint.remove();style.remove();}};
+ return {refresh,cancel:()=>finish(false),isDragging:()=>!!gesture,destroy(){if(destroyed)return;finish(false);destroyed=true;observer.disconnect();viewport.removeEventListener('touchviewportstart',blur);scope.removeEventListener('keydown',keydown,true);window.removeEventListener('blur',blur);window.removeEventListener('resize',refresh);overlay.remove();toggle.remove();alignment.remove();hint.remove();style.remove();}};
 }

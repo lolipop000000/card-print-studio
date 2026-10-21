@@ -6,6 +6,7 @@ import {valueLabel,cardProblemLabel} from './problem-details.js';
 import {isBlendMode} from './blend-modes.js';
 import {textStyleProblems} from './text-style.js';
 import {validateCardTemplates} from './card-templates.js';
+import {textBoundaries} from './text-ranges.js';
 export function createProject(){
   const p={format:'card-print-studio',version:1,name:'나의 카드 덱',
     settings:{cardWidthMm:63,cardHeightMm:88,maxWidthMm:63,maxHeightMm:88,minFontPt:7,rankRules:Object.fromEntries(RANKS.map((r,i)=>[r,{baseHp:[100,220,340,460][i],hpCap:null}]))},
@@ -79,6 +80,28 @@ export function validateProject(p){
       const assetId=layer?.params?.assetId;
       if(layer?.kind==='sprite'&&assetId!==null&&assetId!==undefined&&!assetRef(assetId))
         invalid('asset-reference',context+' · 커스텀 입자 레이어 '+(index+1)+' (ID '+valueLabel(layer.id)+')','그림 ID',assetId,'프로젝트 그림 자료에 존재하는 ID여야 합니다',extra);
+    }
+  };
+  const textRanges=(owner,fields,extra,context)=>{
+    if(owner.textRanges===undefined)return;
+    if(!object(owner.textRanges)){invalid('text-range',context,'글자 구간 목록',owner.textRanges,'텍스트 필드별 배열을 가진 객체여야 합니다',extra);return;}
+    for(const [field,ranges] of Object.entries(owner.textRanges)){
+      const location=context+' · '+field+' 글자 구간';
+      if(!fields.includes(field)){invalid('text-range',location,'텍스트 필드',field,fields.join(', ')+' 중 하나여야 합니다',extra);continue;}
+      if(!Array.isArray(ranges)){invalid('text-range',location,'구간 목록',ranges,'배열이어야 합니다',extra);continue;}
+      const text=typeof owner[field]==='string'?owner[field]:'',boundaries=new Set(textBoundaries(text));let end=0;
+      for(const [index,r] of ranges.entries()){
+        const label=location+' '+(index+1)+'번';
+        if(!object(r)){invalid('text-range',label,'구간',r,'ID, 시작·끝 위치, 스타일을 가진 객체여야 합니다',extra);continue;}
+        checkId(r.id,label,extra);
+        if(!Number.isInteger(r.start)||!Number.isInteger(r.end)||r.start<end||r.end<=r.start||r.end>text.length||!boundaries.has(r.start)||!boundaries.has(r.end))
+          invalid('text-range',label,'시작·끝 위치',[r.start,r.end],'0~'+text.length+' 범위의 문자 경계여야 하며 위치 순서대로 겹치지 않아야 합니다',extra);
+        if(Number.isInteger(r.end))end=r.end;
+        if(!object(r.style)){invalid('text-range',label,'글자 스타일',r.style,'스타일 객체여야 합니다',extra);continue;}
+        if(r.style.color!==undefined&&(typeof r.style.color!=='string'||!/^#[0-9a-f]{6}$/i.test(r.style.color)))invalid('text-range',label,'글자 색',r.style.color,'#RRGGBB 형식이어야 합니다',extra);
+        for(const problem of textStyleProblems(r.style))invalid('text-range',label,problem.label,problem.value,problem.rule,extra);
+        if(r.style.visualEffects!==undefined)effectRecipe(r.style.visualEffects,'text',extra,label);
+      }
     }
   };
   if(p.visualEffectPresets!==undefined&&!Array.isArray(p.visualEffectPresets))invalid('visual-effect-presets','','내 이펙트 목록',p.visualEffectPresets,'배열이어야 합니다');
@@ -165,6 +188,7 @@ export function validateProject(p){
       for(const problem of textStyleProblems(e.style))invalid(problem.key==='fontPt'?'font':'text-style',context,problem.label,problem.value,problem.rule,extra);
       if(!assetRef(e.assetId))invalid('asset-reference',context,'그림 ID',e.assetId,'프로젝트 그림 자료에 존재하는 ID여야 합니다',extra);
       if(e.content!==undefined&&typeof e.content!=='string')invalid('text',context,'요소 텍스트',e.content,'문자열이어야 합니다',extra);
+      textRanges(e,['content'],extra,context);
       if(e.binding!==null&&e.binding!==undefined){
         const binding=e.binding,fields=['name','hp','art','item.effect','skill.name','skill.effect','skill.dice','skill.keywords','item.keywords'];
         if(!object(binding))invalid('binding',context,'카드 정보 연결',binding,'field가 있는 연결 객체여야 합니다',extra);
@@ -185,6 +209,8 @@ export function validateProject(p){
     if(card.autoSkillLayout!==undefined&&typeof card.autoSkillLayout!=='boolean')invalid('card-info',context,'스킬 자동 배치',card.autoSkillLayout,'true 또는 false여야 합니다',extra);
     if(card.visualEffects!==undefined)effectRecipe(card.visualEffects,'frame',extra,context+' · 카드 테두리');
     keywordRefs(card.keywords,extra,context);
+    keywordRefs(card.nameKeywords,extra,context+' · 제목');
+    textRanges(card,card.kind==='item'?['name','effect']:['name'],extra,context);
     if(!assetRef(card.artAssetId))invalid('asset-reference',context,'카드 그림 ID',card.artAssetId,'프로젝트 그림 자료에 존재하는 ID여야 합니다',extra);
     if(['monster','item'].includes(card.kind)){
       const minimum=card.kind==='monster'?1:0,attributeCode=card.kind==='monster'?'monster-info':'item-info';
@@ -218,6 +244,7 @@ export function validateProject(p){
           if(typeof sk.name!=='string')invalid('skill',location,'스킬 이름',sk.name,'문자열이어야 합니다',detail);
           if(typeof sk.effect!=='string')invalid('skill',location,'스킬 효과',sk.effect,'문자열이어야 합니다',detail);
           dice(sk.dice,detail,location);keywordRefs(sk.keywords,detail,location);
+          keywordRefs(sk.nameKeywords,detail,location+' · 제목');textRanges(sk,['name','effect'],detail,location);
           if(sk.nameStyle!==undefined){
             if(!object(sk.nameStyle))invalid('skill-name-style',location,'이름 스타일',sk.nameStyle,'스타일 객체여야 합니다',detail);
             else {

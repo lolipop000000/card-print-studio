@@ -1,4 +1,5 @@
 import {clone} from './types.js';
+import {textRangeTarget} from './text-ranges.js';
 
 export const TEXT_STYLE_DEFAULTS=Object.freeze({fontPt:9,fontWeight:400,fontStyle:'normal',letterSpacingMm:0,lineHeight:1.22,align:'left',underline:false});
 export const TEXT_STYLE_KEYS=Object.freeze(Object.keys(TEXT_STYLE_DEFAULTS));
@@ -18,8 +19,9 @@ export function textStyleProblems(style){
  check('underline','밑줄',v=>typeof v==='boolean','true 또는 false여야 합니다');
  return problems;
 }
-function targetStyle(project,{cardId,back=false,elementId=null,skillId=null},{write=false}={}){
+function targetStyle(project,{cardId,back=false,elementId=null,skillId=null,textRangeId=null},{write=false}={}){
  const card=back?project.back:project.cards.find(c=>c.id===cardId);if(!card)throw Error('글자를 꾸밀 카드를 찾을 수 없어요.');
+ if(textRangeId!==null)return {card,owner:textRangeTarget(project,{cardId,back,elementId,textRangeId}).range.style,text:true};
  if(skillId!==null){
   const skill=!back&&[...(card.passives||[]),...(card.actives||[])].find(s=>s.id===skillId);if(!skill)throw Error('글자를 꾸밀 기술을 찾을 수 없어요.');
   if(write)skill.nameStyle??={};return {card,owner:skill.nameStyle||{},text:true};
@@ -36,6 +38,6 @@ export function writeTargetTextStyle(project,target,style){
  const problem=textStyleProblems(style)[0];if(problem)throw Error(problem.label+' 값이 올바르지 않습니다. '+problem.rule+'.');
  const selected=targetStyle(project,target,{write:true});if(!selected.text)throw Error('글자 꾸미기는 텍스트에만 적용할 수 있어요.');
  for(const key of TEXT_STYLE_KEYS){if(style[key]===undefined)delete selected.owner[key];else selected.owner[key]=clone(style[key]);}
- if(target.elementId&&!target.skillId&&selected.card.kind)selected.card.template='custom';
+ if(target.elementId&&!target.skillId&&!target.textRangeId&&selected.card.kind)selected.card.template='custom';
 }
 

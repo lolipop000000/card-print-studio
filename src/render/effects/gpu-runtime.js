@@ -13,10 +13,12 @@ precision highp sampler2DArray;
 uniform sampler2D image,source,auxiliary,mask;
 uniform sampler2DArray pyramid;
 uniform ivec2 size;
+uniform ivec2 pixelOrigin;
 uniform vec4 u0,u1,u2,u3,u4,u5,u6,u7;
 out vec4 result;
 vec4 get(ivec2 p){if(any(lessThan(p,ivec2(0)))||any(greaterThanEqual(p,size)))return vec4(0.);return texelFetch(image,p,0)*255.;}
-vec4 original(ivec2 p){if(any(lessThan(p,ivec2(0)))||any(greaterThanEqual(p,size)))return vec4(0.);return texelFetch(source,p,0)*255.;}
+vec2 pixelPosition(){return gl_FragCoord.xy+vec2(pixelOrigin);}
+vec4 original(ivec2 p){p-=pixelOrigin;if(any(lessThan(p,ivec2(0)))||any(greaterThanEqual(p,textureSize(source,0))))return vec4(0.);return texelFetch(source,p,0)*255.;}
 vec4 premul(vec4 v){return vec4(v.rgb*v.a/255.,v.a);}
 vec4 sampleAt(vec2 p){
  // Derive weights from the same rounded cell used by the fetches. On ANGLE,
@@ -76,7 +78,7 @@ function programFor(d,key,body){
   }
   program=gl.createProgram();if(!program)throw Error('program allocation');for(const s of shaders)gl.attachShader(program,s);gl.linkProgram(program);
   if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error('program link');
-  const value={program,uniforms:Object.fromEntries(['image','source','auxiliary','pyramid','mask','size',...Array.from({length:8},(_,i)=>'u'+i)].map(n=>[n,gl.getUniformLocation(program,n)]))};
+  const value={program,uniforms:Object.fromEntries(['image','source','auxiliary','pyramid','mask','size','pixelOrigin',...Array.from({length:8},(_,i)=>'u'+i)].map(n=>[n,gl.getUniformLocation(program,n)]))};
   if(d.programs.size>=PROGRAM_LIMIT){const oldest=d.programs.keys().next().value;gl.deleteProgram(d.programs.get(oldest).program);d.programs.delete(oldest);}
   d.programs.set(key,value);return value;
  }catch(e){if(program)gl.deleteProgram(program);throw e;}finally{for(const shader of shaders)gl.deleteShader(shader);}
@@ -93,7 +95,7 @@ function target(d,name,width,height,format){
 
 /** Input/output row order is unchanged. Byte uploads bypass browser color
  * conversion and Float32 intermediates retain low-alpha and morphology data. */
-export function runGpuEffect({kind,width,height,data,passes,aux=null,mask=null,levels=0}){
+export function runGpuEffect({kind,width,height,data,passes,aux=null,mask=null,levels=0,pixelOrigin=[0,0],sourceSize=null}){
  const d=device||createDevice();if(!d){status.reason=lost?'context-lost':unavailable;return null;}
  const bytes=width*height*(40+4*levels)+(aux?aux.width*aux.height*16:16)+(mask?width*height*4:4);
  if(width>d.limit||height>d.limit||aux&&(aux.width>d.limit||aux.height>d.limit)||bytes>LIMIT||levels>d.gl.getParameter(d.gl.MAX_ARRAY_TEXTURE_LAYERS)){status.reason='job-too-large';return null;}
@@ -115,7 +117,7 @@ export function runGpuEffect({kind,width,height,data,passes,aux=null,mask=null,l
   for(let i=0;i<passes.length;i++){
    const pass=passes[i],last=i===passes.length-1,next=last?output:target(d,'scratch'+(i%2),width,height,gl.RGBA32F),program=programFor(d,pass.key,pass.body),u=program.uniforms;
    gl.useProgram(program.program);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,current.texture);gl.bindFramebuffer(gl.FRAMEBUFFER,next.framebuffer);
-   gl.uniform1i(u.image,0);gl.uniform1i(u.source,1);gl.uniform1i(u.auxiliary,2);gl.uniform1i(u.pyramid,3);gl.uniform1i(u.mask,4);gl.uniform2i(u.size,width,height);
+   gl.uniform1i(u.image,0);gl.uniform1i(u.source,1);gl.uniform1i(u.auxiliary,2);gl.uniform1i(u.pyramid,3);gl.uniform1i(u.mask,4);gl.uniform2i(u.size,sourceSize?.[0]??width,sourceSize?.[1]??height);gl.uniform2i(u.pixelOrigin,...pixelOrigin);
    for(let j=0;j<8;j++)gl.uniform4fv(u['u'+j],pass.values?.['u'+j]||[0,0,0,0]);
    gl.drawArrays(gl.TRIANGLES,0,3);
    if(pass.saveLevel!==undefined){gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D_ARRAY,d.pyramid);gl.copyTexSubImage3D(gl.TEXTURE_2D_ARRAY,0,0,0,pass.saveLevel,0,0,width,height);}

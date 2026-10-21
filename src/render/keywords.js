@@ -67,6 +67,7 @@ function drawIcon(ctx,keyword,assets,x,y,size){
  ctx.drawImage(image,x+(size-width*scale)/2,y+(size-height*scale)/2,width*scale,height*scale);
 }
 const hasEffects=span=>span?.style.visualEffects?.layers.some(layer=>layer.enabled&&layer.opacity>0);
+const hasOwnColor=span=>span?.style.color!==undefined||hasEffects(span);
 const lineOffset=(line,rect,style)=>style.align==='center'?(rect.w-line.width)/2:style.align==='right'?rect.w-line.width:0;
 const itemColor=(item,style)=>item.nameSpan?.style.color||(item.reference?referenceColor:item.keyword?.color||style.color||'#233831');
 function lineParts(line){
@@ -79,14 +80,16 @@ export function layoutSkillNameRuns(layout,rect,style){
   if(!line.items)continue;
   for(const part of lineParts(line))if(part.span){
    const first=part.items[0],last=part.items.at(-1),x=rect.x+lineOffset(line,rect,style)+part.start+first.iconWidth+first.leftPad;
-   runs.push({id:part.span.id+':line:'+lineIndex,spanId:part.span.id,skillId:part.span.skillId,style:part.span.style,fontPt:Math.min(...part.items.map(item=>item.fontPt??layout.fontPt)),lineIndex,items:part.items,rect:{x,y:rect.y+line.yMm,w:Math.max(.01,rect.x+lineOffset(line,rect,style)+part.end-last.rightPad-x),h:line.heightMm}});
+   runs.push({id:part.span.id+':line:'+lineIndex,spanId:part.span.id,skillId:part.span.skillId,textRangeId:part.span.rangeId,style:part.span.style,fontPt:Math.min(...part.items.map(item=>item.fontPt??layout.fontPt)),lineIndex,items:part.items,rect:{x,y:rect.y+line.yMm,w:Math.max(.01,rect.x+lineOffset(line,rect,style)+part.end-last.rightPad-x),h:line.heightMm}});
   }
  }
  return runs;
 }
 const excluded=(span,lineIndex,excludeNameRun)=>span&&excludeNameRun?.spanId===span.id&&excludeNameRun.lineIndex===lineIndex;
 function drawLegacyPart(ctx,line,part,x,y,style,size,color){
- ctx.save();ctx.beginPath();ctx.rect(x+part.start,y-textLineHeight(size,style),Math.max(.001,part.end-part.start),textLineHeight(size,style)*3);ctx.clip();
+ // Glyph ink may extend beyond its advance at the end of a line.
+ const end=part.end>=line.width-.0001?part.end+size*PT_MM:part.end;
+ ctx.save();ctx.beginPath();ctx.rect(x+part.start,y-textLineHeight(size,style),Math.max(.001,end-part.start),textLineHeight(size,style)*3);ctx.clip();
  ctx.font=textFont(style,size);ctx.fillStyle=color;drawTextLine(ctx,line.legacyText,x,y,style,size);ctx.restore();
 }
 function drawItem(ctx,item,x,y,style,assets,{plainMask=false,icon=true}={}){
@@ -110,13 +113,13 @@ export function drawRichText(ctx,text,rect,style,min,keywords,assets,{plainMask=
   const offset=lineOffset(line,rect,style),y=rect.y+line.yMm;
   if(line.legacyText!==undefined){
    for(const part of lineParts(line)){
-    if((plainMask&&part.span)||(skipNameEffects&&hasEffects(part.span))||excluded(part.span,i,excludeNameRun))continue;
+    if((plainMask&&hasOwnColor(part.span))||(skipNameEffects&&hasEffects(part.span))||excluded(part.span,i,excludeNameRun))continue;
     drawLegacyPart(ctx,line,part,rect.x+offset,y,style,layout.fontPt,plainMask?'#ffffff':itemColor(part.items[0],style));
    }
    continue;
   }
   for(const item of line.items){
-   if(plainMask&&(item.keyword||item.reference||item.nameSpan)||excluded(item.nameSpan,i,excludeNameRun))continue;
+   if(plainMask&&(item.keyword||item.reference||hasOwnColor(item.nameSpan))||excluded(item.nameSpan,i,excludeNameRun))continue;
    const x=rect.x+offset+item.x;
    if(item.reference){
     ctx.fillStyle='#286fa812';ctx.fillRect(x,y+.05,item.width,line.heightMm-.1);

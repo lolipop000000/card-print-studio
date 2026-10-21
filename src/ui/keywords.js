@@ -1,11 +1,20 @@
 import {el,button,field,preserveFocus} from './dom.js';
 import {addKeyword,updateKeyword,removeKeyword,keywordUseCount,linkKeyword,insertKeywordText,inlineDisplay} from '../model/keywords.js';
 import {syncSkillElements} from '../render/templates.js';
-import {materializeSkillEffect,hasPlainSkillText} from '../model/skill-references.js';
+import {materializeSkillEffect,hasPlainSkillText,resolveSkillEffect,editSkillEffect} from '../model/skill-references.js';
+import {editText} from '../model/text-ranges.js';
 import {importAsset} from '../model/assets.js';
 import {newId} from '../model/types.js';
 import {openDialog} from './dialogs.js';
 const reflow=project=>{project.cards=project.cards.map(c=>syncSkillElements(c,project.settings,project.keywords||[]));};
+const editorStates=new WeakMap();
+function keywordState(ctx,target,field,text){
+ let states=editorStates.get(ctx.store);if(!states)editorStates.set(ctx.store,states=new Map());
+ const key=(ctx.store.getDocumentId?.()||'')+':'+target.id+':'+field;
+ let state=states.get(key);if(!state)states.set(key,state={keywordId:'',range:null,composing:false});
+ if(state.range?.text!==text)state.range=null;
+ return state;
+}
 function keywordMark(project,keyword){
  const asset=project.assets[keyword.iconAssetId];
  return el('span',{class:'keyword-mark',style:'--keyword-color:'+keyword.color},
@@ -59,9 +68,9 @@ export function openKeywordManager(ctx){
     asset?el('img',{id:'keyword-icon-preview',src:asset.dataUrl,alt:keyword.name+' 아이콘'}):el('p',{class:'hint'},'아이콘 없이 이름과 색만 사용해도 돼요.'),
     el('div',{class:'two-fields'},button(asset?'아이콘 교체':'아이콘 가져오기',()=>{selected=keyword.id;iconFile.click();}),button('보관함에서 선택',()=>chooseLibraryIcon(keyword.id),{id:'keyword-icon-library',disabled:pendingIcon||!ctx.openAssetLibrary}),button('아이콘 지우기',()=>change('iconAssetId',null),{disabled:!asset}))));
    const uses=keywordUseCount(p,keyword.id);
-   editor.append(el('p',{class:'hint'},'사용 중 '+uses+'곳 · 이름을 바꾸면 연결된 본문과 배지가 함께 바뀌어요.'),
+   editor.append(el('p',{class:'hint'},'사용 중 '+uses+'곳 · 이름을 바꾸면 연결된 이름·본문·배지가 함께 바뀌어요.'),
     button('삭제',async()=>{
-     const choice=await openDialog({title:'키워드를 삭제할까요?',message:uses+'곳의 키워드 연결과 표시를 해제해요. 작성한 효과 글은 남습니다.',choices:[{id:'delete',label:'키워드 삭제'},{id:'cancel',label:'취소'}]});
+     const choice=await openDialog({title:'키워드를 삭제할까요?',message:uses+'곳의 키워드 연결과 표시를 해제해요. 작성한 이름과 효과 글은 남습니다.',choices:[{id:'delete',label:'키워드 삭제'},{id:'cancel',label:'취소'}]});
      if(choice==='delete')edit('키워드 삭제',p=>removeKeyword(p,keyword.id));
     },{id:'keyword-delete',class:'danger wide'}));
   });
@@ -70,28 +79,56 @@ export function openKeywordManager(ctx){
  document.body.append(dialog);unsubscribe=ctx.store.subscribe(render);render();dialog.showModal();
  return close;
 }
-export function keywordControls(ctx,target,change,effectInputId){
- const p=ctx.store.getProject(),library=p.keywords||[];
- const host=el('div',{class:'skill-keywords'},el('p',{class:'keyword-label'},'키워드'));
+export function keywordControls(ctx,target,change,inputId,{field:textField='effect'}={}){
+ textField=textField==='name'||textField==='title'?'name':'effect';const title=textField==='name',refsKey=title?'nameKeywords':'keywords';
+ const p=ctx.store.getProject(),library=p.keywords||[],text=title?target.name||'':resolveSkillEffect(ctx.card(),target).text;
+ const state=keywordState(ctx,target,textField,text);
+ const host=el('div',{class:'skill-keywords'+(title?' title-keywords':''),'data-keyword-field':textField},el('p',{class:'keyword-label'},title?'이름 키워드':'키워드'));
  if(!library.length){host.append(button('키워드 만들기',()=>ctx.openKeywords(),{class:'wide subtle'}));return host;}
- const picker=el('select',{id:'keyword-picker-'+target.id,class:'skill-keyword-picker','aria-label':'추가할 키워드'},
+ if(!library.some(k=>k.id===state.keywordId))state.keywordId='';
+ const picker=el('select',{id:'keyword-picker-'+(title?'name-':'')+target.id,class:title?'title-keyword-picker':'skill-keyword-picker','aria-label':title?'이름에 넣을 키워드':'추가할 키워드'},
   el('option',{value:''},'키워드 선택'),...library.map(k=>el('option',{value:k.id},k.name)));
- const inline=button('본문에 넣기',()=>add('inline'),{class:'keyword-add-inline',disabled:true});
- const badge=button('배지 추가',()=>add('badge'),{class:'keyword-add-badge',disabled:true});
- picker.addEventListener('change',()=>{inline.disabled=badge.disabled=!picker.value;});
+ picker.value=state.keywordId;
+ const inline=button(title?'이름에 넣기':'본문에 넣기',()=>add('inline'),{class:title?'keyword-add-title wide':'keyword-add-inline',disabled:!picker.value});
+ const badge=title?null:button('배지 추가',()=>add('badge'),{class:'keyword-add-badge',disabled:!picker.value});
+ picker.addEventListener('change',()=>{state.keywordId=picker.value;inline.disabled=!picker.value;if(badge)badge.disabled=!picker.value;});
+ function remember(input){
+  if(!input?.isConnected||state.composing||input.dataset.composing==='true')return;
+  state.range={start:input.selectionStart,end:input.selectionEnd,direction:input.selectionDirection,text:input.value};
+ }
+ // Inputs are still being assembled when these controls are created. Track the
+ // completed field, keeping its selection separate from picker/button focus.
+ queueMicrotask(()=>{
+  const input=document.getElementById(inputId);if(!host.isConnected||!input)return;
+  state.composing=input.dataset.composing==='true';
+  for(const event of ['focus','blur','select','keyup','pointerup','input'])input.addEventListener(event,()=>remember(input));
+  input.addEventListener('compositionstart',()=>{state.composing=true;});
+  input.addEventListener('compositionend',()=>{state.composing=false;remember(input);});
+  if(document.activeElement===input)remember(input);
+  else if(state.range?.text===input.value)input.setSelectionRange(state.range.start,state.range.end,state.range.direction);
+ });
+ host.addEventListener('pointerdown',()=>{const input=document.getElementById(inputId);if(document.activeElement===input)remember(input);},{capture:true});
  function add(display){
   const keyword=library.find(k=>k.id===picker.value);if(!keyword)return;
-  const input=document.getElementById(effectInputId),start=input?.selectionStart??target.effect.length,end=input?.selectionEnd??start;
-  let caret;change(t=>{if(display==='inline')materializeSkillEffect(ctx.card(),t);linkKeyword(t,keyword.id,display);if(display==='inline')caret=insertKeywordText(t,keyword,start,end);});
-  if(caret!==undefined){const next=document.getElementById(effectInputId);next?.focus({preventScroll:true});next?.setSelectionRange(caret,caret);}
+  const input=document.getElementById(inputId);if(state.composing||input?.dataset.composing==='true')return;
+  const value=input?.value??text,range=state.range?.text===value?state.range:null,start=range?.start??input?.selectionStart??value.length,end=range?.end??input?.selectionEnd??start;
+  let caret;change((t,current)=>{
+   if(display==='inline'){
+    if(title){if(t.name!==value)editText(t,'name',value);}
+    else {materializeSkillEffect(current??ctx.card(),t);if(t.effect!==value)editSkillEffect(current??ctx.card(),t,value);}
+   }
+   linkKeyword(t,keyword.id,display,textField);
+   if(display==='inline'){caret=insertKeywordText(t,keyword,start,end,textField);state.range={start:caret,end:caret,direction:'none',text:t[textField]};}
+  });
+  if(caret!==undefined){const next=document.getElementById(inputId);next?.focus({preventScroll:true});next?.setSelectionRange(caret,caret);}
  }
- host.append(picker,el('div',{class:'two-fields'},inline,badge));
- for(const ref of target.keywords||[]){
+ host.append(picker,title?inline:el('div',{class:'two-fields'},inline,badge));
+ for(const ref of target[refsKey]||[]){
   const keyword=library.find(k=>k.id===ref.keywordId);if(!keyword)continue;
   host.append(el('div',{class:'keyword-reference'},
    el('div',{class:'keyword-reference-top'},keywordMark(p,keyword),
-    button('×',()=>change(t=>t.keywords=t.keywords.filter(r=>r.keywordId!==ref.keywordId)),{'aria-label':keyword.name+' 연결 해제',title:'연결 해제 · 본문 글은 유지'})),
-   field('카드 표시','keyword-display-'+target.id+'-'+ref.keywordId,ref.display,v=>change(t=>{
+    button('×',()=>change(t=>t[refsKey]=t[refsKey].filter(r=>r.keywordId!==ref.keywordId)),{'aria-label':keyword.name+(title?' 이름':'')+' 연결 해제',title:'연결 해제 · '+(title?'이름':'본문')+' 글은 유지'})),
+   title?null:field('카드 표시','keyword-display-'+target.id+'-'+ref.keywordId,ref.display,v=>change(t=>{
     const found=t.keywords.find(r=>r.keywordId===ref.keywordId);found.display=v;
     if(inlineDisplay(found)&&!hasPlainSkillText(t,keyword.name)){materializeSkillEffect(ctx.card(),t);insertKeywordText(t,keyword);}
    }),{class:'keyword-display',options:[['inline','본문 강조'],['badge','배지'],['both','본문 강조 + 배지']]}),

@@ -109,3 +109,59 @@ test('batch outputs have independent identities and unique names even when input
   });assert.deepEqual(result.names,['같은 이름','같은 이름-2']);assert.equal(new Set(result.ids).size,2);assert.ok(result.ids.every(id=>id!==result.sourceId));assert.deepEqual(e.errors,[]);
  }finally{await e.browser.close();}
 });
+
+async function openBackground(page,behavior='success'){
+ await page.evaluate(behavior=>{
+  const canvas=document.createElement('canvas');canvas.width=8;canvas.height=6;const g=canvas.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,8,6);g.fillStyle='#ff0000';g.fillRect(2,2,4,2);
+  window.cropSource={id:'source',mime:'image/png',dataUrl:canvas.toDataURL(),width:8,height:6,paintingId:'original-art'};window.cropBefore=JSON.stringify(window.cropSource);window.cropResult='pending';window.backgroundCalls=0;window.backgroundAborted=false;
+  const removeBackground=async(image,{signal,onProgress})=>{
+   window.backgroundCalls++;onProgress({stage:'segment',progress:.5,message:'사람·물체를 찾고 있습니다…'});
+   if(behavior==='failure'&&window.backgroundCalls===1)throw new Error('처리 도구를 불러오지 못했습니다. 다시 시도하세요.');
+   if(behavior==='pending')await new Promise((resolve,reject)=>signal.addEventListener('abort',()=>{window.backgroundAborted=true;reject(new DOMException('취소됨','AbortError'));},{once:true}));
+   const result=document.createElement('canvas');result.width=8;result.height=6;const ctx=result.getContext('2d');ctx.drawImage(image,0,0);ctx.clearRect(0,0,8,2);ctx.clearRect(0,4,8,2);return result;
+  };
+  window.cropTest.openImageCropper({asset:window.cropSource,name:'누끼 그림',removeBackground}).then(result=>{window.cropResult=result;});
+ },behavior);await page.locator('#image-cropper').waitFor();
+}
+async function outputPixels(page){
+ return page.evaluate(async()=>{
+  const asset=window.cropResult[0].asset,image=new Image();image.src=asset.dataUrl;await image.decode();const canvas=document.createElement('canvas');canvas.width=asset.width;canvas.height=asset.height;const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);
+  return {corner:[...ctx.getImageData(0,0,1,1).data],subject:[...ctx.getImageData(3,2,1,1).data],size:[asset.width,asset.height],changedId:asset.id!==window.cropSource.id,unchanged:JSON.stringify(window.cropSource)===window.cropBefore};
+ });
+}
+
+test('foreground processing previews and saves a separate transparent PNG without editing the original asset',async()=>{
+ const e=await start();try{const {page}=e;await openBackground(page);await page.locator('#crop-remove-background').click();await page.waitForFunction(()=>document.querySelector('#crop-background-reset')?.disabled===false);
+  assert.match(await page.locator('#crop-status').innerText(),/배경|투명/);await page.locator('#crop-save').click();await page.waitForFunction(()=>Array.isArray(window.cropResult));
+  assert.deepEqual(await outputPixels(page),{corner:[0,0,0,0],subject:[255,0,0,255],size:[8,6],changedId:true,unchanged:true});assert.deepEqual(e.errors,[]);
+ }finally{await e.browser.close();}
+});
+
+test('restoring the original after foreground processing saves the untouched source pixels',async()=>{
+ const e=await start();try{const {page}=e;await openBackground(page);await page.locator('#crop-remove-background').click();await page.waitForFunction(()=>document.querySelector('#crop-background-reset')?.disabled===false);
+  await page.locator('#crop-background-reset').click();assert.equal(await page.locator('#crop-background-reset').isDisabled(),true);await page.locator('#crop-save').click();await page.waitForFunction(()=>Array.isArray(window.cropResult));
+  const output=await outputPixels(page);assert.deepEqual(output.corner,[255,255,255,255]);assert.deepEqual(output.subject,[255,0,0,255]);assert.equal(output.unchanged,true);assert.deepEqual(e.errors,[]);
+ }finally{await e.browser.close();}
+});
+
+test('failed foreground processing retains the current preview and can be retried in the same dialog',async()=>{
+ const e=await start();try{const {page}=e;await openBackground(page,'failure');await page.locator('#crop-remove-background').click();await page.waitForFunction(()=>document.querySelector('#crop-status')?.dataset.kind==='error');
+  assert.match(await page.locator('#crop-status').innerText(),/다시 시도/);assert.equal(await page.locator('#crop-save').isEnabled(),true);assert.equal(await page.locator('#crop-background-reset').isDisabled(),true);
+  await page.locator('#crop-remove-background').click();await page.waitForFunction(()=>document.querySelector('#crop-background-reset')?.disabled===false);assert.equal(await page.evaluate(()=>window.backgroundCalls),2);await page.locator('#crop-cancel').click();assert.deepEqual(e.errors,[]);
+ }finally{await e.browser.close();}
+});
+
+test('closing an in-progress foreground operation aborts it and discards unfinished work',async()=>{
+ const e=await start();try{const {page}=e;await openBackground(page,'pending');await page.locator('#crop-remove-background').click();await page.waitForFunction(()=>window.backgroundCalls===1);
+  assert.equal(await page.locator('#crop-save').isDisabled(),true);assert.match(await page.locator('#crop-status').innerText(),/사람·물체/);await page.locator('#crop-cancel').click();await page.waitForFunction(()=>window.cropResult===null&&window.backgroundAborted);
+  assert.equal(await page.locator('#image-cropper').count(),0);assert.equal(await page.evaluate(()=>JSON.stringify(window.cropSource)===window.cropBefore),true);assert.deepEqual(e.errors,[]);
+ }finally{await e.browser.close();}
+});
+
+test('sheet shortcuts open the selected grid immediately with the supplied row and column counts',async()=>{
+ const e=await start();try{const {page}=e;await open(page,12,8);await page.locator('#crop-cancel').click();
+  await page.evaluate(()=>{window.cropResult='pending';window.cropTest.openImageCropper({asset:window.cropSource,name:'시트',initialMode:'grid',initialGrid:{rows:2,columns:3}}).then(result=>{window.cropResult=result;});});await page.locator('#image-cropper').waitFor();
+  assert.equal(await page.locator('#crop-mode-grid').getAttribute('aria-pressed'),'true');assert.equal(await page.locator('.image-crop-cell').count(),6);await page.locator('#crop-save').click();await page.waitForFunction(()=>Array.isArray(window.cropResult));
+  assert.deepEqual(await page.evaluate(()=>window.cropResult.map(result=>[result.asset.width,result.asset.height])),Array(6).fill([4,4]));assert.deepEqual(e.errors,[]);
+ }finally{await e.browser.close();}
+});
