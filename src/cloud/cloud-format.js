@@ -12,6 +12,7 @@ function slots(data,library=false){
  else{
   for(const value of Object.values(data?.assets??{}))asset(value);
   for(const drawing of Object.values(data?.paintings??{}))for(const layer of drawing?.layers??[])result.push([layer,'png','image/png']);
+  for(const template of data?.cardTemplates??[])result.push(...slots(template));
  }
  return result;
 }
@@ -57,7 +58,7 @@ export function collectBlobRefs(value){
  while(pending.length){
   const item=pending.pop();
   if(typeof item==='string'){const match=refPattern.exec(item);if(match)refs.add(match[1]);}
-  else if(item&&typeof item==='object'&&!seen.has(item)){seen.add(item);pending.push(...Object.values(item));}
+  else if(item&&typeof item==='object'&&!seen.has(item)){seen.add(item);for(const child of Object.values(item))pending.push(child);}
  }
  return [...refs].sort();
 }

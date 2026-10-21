@@ -58,3 +58,10 @@ test('round trips an independent library entry without changing its metadata',as
  assert.equal(JSON.stringify(await fromCloudLibraryEntry(data,async hash=>blobs.get(hash).bytes)),before);
  assert.equal(JSON.stringify(entry),before);
 });
+test('saved card templates also store and restore their independent artwork',async()=>{
+ const p=fixture();p.cardTemplates=[{id:'saved',assets:{art:structuredClone(p.assets.art)},paintings:structuredClone(p.paintings)}];
+ const {data,blobs}=await toCloudProject(p);
+ assert.ok(!JSON.stringify(data).includes('data:image'));
+ assert.equal(cloudProjectForValidation(data).cardTemplates[0].assets.art.dataUrl,'data:image/png;base64,AAAA');
+ assert.equal(JSON.stringify(await fromCloudProject(data,async hash=>blobs.get(hash).bytes)),JSON.stringify(p));
+});
