@@ -167,6 +167,7 @@ export function mountEditor(root,store){
   el('div',{id:'card-warnings',class:'card-warnings'}),
   el('div',{class:'card-effect-transport'},
    button('재생',()=>{},{id:'card-effect-play','aria-pressed':false}),
+   button('고화질 6초 보기',()=>{},{id:'card-effect-prerender'}),
    el('input',{id:'card-effect-time',type:'range',min:0,max:6,step:.01,value:1.2,'aria-label':'카드 미리보기 시간 (초)'}),
    el('output',{id:'card-effect-seconds',htmlFor:'card-effect-time'},'1.20초'),
    button('현재 장면을 인쇄 프레임으로',()=>{},{id:'card-effect-freeze'}),

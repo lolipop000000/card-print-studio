@@ -113,8 +113,6 @@ function drawCard(ctx,project,target,assets,dpi,{timeSec=getEffectFrameSec(proje
   for(const entry of geometry)emitGeometry(entry);
   for(const entry of report.nestedNameGeometry||[])emitGeometry(entry);
   const reportedProblems=[...report.problems.map(problem=>({...problem,...(skillId?{skillId}:{})})),...(report.nestedNameProblems||[])];
-  const b=report.boundsMm;
-  if(b&&(b.x<-.05||b.y<-.05||b.x+b.w>w+.05||b.y+b.h>h+.05))reportedProblems.push({code:'effect-clipped',message:'이펙트가 카드 가장자리에서 잘립니다. 영역이나 효과 크기를 조절할 수 있어요.',severity:'warning',...(skillId?{skillId}:{})});
   for(const problem of reportedProblems)issue(problem.code,problem.message,e,problem.severity,problem.skillId);
   return {...report,reportedProblems,effectGeometry};
  };

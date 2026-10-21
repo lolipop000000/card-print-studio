@@ -50,7 +50,7 @@ test('cached image effects follow replacement pixels and default rendering uses 
  }finally{await browser.close();}
 });
 
-test('offscreen warped text keeps its clipping warning while decoded transparent pixels and empty text stay empty',async()=>{
+test('offscreen effects are clipped silently while decoded transparent pixels and empty text stay empty',async()=>{
  const {browser,page,pageErrors}=await openHarness();try{
   const r=await page.evaluate(async()=>{
    const a=window.testApi;await a.ensureFont();const p=a.createProject(),assets=new Map(),canvas=document.createElement('canvas'),ctx=canvas.getContext('2d',{willReadFrequently:true});
@@ -74,8 +74,8 @@ test('offscreen warped text keeps its clipping warning while decoded transparent
    }
    return {views,preflight,controls,decodedSize:[decoded.naturalWidth,decoded.naturalHeight]};
   });
-  for(const v of r.views){assert.equal(v.inkGone,true,'the scaled glyph is entirely outside the working raster');assert.ok(v.report.problems.some(p=>p.code==='effect-clipped'&&p.severity==='warning'),v.dpi+' DPI must warn about fully discarded text');assert.ok(!v.report.problems.some(p=>p.severity!=='warning'));}
-  assert.ok(r.preflight.some(p=>p.code==='effect-clipped'&&p.severity==='warning'));
+  for(const v of r.views){assert.equal(v.inkGone,true,'the scaled glyph is entirely outside the working raster');assert.ok(!v.report.problems.some(p=>p.code==='effect-clipped'),v.dpi+' DPI must silently clip effects');assert.ok(!v.report.problems.some(p=>p.severity!=='warning'));}
+  assert.ok(!r.preflight.some(p=>p.code==='effect-clipped'));
   assert.deepEqual(r.decodedSize,[1,1]);
   for(const v of r.controls){assert.equal(v.unchanged,true,v.type);assert.deepEqual(v.report.problems,[],v.type);}
   assert.deepEqual(pageErrors,[]);

@@ -62,7 +62,7 @@ test('playing preview exports the identical saved frame into real A4 duplex PDF 
   await load(page,p);const saved=await saveProject(page,'visual-effects-print-project.json');assert.deepEqual(saved.assets,p.assets);assert.deepEqual(saved.paintings,p.paintings);
   await page.locator('#paper-tab').click();await page.waitForFunction(()=>document.querySelectorAll('.paper-cell img').length===20);
   const paperDpi=Number(await page.locator('.paper-cell img').first().getAttribute('data-preview-dpi'));assert.ok(paperDpi>=200,'paper preview matches its current display resolution');
-  const r=await references(saved,paperDpi);assert.equal(r.transparent,0);assert.ok(r.reports.some(p=>p.code==='effect-clipped'));assert.ok(!r.reports.some(p=>p.severity!=='warning'));
+  const r=await references(saved,paperDpi);assert.equal(r.transparent,0);assert.ok(!r.reports.some(p=>p.code==='effect-clipped'));assert.ok(!r.reports.some(p=>p.severity!=='warning'));
   for(const [key,data] of Object.entries(r.refs))await writeFile(path.join(qa,'effects-ref-'+key+'.png'),Buffer.from(data.split(',')[1],'base64'));
   const manifest={pages:r.plan.pages.map(page=>({...page,cells:page.cells.filter(c=>c.cardId).map(c=>({...c,reference:'effects-ref-'+(page.side==='back'?'back':c.cardId)+'.png'}))}))};
   await writeFile(path.join(qa,'effects-references.json'),JSON.stringify(manifest,null,2));

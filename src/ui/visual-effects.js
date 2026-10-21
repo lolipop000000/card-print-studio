@@ -20,6 +20,7 @@ import {getTextRanges,textFieldForElement} from '../model/text-ranges.js';
 import {resolveSkillEffect} from '../model/skill-references.js';
 import {openImageCropper} from './image-crop.js';
 import {packSpriteSheet} from '../model/sprite-sheet.js';
+import {openEffectVideo} from './effect-video.js';
 
 function targetLabel(card,e,index){
  const b=e.binding;
@@ -59,6 +60,7 @@ export function openVisualEffectsEditor(ctx,initialTarget){
  const imageFile=el('input',{id:'effect-sprite-file',type:'file',hidden:true,accept:'image/png,image/jpeg,image/webp',onchange:importSpriteImage});
  let target={...initialTarget},targetType,currentKey,textColor,textStyle,recipe,selected,savedId=null,presetName='',draftFrame=initialFrame,disposed=false,confirming=false,confirmation=null,previewProject,previewTarget,comparisonProject,comparisonTarget,comparing=false,unsubscribe,timer,librarySearch='',libraryCategory='all',libraryComposing=false,transform,previewView,lastDpi=0,renderGeometry=null;
  const cache=createEffectCache(),dialog=el('dialog',{id:'effect-editor',class:'effect-dialog','aria-labelledby':'effect-title'});
+ let closeVideo=null;
  const library=el('aside',{class:'effect-library'}),fields=el('aside',{class:'effect-controls'}),canvas=el('canvas',{id:'effect-preview','aria-label':'선택한 대상과 카드의 이펙트 미리보기'});
  const feedback=el('p',{id:'effect-feedback',class:'effect-feedback',role:'status',hidden:true});
  const status=el('span',{id:'effect-preview-status',role:'status','data-busy':'false'},'미리보기');
@@ -325,7 +327,7 @@ export function openVisualEffectsEditor(ctx,initialTarget){
   for(const sample of library.querySelectorAll('[data-sample-key]')){if(sampleCache.has(sample.dataset.sampleKey))paintSample(sample);else sampleObserver.observe(sample);}
  }
  function cleanup(){
-  if(disposed)return;disposed=true;previewView?.destroy();transform?.destroy();past.length=0;future.length=0;clearTimeout(timer);timeline.destroy();cache.clear();sampleObserver.disconnect();sampleCache.clear();stagedAssets.clear();stagedImages.clear();assetNames.clear();previewAssets.clear();unsubscribe?.();if(ctx.refreshVisualEffects===draw)ctx.refreshVisualEffects=null;document.removeEventListener('visibilitychange',visibility);document.removeEventListener('pointerup',releaseComparison);window.removeEventListener('blur',releaseComparison);
+  if(disposed)return;disposed=true;closeVideo?.();previewView?.destroy();transform?.destroy();past.length=0;future.length=0;clearTimeout(timer);timeline.destroy();cache.clear();sampleObserver.disconnect();sampleCache.clear();stagedAssets.clear();stagedImages.clear();assetNames.clear();previewAssets.clear();unsubscribe?.();if(ctx.refreshVisualEffects===draw)ctx.refreshVisualEffects=null;document.removeEventListener('visibilitychange',visibility);document.removeEventListener('pointerup',releaseComparison);window.removeEventListener('blur',releaseComparison);
   confirmation?.dispatchEvent(new Event('cancel',{cancelable:true}));confirmation=null;
   if(dialog.open)dialog.close();dialog.remove();ctx.onEffectsClosed?.();
  }
@@ -340,6 +342,7 @@ export function openVisualEffectsEditor(ctx,initialTarget){
  }
  function visibility(){timeline.setActive(!document.hidden&&dialog.open);updateTransport();}
  const transport=el('div',{class:'effect-transport'},play,el('label',{class:'check'},selectedPlayback,'선택 대상만 재생'),time,timeLabel,
+  button('고화질 6초 보기',()=>{pendingControl()?.blur();timeline.pause();releaseComparison();prepare();updateTransport();closeVideo?.();closeVideo=openEffectVideo({project:previewProject,target:previewTarget,assets:previewAssets,startTimeSec:timeline.getTime(),playbackTarget:selectedPlayback.checked?target:null,frozenTimeSec:draftFrame,onClose:()=>{closeVideo=null;}});},{id:'effect-prerender'}),
   button('장면 고정',()=>{timeline.pause();editDraft(()=>draftFrame=Math.round(timeline.getTime()*100)/100);timeline.seek(draftFrame);updateTransport();},{id:'effect-freeze',title:'현재 장면을 인쇄 프레임으로'}),
   button('인쇄 장면',()=>{timeline.pause();timeline.seek(draftFrame);updateTransport();},{id:'effect-print-frame'}),frameLabel);
  dialog.append(imageFile,
