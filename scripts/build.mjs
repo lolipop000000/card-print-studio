@@ -5,7 +5,8 @@ import path from 'node:path';
 import {buildCsp} from './csp.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url)),read=(f)=>readFile(path.join(root,f),'utf8');
 const release=JSON.parse(await read('release.json')),pkg=JSON.parse(await read('package.json'));
-const cloud=JSON.parse(await read('cloud.json'));
+const cloud=JSON.parse(await readFile(process.env.STUDIO_CLOUD_CONFIG_FILE||path.join(root,'cloud.json'),'utf8'));
+const output=process.env.STUDIO_DIST_DIR?path.resolve(root,process.env.STUDIO_DIST_DIR):path.join(root,'dist');
 if(release.version!==pkg.version)throw Error('Package and release versions must match');
 if(cloud.anonKey){
  let allowed=cloud.anonKey.startsWith('sb_publishable_');
@@ -35,6 +36,6 @@ for(const folder of [...packages].sort()){
  licenses+='\n\n--- '+pkg.name+' '+pkg.version+' ---\n'+license;
 }
 const html=template.replace('<!-- STUDIO_CSP -->',()=>`<meta http-equiv="Content-Security-Policy" content="${buildCsp(script,cloud)}">`).replace('/* STUDIO_STYLES */',()=>css).replace('<!-- STUDIO_SCRIPT -->',()=>'<script>'+script+'</script><script type="text/plain" id="studio-licenses">'+licenses.replace(/<\/script/gi,'<\\/script')+'</script>');
-await mkdir(path.join(root,'dist'),{recursive:true});await writeFile(path.join(root,'dist/card-print-studio.html'),html);await writeFile(path.join(root,'dist/LICENSES.txt'),licenses);const {sourceUrl,...manifest}=release;await writeFile(path.join(root,'dist/update.json'),JSON.stringify(manifest,null,2)+'\n');
-await writeFile(path.join(root,'dist/index.html'),html);
+await mkdir(output,{recursive:true});await writeFile(path.join(output,'card-print-studio.html'),html);await writeFile(path.join(output,'LICENSES.txt'),licenses);const {sourceUrl,...manifest}=release;await writeFile(path.join(output,'update.json'),JSON.stringify(manifest,null,2)+'\n');
+await writeFile(path.join(output,'index.html'),html);
 console.log('Built offline HTML '+(Buffer.byteLength(html)/1024/1024).toFixed(2)+' MiB; '+packages.size+' bundled package licenses.');
