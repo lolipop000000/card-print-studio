@@ -11,7 +11,11 @@
 
 배포 HTML: **5,574,914 bytes**, SHA256 `7607896c5388f715cd3d7339f644dc7ca0ab983e10713f1924a78005d925e1c1`.
 
-로그는 Git에서 제외한 `artifacts/qa/library-hub-account-ready.log`, `library-hub-cloud-ui-final.log`, `library-hub-full.log`, `library-hub-zoom-red.log`, `library-hub-zoom-green.log`, `library-hub-final-painting-mobile.log`에 있습니다. 게시 결과는 실제 공개 파일 확인 후 기록합니다.
+로그는 Git에서 제외한 `artifacts/qa/library-hub-account-ready.log`, `library-hub-cloud-ui-final.log`, `library-hub-full.log`, `library-hub-zoom-red.log`, `library-hub-zoom-green.log`, `library-hub-final-painting-mobile.log`에 있습니다.
+
+[PR #2](https://github.com/lolipop000000/card-print-studio/pull/2)를 main의 `12f1df33d1ddfdb8f1435416e3b0ba4a17fa727e`로 병합했고 [Pages 배포](https://github.com/lolipop000000/card-print-studio/actions/runs/39696288678)가 성공했습니다. [PP Monster 웹](https://lolipop000000.github.io/card-print-studio/)과 [1.6.1 Release](https://github.com/lolipop000000/card-print-studio/releases/tag/v1.6.1)를 게시했습니다. 공개 웹·main 업데이트 정보·최신 Release·실제 Release HTML 다운로드 모두 HTTP 200이며 버전과 위 HTML 해시가 일치합니다. [게시 확인 결과](evidence/cloud/library-hub-release.json)를 보관했습니다.
+
+실제 공개 HTTPS에서 보관함의 네 탭·내 계정 설정·공개 자료 읽기, 다크모드 재실행 유지와 카드 픽셀 보존을 확인했습니다. 390×844 모바일 화면은 가로 넘침 없이 전체 화면으로 열리고 닫기 버튼은 48px 이상이며 저장·보관함 바로가기도 표시됩니다. 스크립트 오류는 0개입니다. [공개 화면 결과](evidence/cloud/library-hub-production-page.json)에 기록했으며 이는 실제 모바일 하드웨어나 운영 계정 로그인·카드 저장 검증을 뜻하지 않습니다.
 
 ---
 

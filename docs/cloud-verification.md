@@ -151,3 +151,7 @@ Task 15 Step 3은 2026-10-22 사용자의 “깃헙에 올리고 서버까지 �
 최종 수정본에서 별도 Edge 프로필 두 개로 실제 로컬 Auth/API/Realtime을 사용해 공개·사본·공유 에셋 갱신과 공개 해제·삭제, 저장 충돌 선택, 준멤버 11장째 거부와 승인 해제 후 다음 저장 차단을 다시 확인했다. 페이지 스크립트 오류는 0개였다. [실제 서버 UI 결과](evidence/cloud/library-hub-local-ui.json)에 기록했으며, 이는 실제 Google 계정 인증이나 운영 카드 저장을 자동으로 검증했다는 뜻은 아니다.
 
 전체 자동 검사 1,060개는 1,058개 통과·1개 실패·1개 선택적 U2NetP 추론 생략이었다. 유일한 실패에서 실행 취소의 예약된 화면 갱신이 입력 중인 그림 배율을 덮어쓰는 문제를 결정적으로 재현해 고쳤다. 수정 후 새 회귀와 기존 확대 픽셀·저장 검사를 포함한 그림·모바일 18/18과 독립 재검토를 통과했다. 전체 명령을 수정 후 다시 실행한 것은 아니다. 자세한 결과와 배포 HTML 해시는 [검증 기록](verification.md)에 있다.
+
+[PR #2](https://github.com/lolipop000000/card-print-studio/pull/2)를 `12f1df33d1ddfdb8f1435416e3b0ba4a17fa727e`로 병합했다. [Pages 배포](https://github.com/lolipop000000/card-print-studio/actions/runs/39696288678)가 성공했고 [1.6.1 Release](https://github.com/lolipop000000/card-print-studio/releases/tag/v1.6.1)에 여섯 다운로드 파일을 게시했다. 공개 웹·업데이트 정보·최신 Release·실제 HTML 다운로드 네 요청 모두 HTTP 200, 버전 1.6.1과 배포 HTML SHA-256이 일치했다. [게시 확인 결과](evidence/cloud/library-hub-release.json)에 기록했다.
+
+공개 HTTPS에서 보관함 네 탭·내 계정 설정·공개 자료 읽기, 다크모드 유지와 카드 픽셀 보존, 390×844 모바일 전체 화면·48px 닫기 버튼·저장과 보관함 바로가기를 자동 확인했다. 가로 넘침과 스크립트 오류가 없었으며, 공개 화면에서 계정 설정이 펼쳐지는 모습도 직접 확인했다. [공개 화면 결과](evidence/cloud/library-hub-production-page.json)는 실제 모바일 기기나 Google 로그인·운영 카드 저장 검증을 대신하지 않는다.
