@@ -124,6 +124,8 @@
 ### Task 3: 데이터베이스 스키마, RLS, 공개 피드
 
 > 마이그레이션 원문은 **부록 A**, 테스트 기대값은 **부록 B**에 있다. 아래 Interfaces는 요약이다.
+>
+> **진행 상황 (2026-10-21):** `supabase init`(project_id `pp-monster`, analytics 끔, site_url `http://localhost:4173/`)과 부록 A의 마이그레이션 3개 작성·로컬 적용을 마쳤다. 수동 확인 결과: 새 사용자는 `pending`, anon과 사용자의 표 직접 쓰기는 401/403, 본인 `status` 변경은 403, Storage 직접 업로드는 거부, anon은 공개 작업만 보이고 피드에 공개 작업만 생긴다. **남은 일은 Step 1의 자동 통합 테스트 작성**이다(Step 2·3은 `db reset`으로 재현).
 
 **Files:**
 - Create: `supabase/config.toml` (`npx supabase init` 결과)
