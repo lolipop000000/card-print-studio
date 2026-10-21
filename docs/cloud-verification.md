@@ -80,6 +80,24 @@ Task 15 Step 3은 2026-10-22 사용자의 “깃헙에 올리고 서버까지 �
 
 사용자가 GitHub 업로드와 운영 서버 연동을 요청하여 Task 15 Step 3의 운영 반영을 승인했다. 이후 제공한 프로젝트 ref `ytushlpqhdqyimwyempg`와 publishable 공개 키만 `cloud.json`에 반영했다. 비밀 키·DB 비밀번호는 받거나 커밋하지 않았다.
 
-공개 키로 운영 엔드포인트를 읽기 전용 조회한 결과 Auth 설정은 HTTP 200으로 응답했다. Google 공급자는 꺼져 있고 Email 공급자는 켜져 있다. `profiles` 조회는 HTTP 404/PGRST205, `export-manifest`는 HTTP 404/NOT_FOUND이므로 아직 서버 스키마·함수 배포가 완료된 상태가 아니다. Supabase 공식 CLI 로그인 인증을 기다리고 있다.
+공개 키로 처음 조회했을 때 Auth 설정은 HTTP 200, Google 공급자는 꺼짐, Email 공급자는 켜짐이었다. `profiles`와 `export-manifest`는 아직 없었다. 이후 사용자가 공식 CLI의 일회용 인증을 완료했고, 프로젝트 이름 `PP Monster`·지역 `ap-northeast-2`·상태 `ACTIVE_HEALTHY`를 확인한 뒤 연결했다.
 
 공개 설정 반영 후 빌드 성공, CSP·비밀 키 유출 방지·SQL 원문·클라이언트·클라우드 형식 검사 24/24 통과. 이 결과는 운영 저장·Google 로그인·백업 성공을 의미하지 않는다. 서버 배포 및 인증 설정 확인 전에는 버전을 1.6.0으로 올리거나 Pages에 게시하지 않는다.
+
+## 운영 서버 반영 — 2026-10-22
+
+`db push --dry-run`에서 계획의 마이그레이션 세 개만 확인한 뒤 그대로 적용했다. 운영 이력의 `20261021000001`·`20261021000002`·`20261021000003`이 로컬과 일치한다. 부록 A SQL은 수정하지 않았다. 운영의 앱 표 10개 모두 RLS가 켜져 있고, 클라이언트의 작업 INSERT 및 감사·그림 메타데이터 읽기 권한 회수가 적용됐다. `blobs` 버킷은 공개 다운로드, 최대 20 MiB, PNG/JPEG/WebP 제한이며 Realtime 공개 대상은 `public_feed`뿐이다.
+
+`ALLOWED_ORIGINS=https://lolipop000000.github.io`를 설정하고 `api`·`export-manifest`·`maintenance`를 배포했다. 세 함수 모두 ACTIVE/버전 1이며, 계획대로 게이트웨이 JWT 검사 대신 각 핸들러의 권한 검사를 사용한다. 정리 함수는 관리 키 없이 거부되는지만 확인했고 정리 작업 자체는 실행하지 않았다.
+
+| 실제 운영 HTTP 검사 | 결과 |
+|---|---|
+| 로그인 없는 공개 manifest GET | 200, `card-print-studio-manifest` |
+| 로그인 없는 저장 API POST | 401, `unauthenticated` |
+| Pages 출처의 API OPTIONS | 204, 지정한 출처 허용 |
+| 허용하지 않은 출처의 API OPTIONS | 403, 출처 허용 헤더 없음 |
+| 로그인 없는 정리 함수 POST | 401, `unauthorized` |
+
+상세 공개 응답 기록은 커밋에서 제외한 `artifacts/qa/production-cloud-probe.json`에 있다. 별도 임시 설정으로 Auth Site URL을 `https://lolipop000000.github.io/card-print-studio/`, 추가 redirect를 `https://lolipop000000.github.io/card-print-studio/**`로 설정했다. 적용 전 두 update만 검토했고, 선언하지 않은 기존 Auth·MFA·Storage 등 8개 설정은 보존했다. 로컬 개발용 `supabase/config.toml`은 바꾸지 않았다.
+
+비공개 백업 저장소 `lolipop000000/card-print-studio-backup`을 만들고 비공개 여부를 확인했다. Actions에는 공개 값인 `SUPABASE_URL`만 등록했다. 관리 키·DB 접속 비밀번호·백업 전용 최소 권한 토큰은 아직 등록되지 않아 자동 백업과 첫 워크플로 검증은 미완료다. Google 로그인 연결은 사용자가 Google Cloud 프로젝트를 만든 뒤 기본 앱 설정을 진행 중이며, 실제 로그인·저장과 최종 Pages/Release 게시는 아직 완료되지 않았다.
