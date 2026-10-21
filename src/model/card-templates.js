@@ -169,12 +169,8 @@ function collectIds(value,used){
  if(!value||typeof value!=='object')return;
  for(const [key,item] of Object.entries(value)){if((key==='id'||key.endsWith('Id'))&&typeof item==='string')used.add(item);else if(item&&typeof item==='object')collectIds(item,used);}
 }
-/** Apply atomically to a draft. Call once inside store.edit for one undo/redo step. */
-export function applyCardTemplate(project,cardId,templateId){
- assertTemplates(project.cardTemplates);const saved=findTemplate(project,templateId),original=findCard(project,cardId);
- if(original.kind!==saved.kind)throw Error('카드와 서식의 종류가 달라요. 같은 종류의 서식을 선택하세요.');
- const recipe=clone(saved.recipe),used=new Set();collectIds(project,used);
- const fresh=()=>{let value;do{value=newId();}while(used.has(value));used.add(value);return value;};
+/** Shared by template application and independent cloud-asset copies. */
+export function remapTemplateResources(saved,fresh){
  const assetMap=new Map(),paintingMap=new Map(),assets={},paintings={};
  for(const [key,source] of Object.entries(saved.paintings)){
   const drawing=clone(source),layers=new Map(drawing.layers.map(layer=>[layer.id,fresh()]));drawing.id=fresh();paintingMap.set(key,drawing.id);drawing.activeLayerId=layers.get(drawing.activeLayerId);for(const layer of drawing.layers)layer.id=layers.get(layer.id);paintings[drawing.id]=drawing;
@@ -185,6 +181,15 @@ export function applyCardTemplate(project,cardId,templateId){
  const mapEffect=(value,target)=>{
   if(!value)return value;const result=upgradeVisualEffects(value,target);for(const layer of result.layers){layer.id=fresh();if(layer.params?.assetId)layer.params.assetId=assetMap.get(layer.params.assetId);}return result;
  };
+ return {assets,paintings,assetMap,mapEffect};
+}
+/** Apply atomically to a draft. Call once inside store.edit for one undo/redo step. */
+export function applyCardTemplate(project,cardId,templateId){
+ assertTemplates(project.cardTemplates);const saved=findTemplate(project,templateId),original=findCard(project,cardId);
+ if(original.kind!==saved.kind)throw Error('카드와 서식의 종류가 달라요. 같은 종류의 서식을 선택하세요.');
+ const recipe=clone(saved.recipe),used=new Set();collectIds(project,used);
+ const fresh=()=>{let value;do{value=newId();}while(used.has(value));used.add(value);return value;};
+ const {assets,paintings,assetMap,mapEffect}=remapTemplateResources(saved,fresh);
  const target=clone(original),targetRoles=new Map(roles(target).map(({skill,...role})=>[roleKey(role),skill])),mappedSkills=new Set();
  const sx=project.settings.cardWidthMm/recipe.widthMm,sy=project.settings.cardHeightMm/recipe.heightMm;
  target.elements=[];target.template='custom';target.autoSkillLayout=recipe.autoSkillLayout;

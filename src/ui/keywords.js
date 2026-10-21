@@ -62,6 +62,7 @@ export function openKeywordManager(ctx){
    editor.append(field('키워드 이름','keyword-name',keyword.name,v=>change('name',v)),
     field('설명','keyword-description',keyword.description,v=>change('description',v),{textarea:true}),
     field('키워드 색','keyword-color',keyword.color,v=>change('color',v),{type:'color'}));
+   if(ctx.cloudAccount?.canWrite())editor.append(button('에셋으로 공유',()=>ctx.shareAsset('keyword',keyword.id),{id:'keyword-share'}));
    const asset=p.assets[keyword.iconAssetId];
    editor.append(el('section',{class:'keyword-icon-section'},
     el('h3',{},'아이콘'),

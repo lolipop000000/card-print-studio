@@ -1,6 +1,6 @@
 export async function installCloud(page,options={}){
  await page.evaluate(options=>{
-  const fixture={loggedIn:options.loggedIn??true,profile:{id:'u',nickname:options.nickname===undefined?'친구':options.nickname,status:options.status??'member'},calls:[],auth:new Set(),feed:new Set(),feedRows:[],works:[],assets:[],blobs:new Map(),usage:{cards:0,blob_bytes:0}};
+  const fixture={loggedIn:options.loggedIn??true,profile:{id:options.id??'u',nickname:options.nickname===undefined?'친구':options.nickname,status:options.status??'member'},calls:[],auth:new Set(),feed:new Set(),feedRows:[],works:[],assets:[],blobs:new Map(),usage:{cards:0,blob_bytes:0}};
   const client={availability:{available:true,reason:null},config:{url:'https://example.supabase.co',anonKey:'public',pagesOrigin:'https://lolipop000000.github.io'},
    async session(){return fixture.loggedIn?{user:{id:'u'},accessToken:'test'}:null;},async myProfile(){return fixture.loggedIn?structuredClone(fixture.profile):null;},
    onAuthChange(fn){fixture.auth.add(fn);return ()=>fixture.auth.delete(fn);},async signIn(){fixture.loggedIn=true;for(const fn of fixture.auth)fn();},async signOut(){fixture.loggedIn=false;for(const fn of fixture.auth)fn();},
@@ -13,6 +13,10 @@ export async function installCloud(page,options={}){
     if(action==='work.create'){const row={id:crypto.randomUUID(),owner:'u',title:payload.title,data:structuredClone(payload.data),version:1,visibility:'private',deleted_at:null,updated_at:new Date().toISOString()};fixture.works.push(row);return {id:row.id,version:1};}
     if(action==='work.save'){const row=fixture.works.find(row=>row.id===payload.id);row.data=structuredClone(payload.data);return {version:++row.version};}
     if(action==='work.saveDraft')return {savedAt:new Date().toISOString()};
+    if(action==='asset.create'){const row={id:crypto.randomUUID(),kind:payload.kind,title:payload.title,data:structuredClone(payload.data),owner:fixture.profile.id,visibility:'private',version:1,deleted_at:null,updated_at:new Date().toISOString()};fixture.assets.push(row);return {id:row.id,version:1};}
+    if(action==='asset.save'){const row=fixture.assets.find(row=>row.id===payload.id);row.data=structuredClone(payload.data);return {version:++row.version};}
+    if(action==='asset.copy'){const source=fixture.assets.find(row=>row.id===payload.sourceId),row={...structuredClone(source),id:crypto.randomUUID(),owner:fixture.profile.id,visibility:'private',version:1,source_asset_id:source.id,source_owner:source.owner};fixture.assets.push(row);return {id:row.id,version:1};}
+    if(action==='asset.setVisibility'||action==='asset.delete'){const row=fixture.assets.find(row=>row.id===payload.id);if(action.endsWith('setVisibility'))row.visibility=payload.visibility;else row.deleted_at=new Date().toISOString();return {};}
     if(action==='work.copy'){const source=fixture.works.find(row=>row.id===payload.sourceId),row={...structuredClone(source),id:crypto.randomUUID(),owner:'u',visibility:'private',version:1,source_work_id:source.id,source_owner:source.owner};fixture.works.push(row);return {id:row.id};}
     if(['work.setVisibility','work.delete','work.restore'].includes(action)){const row=fixture.works.find(row=>row.id===payload.id);if(action.endsWith('setVisibility'))row.visibility=payload.visibility;else row.deleted_at=action.endsWith('restore')?null:new Date().toISOString();const oldIndex=fixture.feedRows.findIndex(value=>value.item_id===row.id);if(oldIndex>=0)fixture.feedRows.splice(oldIndex,1);if(row.visibility==='public'&&!row.deleted_at)fixture.feedRows.push({item_id:row.id,kind:'work',owner:row.owner,nickname:fixture.profile.nickname,title:row.title,version:row.version,updated_at:row.updated_at});return {};}
     throw Error('Fake action not implemented: '+action);
@@ -21,6 +25,7 @@ export async function installCloud(page,options={}){
   fixture.client=client;window.__cloudFixture=fixture;
   window.showDirectoryPicker=undefined;
   window.__cloudTest.install(client);
+  window.__cloudTest.ctx.cloudBlobs.fetch=async hash=>new Uint8Array(fixture.blobs.get(hash));
  },options);
  await page.waitForSelector('#cloud-account[data-refreshed="true"]');
 }

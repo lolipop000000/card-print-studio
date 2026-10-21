@@ -38,6 +38,7 @@ import {createBlobStore} from './cloud/blobs.js';
 import {createCloudSession} from './cloud/session.js';
 import {createCloudAccountControls} from './ui/cloud-account.js';
 import {openCloudPanel} from './ui/cloud-panel.js';
+import {createCloudAssetControls} from './ui/cloud-assets.js';
 
 export function mountEditor(root,store,{cloudClient=createCloudClient()}={}){
  let ignoreOutputWarnings=false;try{ignoreOutputWarnings=localStorage.getItem('card-print-studio:ignore-output-warnings:v1')==='true';}catch{}
@@ -125,7 +126,8 @@ export function mountEditor(root,store,{cloudClient=createCloudClient()}={}){
  const cloudBlobs=createBlobStore({client:cloudClient,publicBaseUrl:(cloudClient.config?.url??'')+'/storage/v1/object/public/blobs'});
  const cloudSession=createCloudSession({store,client:cloudClient,blobs:cloudBlobs});
  const cloudAccount=createCloudAccountControls(ctx,{client:cloudClient,session:cloudSession});
- Object.assign(ctx,{cloudSession,cloudAccount,cloudBlobs,workspaceFiles});
+ Object.assign(ctx,{cloudSession,cloudAccount,cloudBlobs,workspaceFiles,assetLibrary});
+ const cloudAssetControls=createCloudAssetControls(ctx,{client:cloudClient,blobs:cloudBlobs,account:cloudAccount,assetLibrary});
  ctx.canExport=()=>!viewingPublic||cloudAccount.canWrite();
  const updateView=()=>{viewingPublic=cloudSession.state().viewing;for(const node of root.querySelectorAll('[data-cloud-export]'))node.hidden=!ctx.canExport();};
  const stopCloudView=cloudSession.onChange(updateView);
@@ -255,7 +257,7 @@ export function mountEditor(root,store,{cloudClient=createCloudClient()}={}){
  const unload=event=>{if(store.isDirty()||document.querySelector('[data-paint-dirty="true"],[data-effect-dirty="true"]')){event.preventDefault();event.returnValue='';}};
  window.addEventListener('keydown',key);window.addEventListener('beforeunload',unload);
  refresh();root.dataset.ready='true';updates.checkAtStartup();
- return Object.assign(ctx,{getActiveCardId:()=>state.activeCardId,destroy(){ctx.closeCloudPanel?.();stopCloudView();root.removeEventListener('click',readonlyClick,true);Object.assign(store,originalMutations);cloudAccount.destroy();cloudSession.dispose();cancelAnimationFrame(phoneFitFrame);mobileWorkspace.destroy();assetLibrary.destroy();recovery.destroy();cardTemplates.destroy();cardLibrary.destroy();updates.destroy();fileDrop.destroy();cardFiles.destroy();workspaceFiles.destroy();ctx.closeVisualEffects?.({force:true});ctx.closeKeywords?.();unsubscribe();window.removeEventListener('keydown',key);window.removeEventListener('beforeunload',unload);cardCanvas.destroy();paperView.destroy();root.replaceChildren();}});
+ return Object.assign(ctx,{getActiveCardId:()=>state.activeCardId,destroy(){ctx.closeCloudPanel?.();cloudAssetControls.destroy();stopCloudView();root.removeEventListener('click',readonlyClick,true);Object.assign(store,originalMutations);cloudAccount.destroy();cloudSession.dispose();cancelAnimationFrame(phoneFitFrame);mobileWorkspace.destroy();assetLibrary.destroy();recovery.destroy();cardTemplates.destroy();cardLibrary.destroy();updates.destroy();fileDrop.destroy();cardFiles.destroy();workspaceFiles.destroy();ctx.closeVisualEffects?.({force:true});ctx.closeKeywords?.();unsubscribe();window.removeEventListener('keydown',key);window.removeEventListener('beforeunload',unload);cardCanvas.destroy();paperView.destroy();root.replaceChildren();}});
 }
 async function boot(){const root=document.getElementById('app');if(!root)return;try{await ensureFont();const p=createProject();p.cards[0]=applyTemplate(p.cards[0],p.settings,'monster-standard');mountEditor(root,createStore(p,{prepare:d=>{d.cards=d.cards.map(c=>c.variant&&c.autoSkillLayout?syncSkillElements(c,d.settings,d.keywords||[]):c);}}));}catch(e){root.textContent='작업실을 열지 못했어요: '+e.message;}}
 boot();

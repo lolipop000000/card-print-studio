@@ -321,6 +321,7 @@ export function openVisualEffectsEditor(ctx,initialTarget){
     !(p.visualEffectPresets||[]).length?el('p',{class:'hint'},'조합에 이름을 붙여 다른 글자에도 써보세요.'):null,
     field('이펙트 이름','effect-preset-name',name,()=>{},{maxLength:120}),
     button('새 이펙트로 저장',()=>savePreset(false),{id:'effect-save-preset',class:'wide',disabled:pendingImports>0}),
+    ctx.cloudAccount?.canWrite()?button('에셋으로 공유',()=>ctx.shareAsset('effect_template',savedId),{id:'effect-share',class:'wide',disabled:pendingImports>0||!savedId}):null,
     el('div',{class:'two-fields'},button('저장본 수정',()=>savePreset(true),{id:'effect-update-preset',disabled:pendingImports>0||!savedId}),button('저장본 삭제',()=>{if(storeEdit('내 이펙트 삭제',p=>removeVisualEffectPreset(p,savedId))){savedId=null;renderLibrary();}},{id:'effect-delete-preset',disabled:!savedId,class:'danger'})),
     el('p',{class:'hint'},'저장본을 바꿔도 이미 카드에 적용한 조합은 유지돼요.')].filter(node=>node!==null));
   });

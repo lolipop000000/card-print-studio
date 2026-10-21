@@ -37,10 +37,11 @@ export function createCardTemplateControls(ctx){
    if(!saved.length)list.append(el('p',{class:'hint card-template-empty'},'저장한 서식이 없어요. 현재 카드의 디자인에 이름을 붙여 보관하세요.'));
    for(const preset of saved){
     const compatible=preset.kind===card.kind;
+    const shareButton=ctx.cloudAccount?.canWrite()?button('에셋으로 공유',()=>ctx.shareAsset('card_template',preset.id),{'data-action':'share',disabled:busy}):null;
     const applyButton=button('적용',()=>apply(preset.id),{'data-action':'apply',class:'primary',disabled:busy||!compatible,'data-unavailable':String(!compatible),'aria-label':preset.name+' 서식 적용',title:compatible?'현재 카드에 디자인을 적용해요.':'같은 종류의 카드에 적용할 수 있어요.'});
     list.append(el('div',{class:'card-template-row','data-template-id':preset.id},
      el('div',{class:'card-template-summary'},el('strong',{},preset.name),el('small',{},(preset.kind==='monster'?'몬스터':'아이템')+' · '+preset.recipe.widthMm+' × '+preset.recipe.heightMm+' mm · '+(preset.recipe.autoSkillLayout?'기술 자동 맞춤':'수동 배치'))),
-     el('div',{class:'card-template-actions'},applyButton,button('이름 변경',()=>rename(preset.id),{'data-action':'rename',disabled:busy,'aria-label':preset.name+' 서식 이름 변경'}),button('삭제',()=>remove(preset.id),{'data-action':'delete',class:'danger',disabled:busy,'aria-label':preset.name+' 서식 삭제'}))));
+     el('div',{class:'card-template-actions'},applyButton,shareButton,button('이름 변경',()=>rename(preset.id),{'data-action':'rename',disabled:busy,'aria-label':preset.name+' 서식 이름 변경'}),button('삭제',()=>remove(preset.id),{'data-action':'delete',class:'danger',disabled:busy,'aria-label':preset.name+' 서식 삭제'}))));
    }
   }
   async function save(){
