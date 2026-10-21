@@ -57,6 +57,8 @@ update public.tier_limits set max_cards=120,max_blob_bytes=157286400 where tier=
 
 정리 함수는 관리 키만 허용한다. 버전·초안·휴지통을 포함한 모든 참조를 확인하고 24시간이 지난 미참조 그림, 30일이 지난 휴지통, 90일이 지난 감사 기록을 정리한다. DB 참조 변경을 잠시 잠그므로 이용이 적은 시간에 실행한다.
 
+새 서버 키는 `apikey` 헤더로 보내고 Edge의 `SUPABASE_SECRET_KEYS` 사전에 있는 값과 정확히 대조한다. 기존 `service_role` 키는 Bearer 방식으로 계속 지원한다. 키 접두사만으로 승인하거나 일반 사용자 JWT·공개 키를 허용하지 않는다. [Supabase의 새 API 키 전환 안내](https://supabase.com/docs/guides/getting-started/migrating-to-new-api-keys)에 맞춘 방식이며, 실제 키 값은 서버와 Actions 안에서만 사용한다.
+
 정리 호출 결과는 Actions의 `maintenance-result` 첨부 파일에 7일 보관한다. HTTP 상태, 허용된 오류 코드, 성공 시 정리 수량만 포함하며 응답 원문·접속 주소·비밀 값·예외 메시지는 기록하지 않는다. 실패한 호출을 성공으로 처리하지 않으며, 백업 푸시가 실패하면 정리를 호출하지 않는다. 전체 실패 로그를 내려받을 필요 없이 이 결과부터 확인한다.
 
 복원 절차: [restore-backup.md](../scripts/restore-backup.md). 운영 배포와 첫 수동 워크플로 실행은 사용자 승인 뒤에 진행한다.

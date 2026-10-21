@@ -30,7 +30,7 @@ https://supabase.com/dashboard → New project. **운영용 하나만** 만든�
 - **Project ref**: 주소 `https://supabase.com/dashboard/project/<ref>`의 `<ref>`
 - **Project URL**: Project Settings → API (또는 Data API) → `https://<ref>.supabase.co`
 - **공개 키**: Project Settings → API Keys → `anon`(legacy) 또는 `publishable` 키. 작업실에 들어가는 키이고 공개돼도 괜찮다.
-- **백업 비밀 키**: 같은 화면의 Legacy API Keys에서 `service_role` 키를 쓴다. 현재 정리 함수도 이 키로 요청을 확인하므로 `sb_secret_…` 키로 대체하지 않는다. **절대 작업실 코드, 채팅, 깃허브 커밋에 넣지 않는다.** GitHub Actions secret에만 넣는다.
+- **백업 비밀 키**: 같은 화면의 Secret keys에서 서버 전용 `sb_secret_…` 키를 쓰거나 Legacy API Keys의 `service_role` 키를 쓴다. 정리 함수는 운영 환경에 등록된 관리 키와 정확히 일치하는 요청만 허용한다. **절대 작업실 코드, 채팅, 깃허브 커밋에 넣지 않는다.** GitHub Actions secret에만 넣는다.
 - **DB 접속 주소**: 상단 Connect 버튼 → Connection string → **Session pooler** 주소
   - GitHub Actions에는 IPv6가 없어서 Direct connection이 안 되므로 pooler를 쓴다.
   - 형식: `postgresql://postgres.<ref>:<비밀번호>@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres`
@@ -75,7 +75,7 @@ https://console.cloud.google.com
 | 이름 | 값 |
 |---|---|
 | `SUPABASE_URL` | 운영 Project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | 운영 Legacy API Keys의 `service_role` |
+| `SUPABASE_SERVICE_ROLE_KEY` | 운영 서버 전용 Secret key 또는 Legacy `service_role` 키. 설정 이름은 호환성을 위해 유지 |
 | `SUPABASE_DB_URL` | 운영 Session pooler 주소 |
 | `BACKUP_REPO_TOKEN` | 3번 토큰 |
 

@@ -15,7 +15,9 @@ async function requestMaintenance(env){
  }catch{return {ok:false,status:0,code:'configuration-invalid'};}
  let response;
  try{
-  response=await fetch(endpoint,{method:'POST',headers:{Authorization:`Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`},redirect:'error',signal:AbortSignal.timeout(30000)});
+  const key=env.SUPABASE_SERVICE_ROLE_KEY;
+  const headers=key.startsWith('sb_secret_')?{apikey:key}:{Authorization:`Bearer ${key}`};
+  response=await fetch(endpoint,{method:'POST',headers,redirect:'error',signal:AbortSignal.timeout(30000)});
  }catch{return {ok:false,status:0,code:'request-failed'};}
  let body;
  try{body=await response.json();}catch{return {ok:false,status:response.status,code:'unexpected-response'};}

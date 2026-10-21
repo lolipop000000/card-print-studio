@@ -55,6 +55,17 @@ test('failed maintenance keeps a known error code and excludes response secrets'
  assert.ok(!result.output.includes('postgresql://secret'));
 });
 
+test('modern server keys use the apikey header instead of JWT bearer authentication',async t=>{
+ let actualHeaders;
+ const result=await run(t,(request,response)=>{
+  actualHeaders=request.headers;
+  response.end(JSON.stringify({ok:true,result:{trashed:0,blobs:0,audits:0}}));
+ },{SUPABASE_SERVICE_ROLE_KEY:'sb_secret_test-only-fixture'});
+ assert.equal(result.exitCode,0);
+ assert.equal(actualHeaders.apikey,'sb_secret_test-only-fixture');
+ assert.equal(actualHeaders.authorization,undefined);
+});
+
 test('unknown errors and invalid success payloads never become diagnostic content',async t=>{
  for(const [status,body] of [[401,{ok:false,code:key}],[200,{ok:true,result:{trashed:-1,blobs:0,audits:0}}]]){
   const result=await run(t,(_request,response)=>{response.writeHead(status);response.end(JSON.stringify(body));});
