@@ -6,6 +6,26 @@ import {createVariant} from '../src/model/variants.js';
 import {createVisualEffects,makeVisualEffectLayer} from '../src/model/visual-effects.js';
 import {resolveSkillEffect} from '../src/model/skill-references.js';
 import {exportCardFile,parseCardFile,importCardFile} from '../src/model/card-file.js';
+import {selectedKeywords} from '../src/model/keywords.js';
+
+test('a standalone card retains keywords and icons used only by automatically matched titles',()=>{
+ const p=createProject(),card=p.cards[0];card.name='불꽃 기사';
+ card.passives=[{id:'guard',name:'불꽃 수호',effect:'효과 유지',keywords:[],dice:null}];
+ p.keywords=[{id:'fire',name:'불꽃',description:'타오르는 힘',color:'#dd1144',iconAssetId:'fire-icon'},
+  {id:'unused',name:'얼음',description:'',color:'#1155dd',iconAssetId:null}];
+ p.assets['fire-icon']={id:'fire-icon',mime:'image/png',dataUrl:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==',width:1,height:1,paintingId:null};
+ const before=serializeProject(p),file=exportCardFile(p,card.id),one=parseCardFile(file);
+ assert.deepEqual(one.keywords.map(k=>k.name),['불꽃']);
+ assert.deepEqual(Object.keys(one.assets),['fire-icon']);
+ assert.equal(serializeProject(p),before,'card export must not modify the original deck or title');
+ const target=createProject(),imported=importCardFile(target,file);
+ assert.equal(imported.name,'불꽃 기사');assert.equal(imported.passives[0].name,'불꽃 수호');
+ const [matched]=selectedKeywords(target,imported,'title');
+ assert.equal(matched.name,'불꽃');assert.notEqual(matched.id,'fire');
+ assert.notEqual(matched.iconAssetId,'fire-icon');assert.ok(target.assets[matched.iconAssetId]);
+ assert.deepEqual(selectedKeywords(target,imported.passives[0],'title').map(k=>k.id),[matched.id]);
+ assert.deepEqual(validateProject(target),[]);
+});
 
 const pixel='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j7xkAAAAASUVORK5CYII=';
 const asset=(id,paintingId=null)=>({id,mime:'image/png',dataUrl:pixel,width:1,height:1,paintingId});

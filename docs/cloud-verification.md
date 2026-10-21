@@ -72,4 +72,6 @@ npm run test:cloud:ui
 
 Task 1–14와 Task 15 Steps 1–2의 로컬 구현·검증을 마쳤다. 중요한 리뷰 지적 8개는 실패 재현 → 수정 → 통과 후 전체 검사로 확인했다. 보류한 경미한 지적은 없다. 부록 A 마이그레이션은 `b02c766` 이후 변경하지 않았다.
 
-Task 15 Step 3은 사용자 확인 전까지 대기한다. 운영 Supabase 반영, 운영 Google OAuth, 운영 환경 백업 복원, GitHub 푸시와 Pages 배포는 이 로컬 검증에 포함되지 않는다.
+Task 15 Step 3은 2026-10-22 사용자의 “깃헙에 올리고 서버까지 연동하자” 요청으로 운영 반영 승인을 받았다. `feat/cloud-sharing` 브랜치를 GitHub에 게시하고 Pages를 GitHub Actions 방식으로 설정했다. 운영 Supabase 로그인·프로젝트 연결과 공개 URL/키, Google OAuth, 백업용 비밀 설정은 아직 준비되지 않았다. 운영 DB·함수 반영, 1.6.0 출시와 Pages 실제 배포는 이 설정을 마친 뒤 진행한다.
+
+운영 준비 중 `origin/main`의 v1.5.3 제목 키워드 수정을 이 작업 브랜치에 통합했다. 별도 작업 폴더는 수정하지 않았다. 충돌은 카드 한 장 파일의 제목·본문 자동 키워드와 전용 이펙트 의존 이미지 보존을 유지하고, HTML과 서버 검증 번들을 다시 생성하는 방식으로 해결했다. 통합 후 관련 검사 113개와 실제 브라우저 검사 7개(다크모드, 키워드 이펙트, 오프라인 저장·인쇄)가 통과했다. 비밀 키 누출 검사와 부록 A SQL 원문 검사도 통과했다. 로그는 `artifacts/qa/publish-merged-unit.log`, `publish-merged-browser.log`에 보관한다.

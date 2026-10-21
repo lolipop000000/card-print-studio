@@ -5,14 +5,19 @@ export const inlineDisplay=ref=>ref.display==='inline'||ref.display==='both';
 export const badgeDisplay=ref=>ref.display==='badge'||ref.display==='both';
 const titleField=field=>field==='title'||field==='name';
 export function selectedKeywords(project,target,display){
- const library=new Map((project.keywords||[]).map(k=>[k.id,k]));
- if(titleField(display))return (target?.nameKeywords||[]).map(ref=>library.get(ref.keywordId)).filter(Boolean);
+ const keywords=project.keywords||[],library=new Map(keywords.map(k=>[k.id,k]));
+ if(titleField(display)){
+  // Derive title styling from the authored name, including keywords registered
+  // later. No extra edit or saved link is needed just to display a typed name.
+  const matches=new Set(tokenizeKeywords(target?.name||'',keywords).flatMap(run=>run.keyword?[run.keyword.id]:[]));
+  return keywords.filter(keyword=>matches.has(keyword.id));
+ }
  return (target?.keywords||[]).filter(ref=>!display||(display==='inline'?inlineDisplay(ref):badgeDisplay(ref))).map(ref=>library.get(ref.keywordId)).filter(Boolean);
 }
 export function keywordTargets(project){
  return project.cards.flatMap(c=>[c,...(c.passives||[]),...(c.actives||[])]);
 }
-export function keywordUseCount(project,id){return keywordTargets(project).filter(t=>[...(t.keywords||[]),...(t.nameKeywords||[])].some(r=>r.keywordId===id)).length;}
+export function keywordUseCount(project,id){return keywordTargets(project).filter(t=>(t.keywords||[]).some(r=>r.keywordId===id)||selectedKeywords(project,t,'title').some(k=>k.id===id)).length;}
 /** Literal, longest-name-first matching: user text is never HTML or a regular expression. */
 export function tokenizeKeywords(text,keywords){
  const candidates=[...keywords].sort((a,b)=>b.name.length-a.name.length),runs=[];let plain='',at=0;
