@@ -100,7 +100,8 @@ export function createCloudSession({store,client,blobs,now=Date.now,setTimer=(fn
    if(choice==='save-as-copy')return enqueue(()=>create(store.getProject().name));
    throw new CloudError(400,'invalid','서버 내용 불러오기 또는 사본 저장을 선택하세요.');
   },
-  setReadOnly(error=new CloudError(403,'not-member','관리자 승인 후 저장과 공유를 쓸 수 있어요.')){cancel();emit({status:'read-only',error});},
+  setReadOnly(error=new CloudError(403,'not-member','관리자 승인 후 저장과 공유를 쓸 수 있어요.')){epoch++;cancel();emit({status:'read-only',error});},
+  resumeWrites(){if(current.status==='read-only'&&current.error?.code==='not-member'){emit({status:current.workId?(current.draftSavedAt?'draft-saved':'saved'):'idle',error:null});schedule();}},
   dispose(){if(disposed)return;disposed=true;epoch++;cancel();unsubscribe();listeners.clear();}
  };
 }

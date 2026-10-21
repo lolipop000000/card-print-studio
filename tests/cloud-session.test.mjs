@@ -24,6 +24,12 @@ async function setup(){
  return {timer,store,client,blobs,session,calls,remote,faults,edit:name=>store.edit('이름',p=>p.name=name)};
 }
 const count=(calls,action)=>calls.filter(call=>call.action===action).length;
+test('account read-only cancels delayed writes and can resume after approval',async()=>{
+ const x=await setup();try{
+  let release;const gate=new Promise(resolve=>release=resolve);x.blobs.ensureUploaded=async()=>gate;x.edit('승인 전');const saving=x.session.save();await new Promise(setImmediate);x.session.setReadOnly();release();await saving.catch(()=>{});
+  assert.equal(count(x.calls,'work.save'),0);assert.equal(x.session.state().status,'read-only');x.session.resumeWrites();await x.session.save();assert.equal(count(x.calls,'work.save'),1);assert.equal(x.store.isDirty(),false);
+ }finally{x.session.dispose();}
+});
 test('edits produce at most one draft call per 30 seconds',async()=>{
  const x=await setup();try{x.edit('하나');await x.timer.advance(10000);x.edit('둘');await x.timer.advance(19999);assert.equal(count(x.calls,'work.saveDraft'),0);await x.timer.advance(1);assert.equal(count(x.calls,'work.saveDraft'),1);assert.equal(x.session.state().status,'draft-saved');x.edit('셋');await x.timer.advance(29999);assert.equal(count(x.calls,'work.saveDraft'),1);await x.timer.advance(1);assert.equal(count(x.calls,'work.saveDraft'),2);assert.equal(x.calls.at(-1).payload.baseSavedAt,x.calls.at(-2).payload.baseSavedAt===null?new Date(x.timer.now()-30000).toISOString():null);}finally{x.session.dispose();}
 });

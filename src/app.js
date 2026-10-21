@@ -34,12 +34,15 @@ import {placeImageAsset} from './model/asset-placement.js';
 import {textRangeOwners,remapTextRanges} from './model/text-ranges.js';
 import {mountMobileWorkspace} from './ui/mobile-workspace.js';
 import {createCloudClient} from './cloud/client.js';
+import {createBlobStore} from './cloud/blobs.js';
+import {createCloudSession} from './cloud/session.js';
+import {createCloudAccountControls} from './ui/cloud-account.js';
 
-export function mountEditor(root,store){
+export function mountEditor(root,store,{cloudClient=createCloudClient()}={}){
  let ignoreOutputWarnings=false;try{ignoreOutputWarnings=localStorage.getItem('card-print-studio:ignore-output-warnings:v1')==='true';}catch{}
  const state={ignoreOutputWarnings,activeCardId:store.getProject().cards[0]?.id,selectedElementId:null,selectedElementIds:[],back:false,mode:'card',cardScale:5.3,paintOpen:false,effectOpen:false};
  let generation=0;
- const ctx={store,state,cloudClient:createCloudClient(),assets:new Map(),card:()=>store.getProject().cards.find(c=>c.id===state.activeCardId),
+ const ctx={store,state,cloudClient,assets:new Map(),card:()=>store.getProject().cards.find(c=>c.id===state.activeCardId),
   target:()=>state.back?store.getProject().back:ctx.card(),
   edit(label,change){try{store.edit(label,change);}catch(e){showMessage(e.message);refresh();}},
   editTarget(label,fn){ctx.edit(label,d=>{const target=state.back?d.back:d.cards.find(c=>c.id===state.activeCardId);if(target)fn(target);});},
@@ -113,7 +116,17 @@ export function mountEditor(root,store){
  };
  const cardFiles=createCardFileControls({store,workspaceFiles,card:()=>ctx.card(),onAdded:id=>ctx.selectCard(id)});
  const updates=createUpdateControls({store,onOpen:()=>cardCanvas.setActive(false),onClose:()=>refresh()});
- const save=()=>workspaceFiles.save();
+ const cloudBlobs=createBlobStore({client:cloudClient,publicBaseUrl:(cloudClient.config?.url??'')+'/storage/v1/object/public/blobs'});
+ const cloudSession=createCloudSession({store,client:cloudClient,blobs:cloudBlobs});
+ const cloudAccount=createCloudAccountControls(ctx,{client:cloudClient,session:cloudSession});
+ Object.assign(ctx,{cloudSession,cloudAccount,cloudBlobs,workspaceFiles});
+ const save=async()=>{
+  if(typing(document.activeElement))document.activeElement.blur();
+  if(cloudAccount.isCloudSaveActive()){
+   try{await cloudSession.save();return !store.isDirty();}catch(error){showMessage(error.message);return false;}
+  }
+  cloudAccount.notifyLocalSave();return workspaceFiles.save();
+ };
  const cardTemplates=createCardTemplateControls(ctx);
  const recovery=createRecoveryControls({store,save,onRestored:()=>{workspaceFiles.storage.unbind();ctx.closeVisualEffects?.({force:true});cardCanvas.resetTime();state.activeCardId=store.getProject().cards[0]?.id;state.back=false;setElementSelection(state,[]);ctx.cardLibrary?.reset();refresh();}});
  const exportProject=()=>saveProjectFile(store,{markSaved:!workspaceFiles.storage.getState().folderName}).catch(e=>showMessage(e.message));
@@ -121,7 +134,7 @@ export function mountEditor(root,store){
   el('div',{class:'brand'},el('span',{class:'brand-symbol'},'▤'),el('div',{},el('strong',{},'카드 작업실'),el('small',{},'내가 만든 카드, 내가 그린 그림'))),
   el('div',{class:'deck-heading'},deckName,el('span',{id:'save-state',class:'save-state'},'저장됨'),workspaceFiles.status,recovery.status),
   el('div',{class:'top-actions'},
-   updates.button,
+   cloudAccount.node,updates.button,
    recovery.button,cardTemplates.button,assetLibrary.button,
    button('키워드 관리',()=>ctx.openKeywords(),{id:'keyword-manager'}),
    button('새 덱',async()=>{if(await confirmReplacement(store,{save})){workspaceFiles.storage.unbind();ctx.closeVisualEffects?.({force:true});const p=createProject();p.cards[0]=applyTemplate(p.cards[0],p.settings,'monster-standard');state.activeCardId=p.cards[0].id;setElementSelection(state,[]);state.back=false;store.load(p);ctx.cardLibrary?.reset();cardCanvas.resetTime();}}, {'aria-label':'새 덱'}),
@@ -228,7 +241,7 @@ export function mountEditor(root,store){
  const unload=event=>{if(store.isDirty()||document.querySelector('[data-paint-dirty="true"],[data-effect-dirty="true"]')){event.preventDefault();event.returnValue='';}};
  window.addEventListener('keydown',key);window.addEventListener('beforeunload',unload);
  refresh();root.dataset.ready='true';updates.checkAtStartup();
- return Object.assign(ctx,{getActiveCardId:()=>state.activeCardId,destroy(){cancelAnimationFrame(phoneFitFrame);mobileWorkspace.destroy();assetLibrary.destroy();recovery.destroy();cardTemplates.destroy();cardLibrary.destroy();updates.destroy();fileDrop.destroy();cardFiles.destroy();workspaceFiles.destroy();ctx.closeVisualEffects?.({force:true});ctx.closeKeywords?.();unsubscribe();window.removeEventListener('keydown',key);window.removeEventListener('beforeunload',unload);cardCanvas.destroy();paperView.destroy();root.replaceChildren();}});
+ return Object.assign(ctx,{getActiveCardId:()=>state.activeCardId,destroy(){cloudAccount.destroy();cloudSession.dispose();cancelAnimationFrame(phoneFitFrame);mobileWorkspace.destroy();assetLibrary.destroy();recovery.destroy();cardTemplates.destroy();cardLibrary.destroy();updates.destroy();fileDrop.destroy();cardFiles.destroy();workspaceFiles.destroy();ctx.closeVisualEffects?.({force:true});ctx.closeKeywords?.();unsubscribe();window.removeEventListener('keydown',key);window.removeEventListener('beforeunload',unload);cardCanvas.destroy();paperView.destroy();root.replaceChildren();}});
 }
-async function boot(){const root=document.getElementById('app');try{await ensureFont();const p=createProject();p.cards[0]=applyTemplate(p.cards[0],p.settings,'monster-standard');mountEditor(root,createStore(p,{prepare:d=>{d.cards=d.cards.map(c=>c.variant&&c.autoSkillLayout?syncSkillElements(c,d.settings,d.keywords||[]):c);}}));}catch(e){root.textContent='작업실을 열지 못했어요: '+e.message;}}
+async function boot(){const root=document.getElementById('app');if(!root)return;try{await ensureFont();const p=createProject();p.cards[0]=applyTemplate(p.cards[0],p.settings,'monster-standard');mountEditor(root,createStore(p,{prepare:d=>{d.cards=d.cards.map(c=>c.variant&&c.autoSkillLayout?syncSkillElements(c,d.settings,d.keywords||[]):c);}}));}catch(e){root.textContent='작업실을 열지 못했어요: '+e.message;}}
 boot();

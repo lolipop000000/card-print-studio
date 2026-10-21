@@ -20,4 +20,12 @@ import * as textures from '../src/render/effects/textures.js';
 import * as filters from '../src/render/effects/filters.js';
 import {createVariant} from '../src/model/variants.js';
 import {ensureFont} from '../src/render/font.js';
+import {mountEditor} from '../src/app.js';
+import {createStore} from '../src/model/store.js';
+let cloudContext;
+window.__cloudTest={install(client){
+ cloudContext?.destroy();let root=document.getElementById('cloud-test-root');if(!root){root=document.createElement('main');root.id='cloud-test-root';document.body.append(root);}
+ const value=project.createProject();value.cards[0]=templates.applyTemplate(value.cards[0],value.settings,'monster-standard');
+ cloudContext=mountEditor(root,createStore(value),{cloudClient:client});return cloudContext;
+},get ctx(){return cloudContext;}};
 window.testApi={...skillNameStyles,...richText,...project,...templates,...card,...text,...assets,...painting,...history,...tools,...viewport,...visualEffects,...effectRenderer,...pdf,...sheets,...masks,...generators,...shape,...textures,...filters,createVariant,ensureFont};window.testApiReady=true;
