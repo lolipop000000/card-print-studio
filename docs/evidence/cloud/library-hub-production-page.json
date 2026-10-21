@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "checkedAt": "2026-10-21T23:54:08.651Z",
+  "url": "https://lolipop000000.github.io/card-print-studio/",
+  "pageErrors": [],
+  "httpStatus": 200,
+  "accountInLibrary": true,
+  "realPublicFeedLoaded": true,
+  "themeKeepsCardPixels": true,
+  "themePersists": true,
+  "mobileFullScreen": true,
+  "touchTargetAtLeast48": true,
+  "quickActionsVisible": true
+}
