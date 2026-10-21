@@ -33,12 +33,13 @@ import {openImageCropper} from './ui/image-crop.js';
 import {placeImageAsset} from './model/asset-placement.js';
 import {textRangeOwners,remapTextRanges} from './model/text-ranges.js';
 import {mountMobileWorkspace} from './ui/mobile-workspace.js';
+import {createCloudClient} from './cloud/client.js';
 
 export function mountEditor(root,store){
  let ignoreOutputWarnings=false;try{ignoreOutputWarnings=localStorage.getItem('card-print-studio:ignore-output-warnings:v1')==='true';}catch{}
  const state={ignoreOutputWarnings,activeCardId:store.getProject().cards[0]?.id,selectedElementId:null,selectedElementIds:[],back:false,mode:'card',cardScale:5.3,paintOpen:false,effectOpen:false};
  let generation=0;
- const ctx={store,state,assets:new Map(),card:()=>store.getProject().cards.find(c=>c.id===state.activeCardId),
+ const ctx={store,state,cloudClient:createCloudClient(),assets:new Map(),card:()=>store.getProject().cards.find(c=>c.id===state.activeCardId),
   target:()=>state.back?store.getProject().back:ctx.card(),
   edit(label,change){try{store.edit(label,change);}catch(e){showMessage(e.message);refresh();}},
   editTarget(label,fn){ctx.edit(label,d=>{const target=state.back?d.back:d.cards.find(c=>c.id===state.activeCardId);if(target)fn(target);});},
