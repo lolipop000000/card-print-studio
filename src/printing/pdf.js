@@ -22,7 +22,7 @@ export async function createPdf(project){
  try{assets=await loadAssets(project);}catch(e){throw failure([{code:'asset-decode',message:e.message}]);}
  const problems=await preflightProject(project,assets);if(problems.some(p=>p.severity!=='warning'))throw failure(problems.filter(p=>p.severity!=='warning'));
  const plan=planSheets(project),pdf=new jsPDF({unit:'mm',format:[plan.widthMm,plan.heightMm],orientation:project.print.orientation,compress:true,precision:6}),cache=new Map();
- pdf.setProperties({title:project.name,creator:'카드 작업실',subject:plan.pages.map(p=>p.side).join(',')});
+ pdf.setProperties({title:project.name,creator:'PP Monster',subject:plan.pages.map(p=>p.side).join(',')});
  for(const [i,page] of plan.pages.entries()){
   if(i)pdf.addPage([plan.widthMm,plan.heightMm],project.print.orientation);
   for(const c of page.cells.filter(c=>c.cardId)){

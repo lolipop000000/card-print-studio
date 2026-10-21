@@ -26,7 +26,7 @@ function httpsUrl(value,label,base){
 export const normalizeSource=value=>httpsUrl(value,'배포 주소');
 
 export function parseRelease(value,source){
- if(!value||typeof value!=='object'||Array.isArray(value)||value.format!==FORMAT)throw fail('카드 작업실의 새 버전 정보 파일이 아니에요. 작업실용 update.json 주소가 필요해요.');
+ if(!value||typeof value!=='object'||Array.isArray(value)||value.format!==FORMAT)throw fail('PP Monster의 새 버전 정보 파일이 아니에요. 작업실용 update.json 주소가 필요해요.');
  versionParts(value.version);
  if(value.releasedAt!==undefined){
   const date=value.releasedAt;

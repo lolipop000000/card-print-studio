@@ -30,7 +30,7 @@ https://supabase.com/dashboard → New project. **운영용 하나만** 만든�
 - **Project ref**: 주소 `https://supabase.com/dashboard/project/<ref>`의 `<ref>`
 - **Project URL**: Project Settings → API (또는 Data API) → `https://<ref>.supabase.co`
 - **공개 키**: Project Settings → API Keys → `anon`(legacy) 또는 `publishable` 키. 작업실에 들어가는 키이고 공개돼도 괜찮다.
-- **비밀 키**: 같은 화면의 `service_role`(legacy) 또는 `secret` 키. **절대 작업실 코드, 채팅, 깃허브 커밋에 넣지 않는다.** GitHub Actions secret에만 넣는다.
+- **백업 비밀 키**: 같은 화면의 Legacy API Keys에서 `service_role` 키를 쓴다. 현재 정리 함수도 이 키로 요청을 확인하므로 `sb_secret_…` 키로 대체하지 않는다. **절대 작업실 코드, 채팅, 깃허브 커밋에 넣지 않는다.** GitHub Actions secret에만 넣는다.
 - **DB 접속 주소**: 상단 Connect 버튼 → Connection string → **Session pooler** 주소
   - GitHub Actions에는 IPv6가 없어서 Direct connection이 안 되므로 pooler를 쓴다.
   - 형식: `postgresql://postgres.<ref>:<비밀번호>@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres`
@@ -42,12 +42,12 @@ https://console.cloud.google.com
 
 1. 상단에서 새 프로젝트 `PP Monster`를 만든다.
 2. 메뉴 → **Google Auth Platform**(또는 "API 및 서비스 → OAuth 동의 화면")으로 간다.
-   - **Branding**: 앱 이름 `카드 작업실`, 지원 이메일은 관리자 메일
+   - **Branding**: 앱 이름 `PP Login`, 지원 이메일은 관리자 메일
    - **Audience**: User type **External**. 게시 상태가 "Testing"이면 **Test users에 등록한 계정만** 로그인할 수 있다. 친구 3~8명이면 Testing으로 두고, 친구들 Gmail을 Test users에 추가하는 방법이 가장 안전하다(모르는 사람은 Google 단계에서부터 막힘). 나중에 사람이 늘면 "Publish app"을 누른다.
    - **Data Access**: 범위에 `openid`를 추가한다. `email`과 `profile`은 기본으로 들어 있다. 다른 범위는 추가하지 않는다.
 3. **Clients → Create client**
    - Application type: **Web application**
-   - Name: `pp-monster-web`
+   - Name: `PP Login`
    - **Authorized JavaScript origins**: `https://lolipop000000.github.io` (경로 없이 도메인만)
    - **Authorized redirect URIs**: Supabase의 콜백 주소 `https://<운영 ref>.supabase.co/auth/v1/callback` (아래 3-2 화면에 표시된 값을 그대로 복사)
    - Create → **Client ID**와 **Client Secret**을 저장한다.
@@ -64,16 +64,18 @@ https://console.cloud.google.com
 
 1. **Pages**: 저장소 `card-print-studio` → Settings → Pages → Build and deployment → Source: **GitHub Actions**
 2. **백업 저장소**: New repository → `card-print-studio-backup`, **Private**
-3. **백업용 토큰**: Settings(개인) → Developer settings → Fine-grained tokens → Generate
-   - Repository access: `card-print-studio-backup`만
-   - Permissions: Contents **Read and write**
-   - 만료: 1년(만료 전에 갱신 일정 잡기)
+3. **백업용 토큰**: [토큰 만들기](https://github.com/settings/personal-access-tokens/new?name=card-print-studio-backup&target_name=lolipop000000&expires_in=365&contents=write)를 연다. 이름·1년 만료·Contents 쓰기 권한이 미리 채워진다.
+   - **Resource owner**가 `lolipop000000`인지 확인한다.
+   - 그 아래 **Repository access → Only select repositories → Select repositories**에서 `card-print-studio-backup`만 고른다.
+   - **Permissions → Add permissions**에서 **Contents**를 검색해 추가하고, Contents 옆 선택을 **Read and write**로 바꾼다. 위 링크로 미리 채운 경우 값만 확인한다. **Generate token**을 누른다.
+   - 생성된 값은 아래 Actions secret `BACKUP_REPO_TOKEN`에 직접 붙여넣는다. 채팅이나 파일에 적지 않는다. 만료 전에 새 토큰으로 교체한다.
+   - `Note / Select scopes`만 보이면 classic 토큰 화면이다. 위 링크 또는 개인 Settings → Developer settings → Personal access tokens → **Fine-grained tokens → Generate new token**으로 이동한다. [GitHub 공식 안내](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-fine-grained-personal-access-token)를 참고한다.
 4. **Actions secrets**: `card-print-studio` → Settings → Secrets and variables → Actions → New repository secret
 
 | 이름 | 값 |
 |---|---|
 | `SUPABASE_URL` | 운영 Project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | 운영 비밀 키 |
+| `SUPABASE_SERVICE_ROLE_KEY` | 운영 Legacy API Keys의 `service_role` |
 | `SUPABASE_DB_URL` | 운영 Session pooler 주소 |
 | `BACKUP_REPO_TOKEN` | 3번 토큰 |
 

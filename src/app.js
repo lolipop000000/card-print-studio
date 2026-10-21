@@ -150,7 +150,7 @@ export function mountEditor(root,store,{cloudClient=createCloudClient()}={}){
  const recovery=createRecoveryControls({store,save,onRestored:()=>{workspaceFiles.storage.unbind();ctx.closeVisualEffects?.({force:true});cardCanvas.resetTime();state.activeCardId=store.getProject().cards[0]?.id;state.back=false;setElementSelection(state,[]);ctx.cardLibrary?.reset();refresh();}});
  const exportProject=()=>{if(!ctx.canExport()){viewNotice();return;}return saveProjectFile(store,{markSaved:!workspaceFiles.storage.getState().folderName}).catch(e=>showMessage(e.message));};
  const top=el('header',{class:'topbar'},
-  el('div',{class:'brand'},el('span',{class:'brand-symbol'},'▤'),el('div',{},el('strong',{},'카드 작업실'),el('small',{},'내가 만든 카드, 내가 그린 그림'))),
+  el('div',{class:'brand'},el('span',{class:'brand-symbol'},'▤'),el('div',{},el('strong',{},'PP Monster'),el('small',{},'내가 만든 카드, 내가 그린 그림'))),
   el('div',{class:'deck-heading'},deckName,el('span',{id:'save-state',class:'save-state'},'저장됨'),workspaceFiles.status,recovery.status),
   el('div',{class:'top-actions'},
    themeControl,cloudAccount.node,updates.button,

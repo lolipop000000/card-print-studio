@@ -28,7 +28,7 @@ export function mountJsonFileDrop(root,{onProject,onCard,onError,canDrop=()=>!do
    const canApply=()=>{if(!isCurrent())return false;if(!canDrop())throw Error('편집 창을 닫은 뒤 JSON 파일을 다시 놓아 주세요.');return true;};
    if(content?.format==='card-print-studio')await onProject(snapshot,canApply);
    else if(content?.format==='card-print-studio-card')await onCard(snapshot,canApply);
-   else throw Error('지원하지 않는 JSON 형식이에요: '+String(content?.format??'형식 표시 없음')+'. 카드 작업실의 덱 또는 카드 파일을 넣어 주세요.');
+   else throw Error('지원하지 않는 JSON 형식이에요: '+String(content?.format??'형식 표시 없음')+'. PP Monster의 덱 또는 카드 파일을 넣어 주세요.');
   }catch(error){if(isCurrent())onError(error.message);}
   finally{if(alive()){busy=false;root.dataset.jsonDropBusy='false';reset();}}
  }

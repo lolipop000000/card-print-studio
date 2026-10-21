@@ -1,6 +1,6 @@
 # 클라우드 검증 기록
 
-대상 브랜치: `feat/cloud-sharing`. 운영 반영·GitHub 푸시·Pages 배포는 수행하지 않았다. 운영용 `cloud.json`은 빈 설정이고 앱 버전은 1.5.2로 유지한다.
+대상 브랜치: `feat/cloud-sharing`. 아래 날짜별 기록은 각 검증 시점의 결과다. 현재 1.6.0 배포를 준비하고 있으며, 운영 DB·서버 함수·Google 로그인 설정을 연결했다. Pages·Release 게시와 첫 운영 백업의 결과는 확인 후 기록한다.
 
 ## 2026-10-21 로컬 검증
 
@@ -101,3 +101,13 @@ Task 15 Step 3은 2026-10-22 사용자의 “깃헙에 올리고 서버까지 �
 상세 공개 응답 기록은 커밋에서 제외한 `artifacts/qa/production-cloud-probe.json`에 있다. 별도 임시 설정으로 Auth Site URL을 `https://lolipop000000.github.io/card-print-studio/`, 추가 redirect를 `https://lolipop000000.github.io/card-print-studio/**`로 설정했다. 적용 전 두 update만 검토했고, 선언하지 않은 기존 Auth·MFA·Storage 등 8개 설정은 보존했다. 로컬 개발용 `supabase/config.toml`은 바꾸지 않았다.
 
 비공개 백업 저장소 `lolipop000000/card-print-studio-backup`을 만들고 비공개 여부를 확인했다. Actions에는 공개 값인 `SUPABASE_URL`만 등록했다. 관리 키·DB 접속 비밀번호·백업 전용 최소 권한 토큰은 아직 등록되지 않아 자동 백업과 첫 워크플로 검증은 미완료다. Google 로그인 연결은 사용자가 Google Cloud 프로젝트를 만든 뒤 기본 앱 설정을 진행 중이며, 실제 로그인·저장과 최종 Pages/Release 게시는 아직 완료되지 않았다.
+
+## Google 로그인 연결 확인 — 2026-10-22
+
+사용자가 Google 로그인 앱 이름을 `PP Login`으로 정하고 OAuth 클라이언트 비밀을 Supabase에 직접 입력했다. 운영 공개 설정 조회에서 Google `true`, Email `false`, 신규 가입 허용을 확인했다. 인증 시작 요청은 Google의 `accounts.google.com`으로 HTTP 302 이동했고, 클라이언트 ID 형식과 Supabase callback 주소가 일치했다. 사용자는 Google 테스트 사용자 등록도 완료했다. 이 확인에는 실제 계정 로그인과 카드 저장은 포함되지 않는다.
+
+배포 파일을 1.6.0으로 올리고 package·lock·release·update의 버전 일치 및 두 HTML의 바이트 일치를 확인했다. 새로운 빌드에서 전체 단위 검사 510/510과 로컬 Supabase 통합 검사 21/21이 통과했다. 전체 브라우저 검사는 524개 통과·실패 0개이며, 고정 모델 파일이 필요한 선택적 U2NetP 실제 추론 1개를 생략했다. 로그는 `artifacts/qa/cloud-release-unit.log`, `cloud-release-browser.log`, `cloud-release-integration.log`, 공개 인증 확인은 `production-auth-probe.json`에 보관한다. 백업 관리 키·DB 접속 주소·백업 저장소 전용 토큰은 사용자가 GitHub Actions에 직접 등록했으며 값은 읽지 않고 네 설정 이름만 확인했다.
+
+## PP Monster 표시 이름 — 2026-10-22
+
+사용자 요청으로 화면·브라우저 탭·업데이트 창·로딩과 오류 안내·PDF 제작자 이름을 PP Monster로 바꿨다. 기존 JSON 형식·브라우저 저장 설정·다운로드 파일명과 저장소 주소를 유지한다. 제목이 예전 이름이라 실패하는 브라우저 검사를 확인한 뒤 변경했고, 최종 빌드의 이름·기존 JSON 저장과 재열기·PDF 표시 검사 1/1, 영향 범위 브라우저 검사 29/29, 전체 단위 검사 510/510이 통과했다. 원래 전체 브라우저 회귀는 이름 변경 전에 끝냈으며, 이름 변경 후 전체 회귀를 다시 수행한 것으로 표현하지 않는다. 최종 HTML과 해시는 [verification.md](verification.md)에 있다.
