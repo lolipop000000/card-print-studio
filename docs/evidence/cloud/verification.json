@@ -1,0 +1,28 @@
+{
+  "sourceCommit": "2dc9ed65dfa8aaffcbe543987b86fb97c3b403a4",
+  "branch": "feat/cloud-sharing",
+  "scope": "local-only",
+  "unit": { "tests": 492, "passed": 492, "failed": 0, "skipped": 0 },
+  "browser": { "tests": 511, "passed": 510, "failed": 0, "skipped": 1 },
+  "localIntegration": { "tests": 20, "passed": 20, "failed": 0, "skipped": 0 },
+  "total": { "tests": 1023, "passed": 1022, "failed": 0, "skipped": 1 },
+  "optionalSkip": {
+    "test": "genuine U2NetP runs locally in a Worker, preserves alpha and dimensions, and runs after offline reload",
+    "reason": "CARD_BG_MODEL_DIR is not configured with pinned ort.min.js, ort-wasm-simd.wasm and u2netp.onnx fixtures"
+  },
+  "actualUi": {
+    "resultFile": "result.json",
+    "distinctEdgeProfiles": 2,
+    "passed": true,
+    "pageErrors": 0
+  },
+  "build": {
+    "passed": true,
+    "htmlBytes": 5542242,
+    "bundledLicenses": 24,
+    "htmlSha256": "1947e239c572b98d64f877dc85083974e3825297f26e2505a8edcb42e8838e4e"
+  },
+  "review": { "importantFixed": 8, "deferredMinors": 0 },
+  "task15": { "step1": "verified", "step2": "verified", "step3": "awaiting-user-confirmation" },
+  "productionDeployed": false
+}
