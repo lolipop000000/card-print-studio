@@ -48,7 +48,19 @@ jobs:
             git push
           fi
       - name: Maintenance after successful backup push
+        id: maintenance
+        timeout-minutes: 2
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: curl --fail-with-body --silent --show-error -X POST "$SUPABASE_URL/functions/v1/maintenance" -H "Authorization:Bearer $SUPABASE_SERVICE_ROLE_KEY"
+          MAINTENANCE_REPORT_FILE: artifacts/qa/maintenance-result.json
+        run: |
+          mkdir -p artifacts/qa
+          node scripts/maintenance-request.mjs
+      - name: Save bounded maintenance result
+        if: ${{ always() && steps.maintenance.outcome != 'skipped' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: maintenance-result
+          path: artifacts/qa/maintenance-result.json
+          retention-days: 7
