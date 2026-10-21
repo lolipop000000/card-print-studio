@@ -1,5 +1,5 @@
 import {el,button,field,preserveFocus} from './dom.js';
-import {addKeyword,updateKeyword,removeKeyword,keywordUseCount,linkKeyword,insertKeywordText,inlineDisplay} from '../model/keywords.js';
+import {addKeyword,updateKeyword,removeKeyword,keywordUseCount,linkKeyword,insertKeywordText,inlineDisplay,selectedKeywords} from '../model/keywords.js';
 import {syncSkillElements} from '../render/templates.js';
 import {materializeSkillEffect,hasPlainSkillText,resolveSkillEffect,editSkillEffect} from '../model/skill-references.js';
 import {editText} from '../model/text-ranges.js';
@@ -83,13 +83,14 @@ export function keywordControls(ctx,target,change,inputId,{field:textField='effe
  textField=textField==='name'||textField==='title'?'name':'effect';const title=textField==='name',refsKey=title?'nameKeywords':'keywords';
  const p=ctx.store.getProject(),library=p.keywords||[],text=title?target.name||'':resolveSkillEffect(ctx.card(),target).text;
  const state=keywordState(ctx,target,textField,text);
- const host=el('div',{class:'skill-keywords'+(title?' title-keywords':''),'data-keyword-field':textField},el('p',{class:'keyword-label'},title?'이름 키워드':'키워드'));
+ const host=el('div',{class:'skill-keywords'+(title?' title-keywords':''),'data-keyword-field':textField},el('p',{class:'keyword-label'},title?'제목 키워드 · 자동 표시':'키워드'));
+ if(title)host.append(el('p',{class:'hint'},'등록한 키워드를 제목에 직접 쓰면 색·굵기·아이콘이 자동으로 적용돼요.'));
  if(!library.length){host.append(button('키워드 만들기',()=>ctx.openKeywords(),{class:'wide subtle'}));return host;}
  if(!library.some(k=>k.id===state.keywordId))state.keywordId='';
- const picker=el('select',{id:'keyword-picker-'+(title?'name-':'')+target.id,class:title?'title-keyword-picker':'skill-keyword-picker','aria-label':title?'이름에 넣을 키워드':'추가할 키워드'},
+ const picker=el('select',{id:'keyword-picker-'+(title?'name-':'')+target.id,class:title?'title-keyword-picker':'skill-keyword-picker','aria-label':title?'제목에 넣을 키워드':'추가할 키워드'},
   el('option',{value:''},'키워드 선택'),...library.map(k=>el('option',{value:k.id},k.name)));
  picker.value=state.keywordId;
- const inline=button(title?'이름에 넣기':'본문에 넣기',()=>add('inline'),{class:title?'keyword-add-title wide':'keyword-add-inline',disabled:!picker.value});
+ const inline=button(title?'제목에 넣기':'본문에 넣기',()=>add('inline'),{class:title?'keyword-add-title wide':'keyword-add-inline',disabled:!picker.value});
  const badge=title?null:button('배지 추가',()=>add('badge'),{class:'keyword-add-badge',disabled:!picker.value});
  picker.addEventListener('change',()=>{state.keywordId=picker.value;inline.disabled=!picker.value;if(badge)badge.disabled=!picker.value;});
  function remember(input){
@@ -123,11 +124,12 @@ export function keywordControls(ctx,target,change,inputId,{field:textField='effe
   if(caret!==undefined){const next=document.getElementById(inputId);next?.focus({preventScroll:true});next?.setSelectionRange(caret,caret);}
  }
  host.append(picker,title?inline:el('div',{class:'two-fields'},inline,badge));
- for(const ref of target[refsKey]||[]){
+ const references=title?selectedKeywords(p,target,'title').map(keyword=>({keywordId:keyword.id})):target[refsKey]||[];
+ for(const ref of references){
   const keyword=library.find(k=>k.id===ref.keywordId);if(!keyword)continue;
   host.append(el('div',{class:'keyword-reference'},
    el('div',{class:'keyword-reference-top'},keywordMark(p,keyword),
-    button('×',()=>change(t=>t[refsKey]=t[refsKey].filter(r=>r.keywordId!==ref.keywordId)),{'aria-label':keyword.name+(title?' 이름':'')+' 연결 해제',title:'연결 해제 · '+(title?'이름':'본문')+' 글은 유지'})),
+    title?el('span',{class:'hint'},'자동 표시'):button('×',()=>change(t=>t[refsKey]=t[refsKey].filter(r=>r.keywordId!==ref.keywordId)),{'aria-label':keyword.name+' 연결 해제',title:'연결 해제 · 본문 글은 유지'})),
    title?null:field('카드 표시','keyword-display-'+target.id+'-'+ref.keywordId,ref.display,v=>change(t=>{
     const found=t.keywords.find(r=>r.keywordId===ref.keywordId);found.display=v;
     if(inlineDisplay(found)&&!hasPlainSkillText(t,keyword.name)){materializeSkillEffect(ctx.card(),t);insertKeywordText(t,keyword);}

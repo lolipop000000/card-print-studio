@@ -37,12 +37,14 @@ test('identical displayed names retain different target identities through an ed
  assert.equal(api('resolveSkillEffect')(c,source).text,'둘째 기술');
 });
 
-test('keyword rename protects referenced spans and rebases subsequent annotations',()=>{
- const {p,c,source}=fixture();p.keywords=[{id:'kw',name:'강타',description:'',color:'#427963',iconAssetId:null}];
+test('keyword rename updates automatic titles while preserving authored reference spans',()=>{
+ const {p,c,source,target}=fixture();p.keywords=[{id:'kw',name:'강타',description:'',color:'#427963',iconAssetId:null}];
  source.effect='강타 후 강타 발동';source.skillReferences[0].start=5;source.skillReferences[0].end=7;source.keywords=[{keywordId:'kw',display:'inline'}];
  updateKeyword(p,'kw',{name:'큰 타격'});
+ assert.equal(target.name,'큰 타격');
  assert.equal(source.effect,'큰 타격 후 강타 발동');assert.deepEqual(source.skillReferences.map(r=>[r.start,r.end]),[[7,9]]);
- assert.equal(api('resolveSkillEffect')(c,source).text,'큰 타격 후 강타 발동');
+ const resolved=api('resolveSkillEffect')(c,source);
+ assert.equal(resolved.text,'큰 타격 후 큰 타격 발동');assert.deepEqual(resolved.skillReferences.map(r=>[r.start,r.end]),[[7,11]]);
  insertKeywordText(source,p.keywords[0],0,0);
  assert.deepEqual(source.skillReferences.map(r=>[r.start,r.end]),[[12,14]]);
 });

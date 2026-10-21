@@ -4,6 +4,7 @@ import {remapSkillReferences} from './skill-references.js';
 import {DEFAULT_BLEND_MODE} from './blend-modes.js';
 import {syncVariants} from './variants.js';
 import {textRangeOwners,remapTextRanges} from './text-ranges.js';
+import {selectedKeywords} from './keywords.js';
 
 export const cardNameKey=name=>String(name??'').normalize('NFC').trim();
 
@@ -17,7 +18,8 @@ function assetIds(card,keywords){
 }
 function oneCardProject(project,original){
  const card=clone(original);delete card.variant;
- const usedKeywords=new Set(keywordRefs(card).map(ref=>ref.keywordId)),keywords=(project.keywords||[]).filter(keyword=>usedKeywords.has(keyword.id)).map(clone);
+ const titleKeywords=[card,...skills(card)].flatMap(owner=>selectedKeywords(project,owner,'title'));
+ const usedKeywords=new Set([...keywordRefs(card).map(ref=>ref.keywordId),...titleKeywords.map(keyword=>keyword.id)]),keywords=(project.keywords||[]).filter(keyword=>usedKeywords.has(keyword.id)).map(clone);
  const assets=Object.fromEntries([...assetIds(card,keywords)].map(id=>[id,clone(project.assets[id])]));
  const usedPaintings=new Set(Object.values(assets).map(asset=>asset.paintingId).filter(Boolean));
  return {format:'card-print-studio',version:1,name:card.name,settings:clone(project.settings),keywords,visualEffectPresets:[],cards:[card],back:{elements:[]},assets,

@@ -22092,15 +22092,18 @@
   var badgeDisplay = (ref) => ref.display === "badge" || ref.display === "both";
   var titleField = (field2) => field2 === "title" || field2 === "name";
   function selectedKeywords(project, target2, display) {
-    const library = new Map((project.keywords || []).map((k2) => [k2.id, k2]));
-    if (titleField(display)) return (target2?.nameKeywords || []).map((ref) => library.get(ref.keywordId)).filter(Boolean);
+    const keywords = project.keywords || [], library = new Map(keywords.map((k2) => [k2.id, k2]));
+    if (titleField(display)) {
+      const matches2 = new Set(tokenizeKeywords(target2?.name || "", keywords).flatMap((run) => run.keyword ? [run.keyword.id] : []));
+      return keywords.filter((keyword) => matches2.has(keyword.id));
+    }
     return (target2?.keywords || []).filter((ref) => !display || (display === "inline" ? inlineDisplay(ref) : badgeDisplay(ref))).map((ref) => library.get(ref.keywordId)).filter(Boolean);
   }
   function keywordTargets(project) {
     return project.cards.flatMap((c4) => [c4, ...c4.passives || [], ...c4.actives || []]);
   }
   function keywordUseCount(project, id5) {
-    return keywordTargets(project).filter((t3) => [...t3.keywords || [], ...t3.nameKeywords || []].some((r2) => r2.keywordId === id5)).length;
+    return keywordTargets(project).filter((t3) => (t3.keywords || []).some((r2) => r2.keywordId === id5) || selectedKeywords(project, t3, "title").some((k2) => k2.id === id5)).length;
   }
   function tokenizeKeywords(text3, keywords) {
     const candidates = [...keywords].sort((a3, b2) => b2.name.length - a3.name.length), runs = [];
@@ -44278,7 +44281,8 @@ void main(){
     const title = textField === "name", refsKey = title ? "nameKeywords" : "keywords";
     const p3 = ctx.store.getProject(), library = p3.keywords || [], text3 = title ? target2.name || "" : resolveSkillEffect(ctx.card(), target2).text;
     const state = keywordState(ctx, target2, textField, text3);
-    const host = el("div", { class: "skill-keywords" + (title ? " title-keywords" : ""), "data-keyword-field": textField }, el("p", { class: "keyword-label" }, title ? "\uC774\uB984 \uD0A4\uC6CC\uB4DC" : "\uD0A4\uC6CC\uB4DC"));
+    const host = el("div", { class: "skill-keywords" + (title ? " title-keywords" : ""), "data-keyword-field": textField }, el("p", { class: "keyword-label" }, title ? "\uC81C\uBAA9 \uD0A4\uC6CC\uB4DC \xB7 \uC790\uB3D9 \uD45C\uC2DC" : "\uD0A4\uC6CC\uB4DC"));
+    if (title) host.append(el("p", { class: "hint" }, "\uB4F1\uB85D\uD55C \uD0A4\uC6CC\uB4DC\uB97C \uC81C\uBAA9\uC5D0 \uC9C1\uC811 \uC4F0\uBA74 \uC0C9\xB7\uAD75\uAE30\xB7\uC544\uC774\uCF58\uC774 \uC790\uB3D9\uC73C\uB85C \uC801\uC6A9\uB3FC\uC694."));
     if (!library.length) {
       host.append(button("\uD0A4\uC6CC\uB4DC \uB9CC\uB4E4\uAE30", () => ctx.openKeywords(), { class: "wide subtle" }));
       return host;
@@ -44286,12 +44290,12 @@ void main(){
     if (!library.some((k2) => k2.id === state.keywordId)) state.keywordId = "";
     const picker = el(
       "select",
-      { id: "keyword-picker-" + (title ? "name-" : "") + target2.id, class: title ? "title-keyword-picker" : "skill-keyword-picker", "aria-label": title ? "\uC774\uB984\uC5D0 \uB123\uC744 \uD0A4\uC6CC\uB4DC" : "\uCD94\uAC00\uD560 \uD0A4\uC6CC\uB4DC" },
+      { id: "keyword-picker-" + (title ? "name-" : "") + target2.id, class: title ? "title-keyword-picker" : "skill-keyword-picker", "aria-label": title ? "\uC81C\uBAA9\uC5D0 \uB123\uC744 \uD0A4\uC6CC\uB4DC" : "\uCD94\uAC00\uD560 \uD0A4\uC6CC\uB4DC" },
       el("option", { value: "" }, "\uD0A4\uC6CC\uB4DC \uC120\uD0DD"),
       ...library.map((k2) => el("option", { value: k2.id }, k2.name))
     );
     picker.value = state.keywordId;
-    const inline = button(title ? "\uC774\uB984\uC5D0 \uB123\uAE30" : "\uBCF8\uBB38\uC5D0 \uB123\uAE30", () => add("inline"), { class: title ? "keyword-add-title wide" : "keyword-add-inline", disabled: !picker.value });
+    const inline = button(title ? "\uC81C\uBAA9\uC5D0 \uB123\uAE30" : "\uBCF8\uBB38\uC5D0 \uB123\uAE30", () => add("inline"), { class: title ? "keyword-add-title wide" : "keyword-add-inline", disabled: !picker.value });
     const badge = title ? null : button("\uBC30\uC9C0 \uCD94\uAC00", () => add("badge"), { class: "keyword-add-badge", disabled: !picker.value });
     picker.addEventListener("change", () => {
       state.keywordId = picker.value;
@@ -44350,7 +44354,8 @@ void main(){
       }
     }
     host.append(picker, title ? inline : el("div", { class: "two-fields" }, inline, badge));
-    for (const ref of target2[refsKey] || []) {
+    const references2 = title ? selectedKeywords(p3, target2, "title").map((keyword) => ({ keywordId: keyword.id })) : target2[refsKey] || [];
+    for (const ref of references2) {
       const keyword = library.find((k2) => k2.id === ref.keywordId);
       if (!keyword) continue;
       host.append(el(
@@ -44360,7 +44365,7 @@ void main(){
           "div",
           { class: "keyword-reference-top" },
           keywordMark(p3, keyword),
-          button("\xD7", () => change((t3) => t3[refsKey] = t3[refsKey].filter((r2) => r2.keywordId !== ref.keywordId)), { "aria-label": keyword.name + (title ? " \uC774\uB984" : "") + " \uC5F0\uACB0 \uD574\uC81C", title: "\uC5F0\uACB0 \uD574\uC81C \xB7 " + (title ? "\uC774\uB984" : "\uBCF8\uBB38") + " \uAE00\uC740 \uC720\uC9C0" })
+          title ? el("span", { class: "hint" }, "\uC790\uB3D9 \uD45C\uC2DC") : button("\xD7", () => change((t3) => t3[refsKey] = t3[refsKey].filter((r2) => r2.keywordId !== ref.keywordId)), { "aria-label": keyword.name + " \uC5F0\uACB0 \uD574\uC81C", title: "\uC5F0\uACB0 \uD574\uC81C \xB7 \uBCF8\uBB38 \uAE00\uC740 \uC720\uC9C0" })
         ),
         title ? null : field("\uCE74\uB4DC \uD45C\uC2DC", "keyword-display-" + target2.id + "-" + ref.keywordId, ref.display, (v3) => change((t3) => {
           const found = t3.keywords.find((r2) => r2.keywordId === ref.keywordId);
@@ -46986,7 +46991,8 @@ void main(){
   function oneCardProject(project, original) {
     const card = clone(original);
     delete card.variant;
-    const usedKeywords = new Set(keywordRefs(card).map((ref) => ref.keywordId)), keywords = (project.keywords || []).filter((keyword) => usedKeywords.has(keyword.id)).map(clone);
+    const titleKeywords = [card, ...skills(card)].flatMap((owner) => selectedKeywords(project, owner, "title"));
+    const usedKeywords = /* @__PURE__ */ new Set([...keywordRefs(card).map((ref) => ref.keywordId), ...titleKeywords.map((keyword) => keyword.id)]), keywords = (project.keywords || []).filter((keyword) => usedKeywords.has(keyword.id)).map(clone);
     const assets = Object.fromEntries([...assetIds(card, keywords)].map((id5) => [id5, clone(project.assets[id5])]));
     const usedPaintings = new Set(Object.values(assets).map((asset) => asset.paintingId).filter(Boolean));
     return {
@@ -48362,12 +48368,12 @@ void main(){
   // release.json
   var release_default = {
     format: "card-print-studio-update",
-    version: "1.5.2",
+    version: "1.5.3",
     releasedAt: "2026-10-21",
     notes: [
-      "\uCE74\uB4DC \uBBF8\uB9AC\uBCF4\uAE30\uC640 \uC774\uD399\uD2B8 \uD3B8\uC9D1\uAE30\uC5D0 \uACE0\uD654\uC9C8 6\uCD08 \uBCF4\uAE30\uB97C \uCD94\uAC00\uD588\uC5B4\uC694. \uD604\uC7AC \uC2DC\uC810\uBD80\uD130 180\uAC1C \uC7A5\uBA74\uC744 \uBA3C\uC800 \uC900\uBE44\uD55C \uB4A4 \uCD08\uB2F9 30\uD504\uB808\uC784 \uC601\uC0C1\uC73C\uB85C \uC7AC\uC0DD\uD574\uC694.",
-      "\uC900\uBE44 \uC9C4\uD589\uB960\uACFC \uCDE8\uC18C, \uAD6C\uAC04 \uC774\uB3D9\uACFC \uBC18\uBCF5 \uC7AC\uC0DD\uC744 \uC81C\uACF5\uD574\uC694. \uC120\uD0DD \uB300\uC0C1\uB9CC \uC7AC\uC0DD\uACFC \uC544\uC9C1 \uC801\uC6A9\uD558\uC9C0 \uC54A\uC740 \uC774\uD399\uD2B8\uB3C4 \uBC18\uC601\uD558\uBA70, \uC778\uC1C4 \uC7A5\uBA74\uACFC \uC800\uC7A5 \uB0B4\uC6A9\uC740 \uBC14\uAFB8\uC9C0 \uC54A\uC544\uC694.",
-      "\uC774\uD399\uD2B8\uAC00 \uCE74\uB4DC \uBC16\uC73C\uB85C \uB098\uAC00 \uC798\uB9B0\uB2E4\uB294 \uACBD\uACE0\uB97C \uC81C\uAC70\uD588\uC5B4\uC694. \uC778\uC1C4 \uC601\uC5ED \uBC16\uC740 \uAE30\uC874\uCC98\uB7FC \uC798\uB9AC\uACE0 \uB2E4\uB978 \uB0B4\uC6A9 \uC810\uAC80\uC740 \uC720\uC9C0\uD574\uC694."
+      "\uCE74\uB4DC \uC774\uB984\uACFC \uD328\uC2DC\uBE0C\xB7\uC561\uD2F0\uBE0C \uC81C\uBAA9\uC5D0 \uB4F1\uB85D\uB41C \uD0A4\uC6CC\uB4DC\uB97C \uC9C1\uC811 \uC4F0\uBA74 \uC0C9\xB7\uAD75\uAE30\xB7\uC544\uC774\uCF58\uC774 \uC790\uB3D9 \uC801\uC6A9\uB3FC\uC694. \uC81C\uBAA9\uC744 \uBA3C\uC800 \uC4F0\uACE0 \uD0A4\uC6CC\uB4DC\uB97C \uB098\uC911\uC5D0 \uB4F1\uB85D\uD574\uB3C4 \uBC18\uC601\uD574\uC694.",
+      "\uC81C\uBAA9\uC5D0 \uC790\uB3D9 \uC801\uC6A9 \uC911\uC778 \uD0A4\uC6CC\uB4DC\uB97C \uD3B8\uC9D1\uCC3D\uC5D0 \uD45C\uC2DC\uD574\uC694. \uC81C\uBAA9\uC5D0 \uB123\uAE30 \uBC84\uD2BC\uC740 \uCEE4\uC11C \uC704\uCE58\uC5D0 \uC0BD\uC785\uD558\uB294 \uC6A9\uB3C4\uB85C \uACC4\uC18D \uC4F8 \uC218 \uC788\uC5B4\uC694.",
+      "\uCE74\uB4DC \uD55C \uC7A5\uB9CC \uC800\uC7A5\uD560 \uB54C\uB3C4 \uC81C\uBAA9\uC5D0\uC11C \uC790\uB3D9\uC73C\uB85C \uC0AC\uC6A9\uD558\uB294 \uD0A4\uC6CC\uB4DC\uC640 \uC544\uC774\uCF58\uC744 \uD568\uAED8 \uBCF4\uAD00\uD574\uC694. \uB418\uB3CC\uB9AC\uAE30\uC640 JSON \uBCF5\uC6D0\uB3C4 \uC790\uB3D9\uC73C\uB85C \uAC80\uC0AC\uD574\uC694."
     ],
     downloadUrl: "./card-print-studio.html",
     sourceUrl: "https://raw.githubusercontent.com/lolipop000000/card-print-studio/main/dist/update.json"
