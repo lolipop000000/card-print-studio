@@ -10,6 +10,7 @@ export async function installCloud(page,options={}){
     if(fixture.profile.status==='revoked'||fixture.profile.status==='pending')throw Object.assign(new Error('관리자 승인 후 저장과 공유를 쓸 수 있어요.'),{status:403,code:'not-member'});
     if(action==='profile.setNickname'){fixture.profile.nickname=payload.nickname;return {nickname:payload.nickname};}
     if(action==='blob.missing')return {missing:payload.hashes.filter(hash=>!fixture.blobs.has(hash))};
+    if(action==='import.begin'){if(fixture.importStarted)throw Object.assign(new Error('PC 작업 올리기는 하루에 한 번만 할 수 있어요.'),{status:429,code:'limit-import'});fixture.importStarted=true;return {token:'import-token',expiresAt:new Date(Date.now()+7200000).toISOString()};}
     if(action==='work.create'){const row={id:crypto.randomUUID(),owner:'u',title:payload.title,data:structuredClone(payload.data),version:1,visibility:'private',deleted_at:null,updated_at:new Date().toISOString()};fixture.works.push(row);return {id:row.id,version:1};}
     if(action==='work.save'){const row=fixture.works.find(row=>row.id===payload.id);row.data=structuredClone(payload.data);return {version:++row.version};}
     if(action==='work.saveDraft')return {savedAt:new Date().toISOString()};

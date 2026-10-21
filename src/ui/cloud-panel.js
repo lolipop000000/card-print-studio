@@ -58,7 +58,7 @@ export async function openCloudPanel(ctx,{client,session,account}){
   }catch(error){if(active()&&token===revision)feedback.textContent=error.message;}
  }
  for(const [key,label] of [['mine','내 작업'],['public','공개 목록'],['assets','에셋'],['trash','휴지통']])tabs.append(button(label,()=>{tab=key;render();},{id:'cloud-tab-'+key,'data-tab':key}));
- dialog.append(el('h2',{id:'cloud-panel-title'},'클라우드'),usage,tabs,list,feedback,el('div',{class:'dialog-actions'},button('새로고침',()=>{void load();}),button('닫기',close,{id:'cloud-close'})));
+ dialog.append(el('h2',{id:'cloud-panel-title'},'클라우드'),usage,tabs,list,feedback,el('div',{class:'dialog-actions'},canWrite()?button('PC 작업 한 번에 올리기',()=>{void ctx.openCloudImport();},{id:'cloud-import-open'}):null,button('새로고침',()=>{void load();}),button('닫기',close,{id:'cloud-close'})));
  const stopFeed=client.subscribeFeed(event=>{if(!active())return;if(event.type==='delete')feed.delete(event.row.item_id);else feed.set(event.row.item_id,event.row);if(tab==='public'||tab==='assets')render();});
  dialog.addEventListener('cancel',event=>{event.preventDefault();close();});document.body.append(dialog);dialog.showModal();await load();
 }

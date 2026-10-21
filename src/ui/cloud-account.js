@@ -9,7 +9,9 @@ export function createCloudAccountControls(ctx,{client,session}){
  const signIn=button('Google 로그인',async()=>{try{await client.signIn();await refresh();}catch(error){showMessage(error.message);}},{id:'cloud-sign-in'});
  const signOut=button('로그아웃',async()=>{try{await client.signOut();session.setReadOnly();await refresh();}catch(error){showMessage(error.message);}},{id:'cloud-sign-out'});
  const refreshButton=button('계정 새로고침',()=>refresh(),{id:'cloud-account-refresh'});
- node.append(badge,signIn,signOut,nicknameButton,refreshButton,saveState,feedback);
+ const importOffer=el('span',{id:'cloud-import-offer',class:'cloud-notice',hidden:true},'PC 작업이 있다면 한 번에 옮길 수 있어요. ',button('PC 작업 올리기',()=>{dismissImport();void ctx.openCloudImport();},{id:'cloud-import-proposal'}),button('나중에',()=>dismissImport(),{'aria-label':'PC 작업 올리기 안내 닫기'}));
+ function dismissImport(){try{localStorage.setItem('cloud-import-offered:'+profile?.id,'true');}catch{}importOffer.hidden=true;}
+ node.append(badge,signIn,signOut,nicknameButton,refreshButton,saveState,feedback,importOffer);
  function render(){
   if(disposed)return;
   const state=session.state();saveState.dataset.state=state.status;
@@ -17,6 +19,8 @@ export function createCloudAccountControls(ctx,{client,session}){
   saveState.title=state.error?.message??'';
   if(state.hasUnsavedDraft&&state.status==='draft-saved')saveState.textContent+=' · 공개본과 다름';
   const enabled=availability.available;
+  let offered=false;try{offered=localStorage.getItem('cloud-import-offered:'+profile?.id)==='true';}catch{}
+  importOffer.hidden=!enabled||!loggedIn||!['trial','member'].includes(profile?.status)||offered;
   signIn.hidden=!enabled||loggedIn;signOut.hidden=!enabled||!loggedIn;nicknameButton.hidden=!enabled||!profile||!['trial','member'].includes(profile.status);refreshButton.hidden=!enabled;
   if(!enabled){badge.textContent=availability.reason==='file'?'웹 주소에서 열면 클라우드를 쓸 수 있어요':'클라우드 설정을 기다리고 있어요';return;}
   const label=({pending:'승인 대기 중',trial:'준멤버',member:'멤버',revoked:'승인 해제 · 읽기 전용'})[profile?.status]??'로그인';

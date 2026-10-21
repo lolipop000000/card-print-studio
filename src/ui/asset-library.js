@@ -129,5 +129,5 @@ export function createAssetLibraryControls(ctx,{workspace}={}){
    el('div',{class:'asset-library-grid'},el('section',{class:'asset-browser'},el('div',{class:'asset-search-row'},current.search,current.count),current.list),current.details),current.feedback,files,json);
   dialog.addEventListener('cancel',event=>{event.preventDefault();if(session===current)finish();});dialog.addEventListener('close',()=>{if(session===current)finish();});document.body.append(dialog);render();dialog.showModal();if(!loaded||loadedIdentity!==storage.identity())void perform(()=>ensureLoaded(current)).catch(()=>{});return result;
  }
- return {button:trigger,open,addAssets,getLibrary:async()=>{await ensureLoaded();return structuredClone(library);},reload:()=>perform(()=>loadLibrary()),destroy(){if(disposed)return;disposed=true;finish();unsubscribe();unsubscribeWorkspace?.();storage.destroy();trigger.remove();}};
+ return {button:trigger,open,addAssets,getLocalLibrary:()=>localStorage.load(),getLibrary:async()=>{await ensureLoaded();return structuredClone(library);},reload:()=>perform(()=>loadLibrary()),destroy(){if(disposed)return;disposed=true;finish();unsubscribe();unsubscribeWorkspace?.();storage.destroy();trigger.remove();}};
 }
