@@ -20,7 +20,7 @@ https://supabase.com/dashboard → New project. 무료 플랜은 프로젝트 2�
 
 | 항목 | 운영용 | 테스트용 |
 |---|---|---|
-| Name | `card-studio` | `card-studio-test` |
+| Name | `PP Monster` | `PP Monster Test` |
 | Region | Northeast Asia (Seoul) | Northeast Asia (Seoul) |
 | Database Password | 긴 무작위 값(비밀번호 관리자에 저장) | 긴 무작위 값 |
 | Plan | Free | Free |
@@ -39,14 +39,14 @@ https://supabase.com/dashboard → New project. 무료 플랜은 프로젝트 2�
 ### 3-1. Google Cloud Console
 https://console.cloud.google.com
 
-1. 상단에서 새 프로젝트 `card-studio`를 만든다.
+1. 상단에서 새 프로젝트 `PP Monster`를 만든다.
 2. 메뉴 → **Google Auth Platform**(또는 "API 및 서비스 → OAuth 동의 화면")으로 간다.
    - **Branding**: 앱 이름 `카드 작업실`, 지원 이메일은 관리자 메일
    - **Audience**: User type **External**. 게시 상태가 "Testing"이면 **Test users에 등록한 계정만** 로그인할 수 있다. 친구 3~8명이면 Testing으로 두고, 친구들 Gmail을 Test users에 추가하는 방법이 가장 안전하다(모르는 사람은 Google 단계에서부터 막힘). 나중에 사람이 늘면 "Publish app"을 누른다.
    - **Data Access**: 범위에 `openid`를 추가한다. `email`과 `profile`은 기본으로 들어 있다. 다른 범위는 추가하지 않는다.
 3. **Clients → Create client**
    - Application type: **Web application**
-   - Name: `card-studio-web`
+   - Name: `pp-monster-web`
    - **Authorized JavaScript origins**: `https://lolipop000000.github.io` (경로 없이 도메인만)
    - **Authorized redirect URIs**: Supabase의 콜백 주소 `https://<운영 ref>.supabase.co/auth/v1/callback` (아래 3-2 화면에 표시된 값을 그대로 복사)
    - Create → **Client ID**와 **Client Secret**을 저장한다.

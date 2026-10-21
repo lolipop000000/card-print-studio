@@ -45,7 +45,7 @@
 - Create: `docs/cloud-setup.md`
 
 - [x] **Step 1:** `docs/cloud-setup.md`에 순서를 작성한다. (2026-10-21 작성 완료. 상세 절차는 그 문서를 보고, 아래는 요약이다.)
-  1. Supabase 프로젝트 두 개를 만든다. 운영용 `card-studio`와 테스트용 `card-studio-test`이며, 무료 플랜 2개를 다 쓴다.
+  1. Supabase 프로젝트 두 개를 만든다. 운영용 `PP Monster`와 테스트용 `PP Monster Test`이며, 무료 플랜 2개를 다 쓴다.
   2. Supabase 계정과 관리자 Google 계정에 2단계 인증을 켠다.
   3. Google Cloud Console에서 OAuth 클라이언트(웹)를 만든다. 승인된 리디렉션 URI는 운영 프로젝트의 `https://<ref>.supabase.co/auth/v1/callback`이다.
   4. Supabase Auth → Providers → Google을 켜고 클라이언트 ID와 비밀값을 넣는다. Site URL과 Redirect URLs에 `https://lolipop000000.github.io/card-print-studio/`를 넣는다.
