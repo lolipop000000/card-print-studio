@@ -1,6 +1,6 @@
 # 클라우드 검증 기록
 
-대상 브랜치: `feat/cloud-sharing`. 아래 날짜별 기록은 각 검증 시점의 결과다. 현재 1.6.0 배포를 준비하고 있으며, 운영 DB·서버 함수·Google 로그인 설정을 연결했다. Pages·Release 게시와 첫 운영 백업의 결과는 확인 후 기록한다.
+대상 브랜치: `feat/cloud-sharing`. 아래 날짜별 기록은 각 검증 시점의 결과다. PP Monster 1.6.0을 main에 통합하고 Pages·Release와 운영 DB·서버 함수·Google 로그인 설정을 게시했다. 첫 운영 백업의 데이터 저장은 성공했으며, 후속 정리 단계는 실패해 원인을 확인 중이다. 실제 사용자 Google 로그인과 운영 카드 저장은 아직 검증하지 않았다.
 
 ## 2026-10-21 로컬 검증
 
@@ -111,3 +111,17 @@ Task 15 Step 3은 2026-10-22 사용자의 “깃헙에 올리고 서버까지 �
 ## PP Monster 표시 이름 — 2026-10-22
 
 사용자 요청으로 화면·브라우저 탭·업데이트 창·로딩과 오류 안내·PDF 제작자 이름을 PP Monster로 바꿨다. 기존 JSON 형식·브라우저 저장 설정·다운로드 파일명과 저장소 주소를 유지한다. 제목이 예전 이름이라 실패하는 브라우저 검사를 확인한 뒤 변경했고, 최종 빌드의 이름·기존 JSON 저장과 재열기·PDF 표시 검사 1/1, 영향 범위 브라우저 검사 29/29, 전체 단위 검사 510/510이 통과했다. 원래 전체 브라우저 회귀는 이름 변경 전에 끝냈으며, 이름 변경 후 전체 회귀를 다시 수행한 것으로 표현하지 않는다. 최종 HTML과 해시는 [verification.md](verification.md)에 있다.
+
+## 실제 게시 확인 — 2026-10-22
+
+[PR #1](https://github.com/lolipop000000/card-print-studio/pull/1)을 `11a8b817d9eb9a668bf6b76cbb8116afd5a3914f`로 main에 병합했다. [Pages 실행](https://github.com/lolipop000000/card-print-studio/actions/runs/39631830163)의 빌드와 배포가 모두 성공했다. [PP Monster 웹](https://lolipop000000.github.io/card-print-studio/)과 [1.6.0 Release](https://github.com/lolipop000000/card-print-studio/releases/tag/v1.6.0)를 공개했다. Release에는 HTML·라이선스·업데이트 정보·사용 안내·이펙트 품질 규칙·검증 기록 여섯 파일이 있다.
+
+2026-10-21 16:13:07 UTC(한국 시각 2026-10-22)에 공개 Pages HTML, main의 update.json, 최신 Release, Release의 실제 HTML 다운로드를 자동 검사했다. 네 요청 모두 HTTP 200이며 버전 1.6.0과 HTML SHA-256 `f2c3ab5a3e022db7e1f8a78e87573f4fa60611a626f5c060b2623ab093e74999`가 일치했다. [게시 검사 결과](evidence/cloud/production-release.json)에 보관했다.
+
+새 Edge 환경에서 실제 HTTPS 페이지의 PP Monster 제목·상단 이름, Google 로그인 버튼, 다크모드의 재실행 유지와 카드 픽셀 보존, 390×844 모바일 작업 메뉴를 확인했다. 페이지 스크립트 오류는 0개였다. 첫 모바일 검사에서는 접힌 메뉴 안의 버튼을 곧바로 찾는 검사 가정이 잘못돼 실패했고, 실제 메뉴를 여는 절차로 고친 뒤 통과했다. 앱 코드는 바꾸지 않았다. [공개 화면 검사 결과](evidence/cloud/production-page.json)에 보관했다. 이는 실제 모바일 기기 검사나 Google 계정 로그인 성공을 의미하지 않는다.
+
+## 첫 운영 백업 — 2026-10-22
+
+사용자가 네 Actions 설정을 직접 저장한 뒤 이름만 확인하고 [첫 백업 실행](https://github.com/lolipop000000/card-print-studio/actions/runs/39631861824)을 시작했다. 비공개 목적지 확인, DB 덤프·새 그림 검증과 저장, 백업 커밋·푸시가 성공했다. 비공개 저장소의 커밋 `216a9bef07cd0044c5eef0196582b19b11c2607c`(2026-10-21 16:07:51 UTC)를 메타데이터로 확인했다. DB 덤프 내용과 비밀 값은 읽지 않았다.
+
+뒤따르는 `Maintenance after successful backup push` 단계는 실패했다. 따라서 전체 워크플로 성공이나 정리 함수의 운영 동작을 검증했다고 주장하지 않는다. 자동 승인 검토가 전체 실패 로그의 로컬 저장을 거부해, 사용자에게 HTTP 상태와 오류 코드만 요청했다. 정리 오류의 원인은 아직 확정하지 않았다. 매일 03:00 KST 예약은 등록돼 있지만 첫 예약 실행과 운영 복원은 아직 확인하지 않았다.

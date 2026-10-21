@@ -10,7 +10,11 @@
 
 배포 HTML: **5,560,118 bytes**, SHA256 `f2c3ab5a3e022db7e1f8a78e87573f4fa60611a626f5c060b2623ab093e74999`.
 
-로그는 Git에서 제외한 `artifacts/qa/cloud-release-browser.log`, `cloud-release-integration.log`, `pp-monster-unit.log`, `pp-monster-branding-red.log`, `pp-monster-branding-green.log`, `pp-monster-related-browser.log`에 보관합니다. 공개 Pages·업데이트 정보·Release 실제 다운로드의 버전과 HTML 해시, 운영 백업의 첫 실행 결과는 게시 후 기록합니다.
+로그는 Git에서 제외한 `artifacts/qa/cloud-release-browser.log`, `cloud-release-integration.log`, `pp-monster-unit.log`, `pp-monster-branding-red.log`, `pp-monster-branding-green.log`, `pp-monster-related-browser.log`에 보관합니다.
+
+[PP Monster 웹](https://lolipop000000.github.io/card-print-studio/)과 [1.6.0 Release](https://github.com/lolipop000000/card-print-studio/releases/tag/v1.6.0)를 게시했습니다. 실제 Pages HTML·업데이트 정보·최신 Release·Release HTML 다운로드 네 요청이 HTTP 200이며 버전 1.6.0과 위 해시가 일치합니다. 공개 페이지에서 이름·로그인 버튼·다크모드 유지·카드 픽셀 보존·모바일 메뉴 동작을 검사했고 스크립트 오류는 0개였습니다. [게시 결과](evidence/cloud/production-release.json)와 [공개 화면 결과](evidence/cloud/production-page.json)를 보관했습니다.
+
+첫 운영 백업의 DB·그림 저장과 비공개 저장소 푸시는 성공했지만 후속 정리 단계가 실패했습니다. 전체 워크플로 성공, 실제 사용자 Google 로그인·운영 카드 저장, 운영 복원은 아직 검증하지 않았습니다. 확인 범위와 남은 오류는 [cloud-verification.md](cloud-verification.md)에 기록했습니다.
 
 ---
 

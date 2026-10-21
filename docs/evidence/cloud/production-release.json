@@ -1,0 +1,37 @@
+{
+  "status": "PASS",
+  "checkedAt": "2026-10-21T16:13:07.636Z",
+  "version": "1.6.0",
+  "localSha256": "f2c3ab5a3e022db7e1f8a78e87573f4fa60611a626f5c060b2623ab093e74999",
+  "checks": [
+    {
+      "name": "page",
+      "status": 200,
+      "ok": true,
+      "sha256": "f2c3ab5a3e022db7e1f8a78e87573f4fa60611a626f5c060b2623ab093e74999",
+      "matchesLocal": true
+    },
+    {
+      "name": "update",
+      "status": 200,
+      "ok": true,
+      "version": "1.6.0",
+      "matchesVersion": true
+    },
+    {
+      "name": "latest",
+      "status": 200,
+      "ok": true,
+      "tag": "v1.6.0",
+      "matchesVersion": true,
+      "assetDigestMatches": true
+    },
+    {
+      "name": "download",
+      "status": 200,
+      "ok": true,
+      "sha256": "f2c3ab5a3e022db7e1f8a78e87573f4fa60611a626f5c060b2623ab093e74999",
+      "matchesLocal": true
+    }
+  ]
+}
