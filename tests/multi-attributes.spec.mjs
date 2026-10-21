@@ -129,7 +129,7 @@ async function prepareLegacyItemCanvas(page){
    {id:'candle-badge',type:'attribute',rect:{x:49,y:4,w:8,h:9},binding:null,style:{fontPt:7}}];
   e.state.activeCardId=item.id;e.state.mode='card';e.state.cardScale=4;e.assets=new Map();e.edit('옛 아이템 테스트',d=>{d.cards=[item];});
   const region=document.createElement('div');region.className='attribute-canvas-fixture';
-  region.innerHTML='<div id="attribute-canvas-host"></div><div hidden><input id="card-zoom" type="range"><span id="card-zoom-value"></span><button id="card-effect-play"></button><input id="card-effect-time" type="number"><span id="card-effect-seconds"></span><button id="card-effect-print-frame"></button><button id="card-effect-freeze"></button><div id="card-warnings"></div><span id="canvas-size"></span></div>';
+  region.innerHTML='<div id="attribute-canvas-host"></div><div hidden><input id="card-zoom" type="range"><span id="card-zoom-value"></span><button id="card-effect-play"></button><button id="card-effect-prerender"></button><input id="card-effect-time" type="number"><span id="card-effect-seconds"></span><button id="card-effect-print-frame"></button><button id="card-effect-freeze"></button><div id="card-warnings"></div><span id="canvas-size"></span></div>';
   document.body.prepend(region);e.renderInspector=()=>a.renderInspector(document.getElementById('inspector'),e);
   e.editTarget=(label,change)=>e.edit(label,d=>change(d.cards.find(c=>c.id===e.state.activeCardId)));
   e.cardCanvas=a.mountCardCanvas(document.getElementById('attribute-canvas-host'),e);

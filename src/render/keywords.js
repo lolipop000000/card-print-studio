@@ -80,7 +80,7 @@ export function layoutSkillNameRuns(layout,rect,style){
   if(!line.items)continue;
   for(const part of lineParts(line))if(part.span){
    const first=part.items[0],last=part.items.at(-1),x=rect.x+lineOffset(line,rect,style)+part.start+first.iconWidth+first.leftPad;
-   runs.push({id:part.span.id+':line:'+lineIndex,spanId:part.span.id,skillId:part.span.skillId,textRangeId:part.span.rangeId,style:part.span.style,fontPt:Math.min(...part.items.map(item=>item.fontPt??layout.fontPt)),lineIndex,items:part.items,rect:{x,y:rect.y+line.yMm,w:Math.max(.01,rect.x+lineOffset(line,rect,style)+part.end-last.rightPad-x),h:line.heightMm}});
+   runs.push({id:part.span.id+':line:'+lineIndex,spanId:part.span.id,skillId:part.span.skillId,textRangeId:part.span.rangeId,keywordId:part.span.keywordId,style:part.span.style,fontPt:Math.min(...part.items.map(item=>item.fontPt??layout.fontPt)),lineIndex,items:part.items,rect:{x,y:rect.y+line.yMm,w:Math.max(.01,rect.x+lineOffset(line,rect,style)+part.end-last.rightPad-x),h:line.heightMm}});
   }
  }
  return runs;
@@ -145,15 +145,25 @@ export function fitKeywordBadges(ctx,keywords,rect,style,min){
  const minimum=Math.max(.1,min);let size=Math.max(minimum,style.fontPt??8);
  for(;;){const layout=badgeLayout(ctx,keywords,rect,style,size);if(layout.fits||size<=minimum+.001)return layout;size=Math.max(minimum,size-.25);}
 }
-export function drawKeywordBadges(ctx,keywords,rect,style,min,assets){
- const layout=fitKeywordBadges(ctx,keywords,rect,style,min);
+export function layoutKeywordBadgeRuns(layout,rect){
+ return layout.items.map((item,index)=>({id:'badge:'+item.keyword.id+':'+index,keywordId:item.keyword.id,keyword:item.keyword,fontPt:layout.fontPt,style:{color:item.keyword.color,visualEffects:item.keyword.visualEffects},rect:{x:rect.x+item.x+.6+item.iconWidth,y:rect.y+item.y+.4,w:Math.max(.01,item.width-1.2-item.iconWidth),h:layout.rowHeight-.8}}));
+}
+export function drawKeywordBadgeRun(ctx,run,rect,style){
+ ctx.save();ctx.beginPath();ctx.rect(rect.x,rect.y,rect.w,rect.h);ctx.clip();ctx.textBaseline='top';ctx.textAlign='left';
+ ctx.font=textFont({...style,fontWeight:Math.max(style.fontWeight??400,700)},run.fontPt);ctx.fillStyle=run.keyword.color;
+ drawTextLine(ctx,run.keyword.name,run.rect.x,run.rect.y,style,run.fontPt);ctx.restore();return {fontPt:run.fontPt,fits:true};
+}
+export function drawKeywordBadges(ctx,keywords,rect,style,min,assets,{layout:prepared,skipNameEffects=false,labelsOnly=false,excludeKeywordRun=null}={}){
+ const layout=prepared||fitKeywordBadges(ctx,keywords,rect,style,min),runs=layoutKeywordBadgeRuns(layout,rect);
  ctx.save();ctx.beginPath();ctx.rect(rect.x,rect.y,rect.w,rect.h);ctx.clip();ctx.textBaseline='top';ctx.textAlign='left';ctx.font=textFont({...style,fontWeight:Math.max(style.fontWeight??400,700)},layout.fontPt);
- for(const item of layout.items){
+ for(const [index,item] of layout.items.entries()){
   const {keyword}=item,x=rect.x+item.x,y=rect.y+item.y;
+  if(!labelsOnly){
   ctx.fillStyle=keyword.color+'18';ctx.strokeStyle=keyword.color;ctx.lineWidth=.18;
   ctx.beginPath();ctx.roundRect(x+.1,y+.1,Math.max(.01,Math.min(item.width,rect.w)-.2),layout.rowHeight-.2,.75);ctx.fill();ctx.stroke();
   if(item.iconWidth)drawIcon(ctx,keyword,assets,x+.6,y+.4,layout.fontPt*PT_MM);
-  ctx.fillStyle=keyword.color;drawTextLine(ctx,keyword.name,x+.6+item.iconWidth,y+.4,style,layout.fontPt);
+  }
+  if(excludeKeywordRun!==runs[index].id&&!(skipNameEffects&&hasEffects(runs[index])))drawKeywordBadgeRun(ctx,runs[index],rect,style);
  }
  ctx.restore();return layout;
 }

@@ -47,7 +47,7 @@ test('title selected range opens its own recipe and survives effect undo, save a
   await page.locator('#effect-undo').click();assert.notEqual(await page.locator('#effect-text-color').inputValue(),'#f27822');await page.locator('#effect-redo').click();
   await page.locator('#effect-apply').click();const saved=await saveProject(page,'text-range-applied.json'),range=saved.cards[0].textRanges.name[0];
   assert.equal(saved.cards[0].name.slice(range.start,range.end),'불꽃');assert.equal(range.style.color,'#f27822');
-  assert.ok(range.style.visualEffects.layers.some(l=>l.kind==='flame'));assert.ok(range.style.visualEffects.layers.some(l=>l.kind==='displacement'||l.kind==='textWarp'));
+  assert.ok(range.style.visualEffects.layers.some(l=>l.kind==='flame'));assert.ok(range.style.visualEffects.layers.some(l=>l.kind==='heatHaze'),'Burning text must retain its irregular heat shimmer when saved');
   await page.locator('#undo').click();const undone=await saveProject(page,'text-range-undone.json');assert.equal(undone.cards[0].textRanges.name[0].style.visualEffects,undefined);
   await page.locator('#redo').click();assert.deepEqual((await saveProject(page,'text-range-redone.json')).cards[0].textRanges,saved.cards[0].textRanges);
   await page.screenshot({path:path.join(qa,'text-range-inspector.png'),fullPage:true});assert.deepEqual(pageErrors,[]);assert.deepEqual(httpRequests,[]);

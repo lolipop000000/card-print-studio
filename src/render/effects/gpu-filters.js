@@ -1,6 +1,7 @@
 import {makeSurface} from './masks.js';
 import {effectRandom} from './random.js';
 import {runGpuEffect} from './gpu-runtime.js';
+import {heatHazeField} from './heat-haze.js';
 import {simpleShaders,distanceHorizontal,distanceVertical,distanceShaders,outlineBase,outlineRange,outlineFinish,alphaBase,alphaBlur,innerShadowFinish} from './gpu-filter-shaders.js';
 
 const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x)),n=(v,d)=>Number.isFinite(v)?v:d;
@@ -71,6 +72,10 @@ export function applyGpuFilter(surface,layer,{rect=surface.work,timeSec=1.2,seed
    aux=auxData(Math.max(w,h));const phaseX=effectRandom(seed,layer.id||'displacement',0,1)*tau,phaseY=effectRandom(seed,layer.id||'displacement',0,2)*tau;
    for(let y=0;y<h;y++)if(axis!=='y')aux.data[y*4]=Math.sin((surface.work.y+(y+.5)/s)*tau/wavelength+phaseX+t*1.7)*amount;
    for(let x=0;x<w;x++)if(axis!=='x')aux.data[x*4+1]=Math.sin((surface.work.x+(x+.5)/s)*tau/wavelength+phaseY-t*1.3)*amount;break;
+  }
+  case 'heatHaze':{
+   const field=heatHazeField(surface,layer,timeSec,seed);aux={width:field.width,height:field.height,data:field.data};neutral=!field.amount;
+   values={u0:[field.amount,field.detail,field.dx,field.dy],u1:[field.key>>>16,field.key&65535,0,0]};break;
   }
   case 'glitch':{
    const distance=clamp(n(p.distance,.7),0,4)*s,strength=clamp(n(p.strength,.65)),bands=clamp(Math.round(n(p.bands,10)),1,128),height=Math.max(1/s,rect.h),tick=layer.motion?.enabled?Math.floor(time*9):0,shifts=new Map();neutral=!distance||!strength;aux=auxData(h);

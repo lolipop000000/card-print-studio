@@ -1,0 +1,54 @@
+name: Private daily cloud backup
+on:
+  schedule:
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: cloud-backup
+  cancel-in-progress: false
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    env:
+      BACKUP_REPOSITORY: ${{ github.repository_owner }}/card-print-studio-backup
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Require a private destination
+        env:
+          GH_TOKEN: ${{ secrets.BACKUP_REPO_TOKEN }}
+        run: test "$(gh api "repos/$BACKUP_REPOSITORY" --jq .private)" = true
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.BACKUP_REPOSITORY }}
+          token: ${{ secrets.BACKUP_REPO_TOKEN }}
+          path: artifacts/cloud-backup
+      - name: Dump database and save verified new blobs
+        run: node scripts/backup.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_DIR: artifacts/cloud-backup
+          BACKUP_DOCKER_IMAGE: postgres:17
+      - name: Commit private snapshot
+        working-directory: artifacts/cloud-backup
+        run: |
+          git config user.name 'cloud-backup'
+          git config user.email 'cloud-backup@users.noreply.github.com'
+          git add --all
+          if ! git diff --cached --quiet; then
+            git commit -m "Daily cloud snapshot $(date -u +%F)"
+            git push
+          fi
+      - name: Maintenance after successful backup push
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: curl --fail-with-body --silent --show-error -X POST "$SUPABASE_URL/functions/v1/maintenance" -H "Authorization:Bearer $SUPABASE_SERVICE_ROLE_KEY"

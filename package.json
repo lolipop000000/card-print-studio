@@ -1,23 +1,28 @@
 {
   "name": "card-print-studio",
-  "version": "1.5.3",
+  "version": "1.6.0",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "node --test --test-concurrency=1 tests/*.test.mjs tests/*.spec.mjs",
     "test:unit": "node --test tests/*.test.mjs",
     "test:browser": "node scripts/build-harness.mjs && node --test --test-concurrency=1 tests/*.spec.mjs",
+    "test:cloud": "node --env-file=.env.cloud-test --test --test-concurrency=1 tests/cloud/*.integration.mjs",
+    "test:cloud:ui": "node --env-file=.env.cloud-test tests/cloud/browser.e2e.mjs",
     "build": "node scripts/build.mjs",
+    "build:server": "node scripts/build-server-model.mjs",
     "verify": "node scripts/verify.mjs",
     "verify:effects": "node scripts/verify.mjs --profile effects",
     "verify:print": "node scripts/verify.mjs --profile print",
     "verify:full": "node scripts/verify.mjs --profile full"
   },
   "dependencies": {
+    "@supabase/supabase-js": "2.118.0",
     "jspdf": "4.2.1"
   },
   "devDependencies": {
     "esbuild": "0.28.2",
-    "playwright": "1.62.1"
+    "playwright": "1.62.1",
+    "postgres": "3.4.7"
   }
 }

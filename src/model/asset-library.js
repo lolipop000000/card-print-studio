@@ -1,4 +1,5 @@
 import {newId} from './types.js';
+import {imageSize} from './image-header.js';
 
 const FORMAT='card-print-studio-assets',VERSION=1;
 export const ASSET_LIBRARY_LIMITS=Object.freeze({entries:512,dimension:8192,pixels:16777216,assetBytes:20*1024*1024,totalBytes:64*1024*1024,nameLength:120});
@@ -6,37 +7,6 @@ const MAX_TEXT=96*1024*1024;
 const object=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const identifier=value=>typeof value==='string'&&/^[\w][\w.:-]{0,127}$/.test(value);
 const invalid=message=>{throw new Error('에셋 보관함: '+message);};
-const u32=(bytes,offset)=>((bytes[offset]*0x1000000)+(bytes[offset+1]<<16)+(bytes[offset+2]<<8)+bytes[offset+3])>>>0;
-const le32=(bytes,offset)=>(bytes[offset]+(bytes[offset+1]<<8)+(bytes[offset+2]<<16)+(bytes[offset+3]*0x1000000))>>>0;
-const word=(bytes,offset)=>(bytes[offset]<<8)+bytes[offset+1];
-function imageSize(bytes,mime){
- if(mime==='image/png'){
-  if(bytes.length<33||[137,80,78,71,13,10,26,10].some((n,i)=>bytes[i]!==n)||u32(bytes,8)!==13||String.fromCharCode(...bytes.slice(12,16))!=='IHDR')return null;
-  return [u32(bytes,16),u32(bytes,20)];
- }
- if(mime==='image/jpeg'){
-  if(bytes[0]!==255||bytes[1]!==216)return null;
-  let cursor=2;
-  while(cursor<bytes.length){
-   if(bytes[cursor++]!==255)return null;
-   while(bytes[cursor]===255)cursor++;
-   const marker=bytes[cursor++];
-   if(marker===217||marker===218)return null;
-   if(marker===1||(marker>=208&&marker<=215))continue;
-   if(cursor+2>bytes.length)return null;
-   const length=word(bytes,cursor);if(length<2||cursor+length>bytes.length)return null;
-   if([192,193,194,195,197,198,199,201,202,203,205,206,207].includes(marker))return length>=8?[word(bytes,cursor+5),word(bytes,cursor+3)]:null;
-   cursor+=length;
-  }
-  return null;
- }
- if(bytes.length<25||String.fromCharCode(...bytes.slice(0,4))!=='RIFF'||String.fromCharCode(...bytes.slice(8,12))!=='WEBP'||le32(bytes,4)+8!==bytes.length)return null;
- const type=String.fromCharCode(...bytes.slice(12,16));
- if(type==='VP8X'&&bytes.length>=30)return [1+bytes[24]+(bytes[25]<<8)+(bytes[26]<<16),1+bytes[27]+(bytes[28]<<8)+(bytes[29]<<16)];
- if(type==='VP8L'&&bytes[20]===47)return [1+bytes[21]+((bytes[22]&63)<<8),1+(bytes[22]>>6)+(bytes[23]<<2)+((bytes[24]&15)<<10)];
- if(type==='VP8 '&&bytes.length>=30&&bytes[23]===157&&bytes[24]===1&&bytes[25]===42)return [(bytes[26]+(bytes[27]<<8))&16383,(bytes[28]+(bytes[29]<<8))&16383];
- return null;
-}
 function raster(value){
  if(!object(value))invalid('그림 자료가 올바르지 않아요.');
  if(!identifier(value.id))invalid('그림 ID가 올바르지 않아요.');

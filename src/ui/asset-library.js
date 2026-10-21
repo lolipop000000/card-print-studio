@@ -1,10 +1,11 @@
 import {createAssetLibrary,createLibraryEntry,parseAssetLibrary,serializeAssetLibrary,ASSET_LIBRARY_LIMITS} from '../model/asset-library.js';
-import {createAssetLibraryStorage} from '../storage/asset-library.js';
+import {createAssetLibraryStorage,createAssetLibraryPersistence} from '../storage/asset-library.js';
 import {importAsset,decodeImage} from '../model/assets.js';
 import {el,button,showMessage} from './dom.js';
 import {download} from './files.js';
 import {openDialog} from './dialogs.js';
 import {openImageCropper} from './image-crop.js';
+import {createCloudLibraryStorage} from '../cloud/shared-assets.js';
 
 const MAX_BATCH_PIXELS=32_000_000,MAX_IMAGE_FILES=64;
 const cleanName=value=>Array.from(String(value||'그림').normalize('NFC').replace(/[\x00-\x1f\x7f]/g,' ').replace(/\.(png|jpe?g|webp)$/i,'').trim()||'그림').slice(0,120).join('');
@@ -13,7 +14,15 @@ const canceled=()=>Object.assign(Error('에셋 작업이 취소되었어요.'),{
 const bytes=asset=>Uint8Array.from(atob(asset.dataUrl.split(',')[1]),character=>character.charCodeAt(0));
 
 export function createAssetLibraryControls(ctx,{workspace}={}){
- const storage=createAssetLibraryStorage({workspace});
+ const localStorage=createAssetLibraryStorage({workspace}),storageListeners=new Set();let cloudStorage=null,cloudOwner=null,loadedIdentity=null;
+ const notifyStorage=()=>{for(const fn of storageListeners)fn();};const stopLocalStorage=localStorage.subscribe(notifyStorage);
+ function chosenStorage(){
+  const owner=ctx.cloudAccount?.canWrite()?ctx.cloudAccount.getProfile().id:null;
+  if(owner!==cloudOwner){cloudStorage?.destroy();cloudStorage=null;cloudOwner=owner;}
+  if(owner&&!cloudStorage){const persistence=createAssetLibraryPersistence(),key='cloud-library-pending:'+owner;cloudStorage=createCloudLibraryStorage({cache:createAssetLibraryStorage({key:'cloud-library:'+owner}),pendingCache:{get:()=>persistence.get(key),set:value=>persistence.set(key,value)},client:ctx.cloudClient,blobs:ctx.cloudBlobs,owner,isActive:()=>ctx.cloudAccount?.canWrite()&&ctx.cloudAccount.getProfile().id===owner});cloudStorage.subscribe(notifyStorage);}
+  return cloudStorage??localStorage;
+ }
+ const storage={getState:()=>chosenStorage().getState(),identity:()=>{chosenStorage();return cloudOwner?'cloud:'+cloudOwner:'local';},load:options=>chosenStorage().load(options),save:value=>chosenStorage().save(value),subscribe(fn){storageListeners.add(fn);return ()=>storageListeners.delete(fn);},destroy(){stopLocalStorage();cloudStorage?.destroy();localStorage.destroy();storageListeners.clear();}};
  let library=createAssetLibrary(),loaded=false,dirty=false,disposed=false,busy=false,selected=null,session=null,lastError=null,prompt=null,cropDialog=null;
  const trigger=button('에셋 보관함',()=>{void open();},{id:'asset-library',title:'그림을 자르고 여러 덱에서 함께 사용해요.'});
  const active=origin=>!disposed&&(!origin||session===origin&&origin.dialog.open);
@@ -22,7 +31,7 @@ export function createAssetLibraryControls(ctx,{workspace}={}){
  function errorMessage(error){lastError=error?.message||'에셋 작업을 완료하지 못했어요.';if(session)session.feedback.textContent=lastError;else if(!disposed)showMessage(lastError);}
  function refreshStatus(){
   if(!session)return;const value=storage.getState(),mode=dirty?(value.mode==='error'?'error':'temporary'):value.mode;
-  session.status.dataset.mode=mode;session.status.textContent=(busy?'작업 중…':dirty?'변경사항 저장 필요':value.mode==='disk'?'폴더 저장됨':value.mode==='error'?'저장 오류':'브라우저 임시 보관')+' · '+(value.location||'브라우저');
+  session.status.dataset.mode=mode;session.status.textContent=(busy?'작업 중…':dirty?'변경사항 저장 필요':value.mode==='cloud'?'클라우드 저장됨':value.mode==='disk'?'폴더 저장됨':value.mode==='error'?'저장 오류':'브라우저 임시 보관')+' · '+(value.location||'브라우저');
   session.storageNote.textContent=value.message||'보관함에서 삭제해도 카드에 이미 적용한 그림은 유지돼요.';
   session.dialog.dataset.busy=String(busy);session.dialog.setAttribute('aria-busy',String(busy));
   for(const node of session.dialog.querySelectorAll('[data-asset-action]'))node.disabled=busy||(node.dataset.needsLoaded==='true'&&!loaded)||(node.dataset.needsSelection==='true'&&!selectedEntry())||(node.dataset.needsApply==='true'&&typeof ctx.applyLibraryAsset!=='function');
@@ -40,13 +49,13 @@ export function createAssetLibraryControls(ctx,{workspace}={}){
   guard();library=result;loaded=true;dirty=storage.getState().pending===true;lastError=null;if(selectFirst||!selectedEntry())selected=library.entries[0]?.id??null;render();
  }
  async function loadLibrary(options,origin){
-  guard(origin);const result=await storage.load(options);acceptLibrary(result,true);guard(origin);return true;
+  guard(origin);const identity=storage.identity(),result=await storage.load(options);if(storage.identity()!==identity)throw canceled();loadedIdentity=identity;acceptLibrary(result,true);guard(origin);return true;
  }
  async function ensureLoaded(origin){
-  guard(origin);return loaded?true:loadLibrary(undefined,origin);
+  guard(origin);return loaded&&loadedIdentity===storage.identity()?true:loadLibrary(undefined,origin);
  }
  async function persist(origin){
-  guard(origin);dirty=true;refreshStatus();const result=await storage.save(library);acceptLibrary(result);guard(origin);return true;
+  guard(origin);if(loadedIdentity!==storage.identity())throw Error('계정이 바뀌었어요. 보관함을 다시 불러오세요.');dirty=true;refreshStatus();const result=await storage.save(library);acceptLibrary(result);guard(origin);return true;
  }
  function uniqueName(name,used){
   const base=cleanName(name);let value=base,index=1;
@@ -79,6 +88,7 @@ export function createAssetLibraryControls(ctx,{workspace}={}){
   if(!entry){current.details.append(el('p',{class:'empty-note'},'목록에서 사용할 그림을 선택하세요.'));return;}
   const action=(label,run,id,extra={})=>button(label,ui(run),{id,'data-asset-action':'','data-needs-selection':'true',...extra});
   const name=el('input',{id:'asset-name',value:entry.name,maxLength:120,'data-asset-action':''});
+  if(ctx.cloudAccount?.canWrite())current.details.append(action('에셋으로 공유',()=>ctx.shareLibraryEntry(entry),'asset-share'));
   current.details.append(el('div',{class:'asset-preview'},el('img',{src:entry.asset.dataUrl,alt:entry.name})),el('p',{class:'hint'},entry.asset.width+' × '+entry.asset.height+' px · '+entry.asset.mime.replace('image/','').toUpperCase()),el('label',{class:'field',htmlFor:'asset-name'},el('span',{},'그림 이름'),name),
    action('이름 변경',async()=>{guard(current);const value=name.value.normalize('NFC').trim();if(library.entries.some(other=>other.id!==entry.id&&other.name.toLocaleLowerCase()===value.toLocaleLowerCase()))throw Error('이미 있는 그림 이름이에요. 다른 이름을 입력하세요.');const next={...library,entries:library.entries.map(other=>other.id===entry.id?{...other,name:value}:other)};serializeAssetLibrary(next);library=next;dirty=true;render();await persist(current);},'asset-rename'),
    el('div',{class:'asset-action-row'},action('영역 자르기 / 시트',async()=>{
@@ -117,7 +127,7 @@ export function createAssetLibraryControls(ctx,{workspace}={}){
     return loadLibrary({discardPending:true},current);
    },'asset-reload'),toolbarButton('저장 재시도',async()=>{await ensureLoaded(current);return persist(current);},'asset-retry'))),
    el('div',{class:'asset-library-grid'},el('section',{class:'asset-browser'},el('div',{class:'asset-search-row'},current.search,current.count),current.list),current.details),current.feedback,files,json);
-  dialog.addEventListener('cancel',event=>{event.preventDefault();if(session===current)finish();});dialog.addEventListener('close',()=>{if(session===current)finish();});document.body.append(dialog);render();dialog.showModal();if(!loaded)void perform(()=>ensureLoaded(current)).catch(()=>{});return result;
+  dialog.addEventListener('cancel',event=>{event.preventDefault();if(session===current)finish();});dialog.addEventListener('close',()=>{if(session===current)finish();});document.body.append(dialog);render();dialog.showModal();if(!loaded||loadedIdentity!==storage.identity())void perform(()=>ensureLoaded(current)).catch(()=>{});return result;
  }
- return {button:trigger,open,addAssets,destroy(){if(disposed)return;disposed=true;finish();unsubscribe();unsubscribeWorkspace?.();storage.destroy();trigger.remove();}};
+ return {button:trigger,open,addAssets,getLocalLibrary:()=>localStorage.load(),getLibrary:async()=>{await ensureLoaded();return structuredClone(library);},reload:()=>perform(()=>loadLibrary()),destroy(){if(disposed)return;disposed=true;finish();unsubscribe();unsubscribeWorkspace?.();storage.destroy();trigger.remove();}};
 }

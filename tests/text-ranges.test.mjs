@@ -12,6 +12,15 @@ const api=name=>{assert.equal(typeof ranges[name],'function','Text selections mu
 const style={color:'#ed6424'};
 function fixture(){const p=createProject(),card=p.cards[0];card.name='불꽃🙂 기사';Object.assign(card,applyTemplate(card,p.settings,'monster-standard'));return {p,card};}
 
+test('overlapping shared styles keep underlying typography and explicit character choices win',()=>{
+ const keyword={id:'keyword',keywordId:'fire',start:0,end:4,style:{color:'#ef6b24'}},
+ skill={id:'skill',skillId:'hot',start:0,end:4,style:{fontPt:24,fontStyle:'italic',color:'#286fa8'}};
+ const result=api('mergeTextSpans')('Fire',[keyword,skill],[{id:'chosen',start:1,end:2,style:{fontPt:30,color:'#3366ff'}}]);
+ assert.deepEqual(result.map(span=>[span.start,span.end,span.style.fontPt,span.style.fontStyle,span.style.color]),[[0,1,24,'italic','#ef6b24'],[1,2,30,'italic','#3366ff'],[2,4,24,'italic','#ef6b24']]);
+ assert.equal(result[0].keywordId,'fire');assert.equal(result[0].skillId,undefined,'Priority target identity must not be inherited from a lower style');
+ assert.equal(result[1].rangeId,'chosen');assert.equal(result[1].keywordId,undefined);
+});
+
 test('selected characters have independent styles and emoji selections keep whole graphemes',()=>{
  const {card}=fixture(),first=api('setTextRange')(card,'name',0,1,style),second=api('setTextRange')(card,'name',3,3,{color:'#3699ff'});
  assert.notEqual(first.id,second.id);

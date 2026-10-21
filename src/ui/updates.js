@@ -77,7 +77,7 @@ export function createUpdateControls({store,onOpen=()=>{},onClose=()=>{}}){
   const direct=el('a',{id:'update-direct-link',class:'update-direct',target:'_blank',rel:'noopener noreferrer',hidden:true},'직접 다운로드 주소 열기'),downloadStatus=el('p',{id:'update-download-status',class:'hint',role:'status',hidden:true});
   const storage=el('p',{class:'hint',hidden:true}),checked=el('small',{class:'update-checked'}),backupStatus=el('p',{id:'update-backup-status',class:'hint',role:'status'});
   dialog.append(
-   el('div',{class:'update-heading'},el('div',{},el('small',{},'카드 작업실'),el('h2',{id:'updates-title'},'작업실 업데이트')),button('닫기',close,{id:'updates-close'})),
+   el('div',{class:'update-heading'},el('div',{},el('small',{},'PP Monster'),el('h2',{id:'updates-title'},'작업실 업데이트')),button('닫기',close,{id:'updates-close'})),
    el('div',{class:'update-current'},el('div',{},el('span',{},'현재 버전'),el('strong',{id:'update-current-version'},release.version)),el('small',{},release.releasedAt+' 배포')),
    status,checked,latest,download,downloadStatus,direct,
    el('details',{class:'update-history'},el('summary',{},'현재 버전의 변경사항'),el('ul',{},release.notes.map(note=>el('li',{},note)))),

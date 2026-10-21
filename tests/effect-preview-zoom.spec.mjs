@@ -39,7 +39,10 @@ test('Ctrl+wheel zooms at the cursor, keeps browser scale, and does not edit the
 for(const [dpr,zoom] of [[1,'3'],[2,'2']])test('zoomed preview rerenders real effect pixels for '+dpr+'x display density',async()=>{
  const e=await start(dpr);try{const {page,project}=e;await page.locator('#effect-preview-zoom').selectOption(zoom);await settled(page);const g=await geometry(page);
   assert.ok(g.pixels>=g.width*dpr-.6,'preview backing pixels must cover the display, instead of stretching the old bitmap');
-  await page.addScriptTag({content:(await reference).outputFiles[0].text});
+  // The release CSP rejects arbitrary inline scripts. Load the test reference
+  // through its permitted blob source, retaining the real application's CSP.
+  const url=await page.evaluate(code=>URL.createObjectURL(new Blob([code],{type:'text/javascript'})),(await reference).outputFiles[0].text);
+  try{await page.addScriptTag({url});}finally{await page.evaluate(url=>URL.revokeObjectURL(url),url);}
   const pixels=await page.evaluate(async p=>{
    const canvas=document.getElementById('effect-preview'),dpi=Number(canvas.dataset.previewDpi),actual=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data,ref=document.createElement('canvas'),assets=await window.zoomReference.loadAssets(p);window.zoomReference.renderCard(ref.getContext('2d',{willReadFrequently:true}),p,p.cards[0],assets,dpi,{timeSec:p.print.effectFrameSec});
    const expected=ref.getContext('2d').getImageData(0,0,ref.width,ref.height).data;let changed=0;for(let i=0;i<actual.length;i++)if(actual[i]!==expected[i])changed++;return {changed,width:ref.width,height:ref.height,actualWidth:canvas.width,actualHeight:canvas.height};

@@ -62,6 +62,9 @@ export function openKeywordManager(ctx){
    editor.append(field('키워드 이름','keyword-name',keyword.name,v=>change('name',v)),
     field('설명','keyword-description',keyword.description,v=>change('description',v),{textarea:true}),
     field('키워드 색','keyword-color',keyword.color,v=>change('color',v),{type:'color'}));
+   editor.append(button(keyword.visualEffects?.layers.length?'전용 이펙트 수정':'전용 이펙트 만들기',()=>ctx.openVisualEffects({cardId:ctx.card()?.id||p.cards[0]?.id,keywordId:keyword.id}),{id:'keyword-effects',class:'wide',disabled:!p.cards.length}),
+    el('p',{class:'hint'},'이 키워드가 나오는 제목·본문·배지에 함께 적용해요. 직접 지정한 글자별 이펙트가 우선해요.'));
+   if(ctx.cloudAccount?.canWrite())editor.append(button('에셋으로 공유',()=>ctx.shareAsset('keyword',keyword.id),{id:'keyword-share'}));
    const asset=p.assets[keyword.iconAssetId];
    editor.append(el('section',{class:'keyword-icon-section'},
     el('h3',{},'아이콘'),

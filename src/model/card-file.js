@@ -4,7 +4,7 @@ import {remapSkillReferences} from './skill-references.js';
 import {DEFAULT_BLEND_MODE} from './blend-modes.js';
 import {syncVariants} from './variants.js';
 import {textRangeOwners,remapTextRanges} from './text-ranges.js';
-import {selectedKeywords} from './keywords.js';
+import {keywordsInText} from './keywords.js';
 
 export const cardNameKey=name=>String(name??'').normalize('NFC').trim();
 
@@ -12,14 +12,16 @@ const FORMAT='card-print-studio-card';
 const skills=card=>[...(card.passives||[]),...(card.actives||[])];
 const keywordRefs=card=>[card,...skills(card)].flatMap(owner=>[...(owner.keywords||[]),...(owner.nameKeywords||[])]);
 function assetIds(card,keywords){
- const recipes=[card.visualEffects,card.nameStyle?.visualEffects,...card.elements.map(element=>element.style?.visualEffects),...skills(card).map(skill=>skill.nameStyle?.visualEffects),...textRangeOwners(card).flatMap(owner=>Object.values(owner.textRanges||{}).flatMap(ranges=>ranges.map(range=>range.style?.visualEffects)))];
+ const recipes=[...keywords.map(keyword=>keyword.visualEffects),card.visualEffects,card.nameStyle?.visualEffects,...card.elements.map(element=>element.style?.visualEffects),...skills(card).map(skill=>skill.nameStyle?.visualEffects),...textRangeOwners(card).flatMap(owner=>Object.values(owner.textRanges||{}).flatMap(ranges=>ranges.map(range=>range.style?.visualEffects)))];
  const effectAssets=recipes.flatMap(recipe=>(recipe?.layers||[]).map(layer=>layer.params?.assetId));
  return new Set([card.artAssetId,...card.elements.map(element=>element.assetId),...keywords.map(keyword=>keyword.iconAssetId),...effectAssets].filter(Boolean));
 }
 function oneCardProject(project,original){
  const card=clone(original);delete card.variant;
- const titleKeywords=[card,...skills(card)].flatMap(owner=>selectedKeywords(project,owner,'title'));
- const usedKeywords=new Set([...keywordRefs(card).map(ref=>ref.keywordId),...titleKeywords.map(keyword=>keyword.id)]),keywords=(project.keywords||[]).filter(keyword=>usedKeywords.has(keyword.id)).map(clone);
+ const usedKeywords=new Set(keywordRefs(card).map(ref=>ref.keywordId));
+ const texts=[card,...skills(card)].flatMap(owner=>[owner.name||'',owner.effect||'']).concat(card.elements.filter(e=>e.type==='text'&&!e.binding).map(e=>e.content||''));
+ for(const text of texts)for(const keyword of keywordsInText(text,project.keywords||[]))usedKeywords.add(keyword.id);
+ const keywords=(project.keywords||[]).filter(keyword=>usedKeywords.has(keyword.id)).map(clone);
  const assets=Object.fromEntries([...assetIds(card,keywords)].map(id=>[id,clone(project.assets[id])]));
  const usedPaintings=new Set(Object.values(assets).map(asset=>asset.paintingId).filter(Boolean));
  return {format:'card-print-studio',version:1,name:card.name,settings:clone(project.settings),keywords,visualEffectPresets:[],cards:[card],back:{elements:[]},assets,
@@ -58,9 +60,15 @@ function originalSignature(project,assetId){
   layers:original.layers.map(layer=>({name:layer.name,visible:layer.visible,locked:layer.locked,opacity:layer.opacity,blendMode:layer.blendMode??DEFAULT_BLEND_MODE,png:layer.png}))
  }:null};
 }
+function keywordEffectSignature(project,keyword){
+ const recipe=clone(keyword.visualEffects);if(!recipe?.layers.length)return null;
+ for(const layer of recipe.layers){delete layer.id;if(layer.params?.assetId)layer.params.assetId=originalSignature(project,layer.params.assetId);}
+ return recipe;
+}
 function compatibleKeyword(existing,incoming,project,source){
  return existing.name===incoming.name&&existing.description===incoming.description&&existing.color.toLowerCase()===incoming.color.toLowerCase()
-  &&JSON.stringify(originalSignature(project,existing.iconAssetId))===JSON.stringify(originalSignature(source,incoming.iconAssetId));
+  &&JSON.stringify(originalSignature(project,existing.iconAssetId))===JSON.stringify(originalSignature(source,incoming.iconAssetId))
+  &&JSON.stringify(keywordEffectSignature(project,existing))===JSON.stringify(keywordEffectSignature(source,incoming));
 }
 
 /** Append atomically to a draft; all new card/art identities are independent. */
@@ -75,7 +83,7 @@ export function importCardFile(project,text,{replaceCardId=null}={}){
  for(const keyword of source.keywords){
   const existing=(project.keywords||[]).find(item=>item.name.normalize('NFC')===keyword.name.normalize('NFC'));
   if(existing){
-   if(!compatibleKeyword(existing,keyword,project,source))throw Error('키워드 “'+keyword.name+'”의 기존 색·설명·아이콘 또는 그림 원본이 달라요. 키워드 이름을 구분한 뒤 다시 불러오세요.');
+   if(!compatibleKeyword(existing,keyword,project,source))throw Error('키워드 “'+keyword.name+'”의 기존 색·설명·아이콘·이펙트 또는 그림 원본이 달라요. 키워드 이름을 구분한 뒤 다시 불러오세요.');
    keywordIds.set(keyword.id,existing.id);
   }else {const id=fresh();keywordIds.set(keyword.id,id);newKeywords.push({...keyword,id});}
  }
@@ -94,6 +102,7 @@ export function importCardFile(project,text,{replaceCardId=null}={}){
  for(const keyword of newKeywords)if(keyword.iconAssetId)keyword.iconAssetId=assetMap.get(keyword.iconAssetId);
  const mapKeywords=target=>{for(const ref of [...(target.keywords||[]),...(target.nameKeywords||[])])ref.keywordId=keywordIds.get(ref.keywordId);};
  const mapEffects=recipe=>{for(const layer of recipe?.layers||[]){layer.id=fresh();if(layer.params?.assetId)layer.params.assetId=assetMap.get(layer.params.assetId);}};
+ for(const keyword of newKeywords)mapEffects(keyword.visualEffects);
  card.id=fresh();if(card.artAssetId)card.artAssetId=assetMap.get(card.artAssetId);mapKeywords(card);mapEffects(card.visualEffects);mapEffects(card.nameStyle?.visualEffects);
  for(const skill of skills(card)){
   skill.id=mapSkill(skill.id);remapSkillReferences(skill,mapSkill,()=>fresh());mapKeywords(skill);mapEffects(skill.nameStyle?.visualEffects);

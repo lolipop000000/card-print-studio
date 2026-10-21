@@ -3,6 +3,7 @@ import {effectRandom} from './random.js';
 import {blurBloomOnGpu,recordCpuBloom} from './gpu-bloom.js';
 import {applyGpuFilter} from './gpu-filters.js';
 import {recordCpuEffect} from './gpu-runtime.js';
+import {heatHazeField,heatHazeShift} from './heat-haze.js';
 
 const clamp=(value,min=0,max=1)=>Math.max(min,Math.min(max,value));
 const number=(value,fallback,min,max)=>clamp(Number.isFinite(value)?value:fallback,min,max);
@@ -156,16 +157,26 @@ function displacement(surface,layer,p,timeSec,seed){
  output.ctx.putImageData(pixels,0,0);return output;
 }
 
+function heatHaze(surface,layer,timeSec,seed){
+ const field=heatHazeField(surface,layer,timeSec,seed),source=imageData(surface);if(!field.amount)return copy(surface,source);
+ const {width:w,height:h}=source,output=fresh(surface),pixels=output.ctx.createImageData(w,h),d=premultiply(source.data),tmp=new Float64Array(4),shift=new Float64Array(2);
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+  heatHazeShift(field,x,y,shift);sample(d,w,h,x-shift[0],y-shift[1],tmp);writePixel(pixels.data,(y*w+x)*4,tmp[0],tmp[1],tmp[2],tmp[3]);
+ }
+ output.ctx.putImageData(pixels,0,0);return output;
+}
+
 /** Independent full-accumulator filters. The compositor owns opacity, scope,
  * protection and clipping. Unknown kinds let the dispatch chain try its next family. */
 export function applyCreativeFilter(surface,layer,{rect=surface.work,timeSec=1.2,seed=1,bloomBackend='auto',backend='auto'}={}){
  if(backend!=='cpu'){const gpu=applyGpuFilter(surface,layer,{rect,timeSec,seed});if(gpu)return gpu;}
- if(['directionalBlur','displacement'].includes(layer.kind))recordCpuEffect(layer.kind);
+ if(['directionalBlur','displacement','heatHaze'].includes(layer.kind))recordCpuEffect(layer.kind);
  const p=layer.params||{};
  switch(layer.kind){
   case 'bloom':return bloom(surface,p,bloomBackend);
   case 'directionalBlur':return directionalBlur(surface,p);
   case 'displacement':return displacement(surface,layer,p,timeSec,seed);
+  case 'heatHaze':return heatHaze(surface,layer,timeSec,seed);
   default:return null;
  }
 }
