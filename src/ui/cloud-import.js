@@ -26,12 +26,12 @@ export async function openCloudImport(ctx,{client,blobs,workspace,assetLibrary})
  async function run(){
   const selected=summary();if(upload.disabled)return;busy=true;attempted=true;render();feedback.textContent='';let done=0,failed=0;
   try{
-   check();const run=await client.call('import.begin',{});check();if(typeof run.token!=='string'||!run.token)throw Error('올리기 토큰을 받지 못했어요. 다시 로그인하세요.');
+   check();const run=await client.call('import.begin',{},{expectedUserId:owner});check();if(typeof run.token!=='string'||!run.token)throw Error('올리기 토큰을 받지 못했어요. 다시 로그인하세요.');
    for(const item of selected){
     check();progress.textContent='올리는 중 '+(done+failed+1)+' / '+selected.length+' · '+item.title;
     try{
-     await blobs.ensureUploaded(item.snapshot.blobBytes,{importToken:run.token,onProgress:value=>{if(!closed)progress.textContent='그림 '+value.done+' / '+value.total+' · '+item.title;}});check();
-     await client.call(item.type==='image'?'asset.create':'work.create',item.type==='image'?{kind:'image',title:item.title,data:item.snapshot.data,importToken:run.token}:{title:item.title,data:item.snapshot.data,importToken:run.token});check();
+     await blobs.ensureUploaded(item.snapshot.blobBytes,{expectedUserId:owner,importToken:run.token,onProgress:value=>{if(!closed)progress.textContent='그림 '+value.done+' / '+value.total+' · '+item.title;}});check();
+     await client.call(item.type==='image'?'asset.create':'work.create',item.type==='image'?{kind:'image',title:item.title,data:item.snapshot.data,importToken:run.token}:{title:item.title,data:item.snapshot.data,importToken:run.token},{expectedUserId:owner});check();
      item.done=true;item.checked=false;done++;
     }catch(error){if(closed)break;item.error=error.message;failed++;if(error.code==='not-member'||error.status===401)throw error;}
     render();

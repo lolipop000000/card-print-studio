@@ -2,8 +2,8 @@ export async function installCloud(page,options={}){
  await page.evaluate(options=>{
   const fixture={loggedIn:options.loggedIn??true,profile:{id:options.id??'u',nickname:options.nickname===undefined?'친구':options.nickname,status:options.status??'member'},calls:[],auth:new Set(),feed:new Set(),feedRows:[],works:[],assets:[],blobs:new Map(),usage:{cards:0,blob_bytes:0}};
   const client={availability:{available:true,reason:null},config:{url:'https://example.supabase.co',anonKey:'public',pagesOrigin:'https://lolipop000000.github.io'},
-   async session(){return fixture.loggedIn?{user:{id:'u'},accessToken:'test'}:null;},async myProfile(){return fixture.loggedIn?structuredClone(fixture.profile):null;},
-   onAuthChange(fn){fixture.auth.add(fn);return ()=>fixture.auth.delete(fn);},async signIn(){fixture.loggedIn=true;for(const fn of fixture.auth)fn();},async signOut(){fixture.loggedIn=false;for(const fn of fixture.auth)fn();},
+   async session(){return fixture.loggedIn?{user:{id:fixture.profile.id},accessToken:'test'}:null;},async myProfile(){return fixture.loggedIn?structuredClone(fixture.profile):null;},
+   onAuthChange(fn){fixture.auth.add(fn);return ()=>fixture.auth.delete(fn);},async signIn(){fixture.loggedIn=true;for(const fn of fixture.auth)fn(await this.session());},async signOut(){fixture.loggedIn=false;for(const fn of fixture.auth)fn(null);},
    async select(table,query={}){const rows=table==='works'?fixture.works:table==='shared_assets'?fixture.assets:table==='public_feed'?fixture.feedRows:table==='work_drafts'?[]:table==='tier_limits'?[{tier:'trial',max_cards:10,max_blob_bytes:15728640},{tier:'member',max_cards:120,max_blob_bytes:157286400}]:[];const selected=rows.filter(row=>Object.entries(query.eq??{}).every(([key,value])=>row[key]===value)&&Object.entries(query.is??{}).every(([key,value])=>row[key]===value));return structuredClone(query.single?selected[0]??null:selected);},
    async usage(){return {...fixture.usage};},subscribeFeed(fn){fixture.feed.add(fn);return ()=>fixture.feed.delete(fn);},
    async call(action,payload){fixture.calls.push({action,payload:structuredClone(payload)});
@@ -12,7 +12,7 @@ export async function installCloud(page,options={}){
     if(action==='blob.missing')return {missing:payload.hashes.filter(hash=>!fixture.blobs.has(hash))};
     if(action==='import.begin'){if(fixture.importStarted)throw Object.assign(new Error('PC 작업 올리기는 하루에 한 번만 할 수 있어요.'),{status:429,code:'limit-import'});fixture.importStarted=true;return {token:'import-token',expiresAt:new Date(Date.now()+7200000).toISOString()};}
     if(action==='work.create'){const row={id:crypto.randomUUID(),owner:'u',title:payload.title,data:structuredClone(payload.data),version:1,visibility:'private',deleted_at:null,updated_at:new Date().toISOString()};fixture.works.push(row);return {id:row.id,version:1};}
-    if(action==='work.save'){const row=fixture.works.find(row=>row.id===payload.id);row.data=structuredClone(payload.data);return {version:++row.version};}
+    if(action==='work.save'){const row=fixture.works.find(row=>row.id===payload.id);if(row.version!==payload.baseVersion)throw Object.assign(Error('다른 곳에서 먼저 저장했어요.'),{code:'conflict',status:409});row.data=structuredClone(payload.data);return {version:++row.version};}
     if(action==='work.saveDraft')return {savedAt:new Date().toISOString()};
     if(action==='asset.create'){const row={id:crypto.randomUUID(),kind:payload.kind,title:payload.title,data:structuredClone(payload.data),owner:fixture.profile.id,visibility:'private',version:1,deleted_at:null,updated_at:new Date().toISOString()};fixture.assets.push(row);return {id:row.id,version:1};}
     if(action==='asset.save'){const row=fixture.assets.find(row=>row.id===payload.id);row.data=structuredClone(payload.data);return {version:++row.version};}

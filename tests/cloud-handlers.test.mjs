@@ -68,8 +68,18 @@ test('uploadBlob is idempotent and enforces the tier byte limit',async()=>{
  const {api,state}=setup(),hash=await sha256Hex(png);await api.uploadBlob(user,hash,png);await api.uploadBlob(user,hash,png);assert.equal(state.puts.length,1);assert.equal(state.blobs.size,1);
  const tiny=setup();tiny.state.tiers.get('member').max_blob_bytes=png.length-1;await rejects(tiny.api.uploadBlob(user,hash,png),'limit-bytes',429);
 });
+test('outstanding uploads reserve cumulative quota and deduplicate until attached or collected',async()=>{
+ const {api,state,repo,create}=setup('trial'),one=png,two=new Uint8Array([...png,0]),three=new Uint8Array([...png,1]);
+ const hashes=await Promise.all([one,two,three].map(sha256Hex));state.tiers.get('trial').max_blob_bytes=one.length+two.length;
+ await api.uploadBlob(user,hashes[0],one);await api.uploadBlob(user,hashes[0],one);await api.uploadBlob(user,hashes[1],two);
+ await rejects(api.uploadBlob(user,hashes[2],three),'limit-bytes',429);
+ assert.equal((await repo.usage(user.id)).blob_bytes,one.length+two.length);assert.equal(state.puts.length,2);
+ const p=work(1);p.assets.art={id:'art',mime:'image/png',width:1,height:1,paintingId:null,dataUrl:'blob:sha256:'+hashes[0]};
+ const {id}=await create(1,{data:p});assert.equal((await repo.usage(user.id)).blob_bytes,one.length+two.length);
+ await api.handle(user,'work.delete',{id});assert.equal((await repo.usage(user.id)).blob_bytes,two.length);
+});
 test('work and asset writes calculate unique live blob usage including drafts and restoration',async()=>{
- const {api,state,create}=setup(),hash=await sha256Hex(png);await api.uploadBlob(user,hash,png);
+ const {api,state,create}=setup(),hash=await sha256Hex(png);await api.uploadBlob(other,hash,png);
  state.tiers.get('member').max_blob_bytes=png.length-1;
  const p=work(1);p.assets.art={id:'art',mime:'image/png',width:1,height:1,paintingId:null,dataUrl:'blob:sha256:'+hash};
  await rejects(create(1,{data:p}),'limit-bytes');

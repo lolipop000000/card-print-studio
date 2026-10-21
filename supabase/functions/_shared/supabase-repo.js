@@ -1,5 +1,6 @@
 // The authenticated HTTP adapter creates one of these per request. A database
 // transaction and advisory lock protect quota checks across separate isolates.
+import {GC_LOCK,GC_PENDING} from './maintenance-repo.js';
 const uuid=value=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 export function createSupabaseRepo(sql){
  let db=sql,owner=null,audits=null;
@@ -20,6 +21,7 @@ export function createSupabaseRepo(sql){
     result=await sql.begin(async transaction=>{
      db=transaction;owner=uuid(id)?id:null;audits=pending;
      await db`set local lock_timeout = '10s'`;await db`set local statement_timeout = '15s'`;
+     await db`select pg_advisory_xact_lock_shared(${GC_LOCK})`;
      await db`select pg_advisory_xact_lock(hashtextextended(${id},0))`;
      const output=await operation();
      for(const entry of pending)await db`insert into public.audit_log ${db({...entry,detail:db.json(entry.detail)},'actor','action','target','ok','detail')}`;
@@ -46,6 +48,10 @@ export function createSupabaseRepo(sql){
    let cards=0;const refs=new Set(changes.extraRefs??[]),add=row=>{for(const ref of row?.blob_refs??[])refs.add(ref);};
    for(const row of workMap.values())if(row.owner===id&&!row.deleted_at){const draft=draftMap.get(row.id);cards+=Math.max(row.card_count,draft?.card_count??0);add(row);add(draft);}
    for(const row of assetMap.values())if(row.owner===id&&!row.deleted_at)add(row);
+   // A newly uploaded image reserves bytes before a work can reference it.
+   // Historical/trash references are already attached, rather than pending.
+   const pending=await db`select sha256 from public.blobs b where uploader=${id} and not exists (select 1 from (select unnest(blob_refs) as sha from public.works union all select unnest(blob_refs) from public.work_drafts union all select unnest(blob_refs) from public.work_versions union all select unnest(blob_refs) from public.shared_assets) refs where refs.sha=b.sha256)`;
+   for(const row of pending)refs.add(row.sha256);
    const sizes=refs.size?await db`select sha256,bytes from public.blobs where sha256=any(${db.array([...refs],1009)})`:[];
    const byteMap=new Map(sizes.map(row=>[row.sha256,Number(row.bytes)]));let blob_bytes=0;
    for(const ref of refs)blob_bytes+=changes.extraSizes?.[ref]??byteMap.get(ref)??0;
@@ -65,7 +71,7 @@ export function createSupabaseRepo(sql){
   async pushVersion(id,version,data,refs){await db`insert into public.work_versions(work_id,version,data,blob_refs) values(${id},${version},${db.json(data)},${db.array(refs,1009)})`;},
   async pruneVersions(id,keep){await db`delete from public.work_versions where work_id=${id} and id not in(select id from public.work_versions where work_id=${id} order by version desc limit ${keep})`;},
   async hasBlobs(hashes){if(!hashes.length)return [];return (await db`select sha256 from public.blobs where sha256=any(${db.array(hashes,1009)})`).map(row=>row.sha256);},
-  async insertBlob(row){await db`insert into public.blobs ${db(row,'sha256','mime','bytes','uploader','created_at')} on conflict(sha256) do nothing`;},
+  async insertBlob(row){await db`insert into public.blobs ${db(row,'sha256','mime','bytes','uploader','created_at')} on conflict(sha256) do nothing`;await db`delete from public.audit_log where action=${GC_PENDING} and detail->>'sha256'=${row.sha256}`;},
   async importRunsSince(id,ms){return await db`select * from public.import_runs where owner=${id} and started_at>${new Date(ms)}`;},
   async startImport(id,options){return (await db`insert into public.import_runs(owner,token,started_at,expires_at) values(${id},${crypto.randomUUID()},${options.started_at},${options.expires_at}) returning *`)[0];},
   async consumeImport(token,counter){if(!['decks','blobs'].includes(counter))throw Error('Invalid import counter');await db`update public.import_runs set ${db(counter)}=${db(counter)}+1 where token=${token} and owner=${owner}`;}

@@ -23,7 +23,7 @@ export async function snapshotAsset(project,kind,itemId){
 const uniqueName=(name,items)=>{const names=new Set(items.map(item=>item.name.normalize('NFC')));let next=name,index=1;while(names.has(next)){const suffix=' ('+(++index)+')';next=Array.from(name).slice(0,120-suffix.length).join('')+suffix;}return next;};
 export async function applySharedAsset(project,data,fetchBlob){
  validateCloudAsset(data.kind,data);const field=fields[data.kind];if(!field)throw Error('이미지는 내 이미지 보관함에 가져오세요.');
- const decoded=await fromCloudProject(data.kind==='card_template'?data.item:data,fetchBlob),item=structuredClone(data.kind==='card_template'?decoded:decoded.item),resources=remapTemplateResources(decoded,()=>newId());
+ const decoded=await fromCloudProject(data.kind==='card_template'?data.item:data,fetchBlob),item=structuredClone(data.kind==='card_template'?decoded:decoded.item),resources=remapTemplateResources({...decoded,assets:decoded.assets??{},paintings:decoded.paintings??{}},()=>newId());
  item.id=newId();item.name=uniqueName(item.name,project[field]??[]);
  if(data.kind==='keyword'){if(item.iconAssetId)item.iconAssetId=resources.assetMap.get(item.iconAssetId);}
  else if(data.kind==='effect_template')item.recipe=resources.mapEffect(item.recipe,'any');
@@ -68,11 +68,11 @@ export function createCloudLibraryStorage({cache,pendingCache,client,blobs,owner
     for(const entry of snapshot.entries){
      const encoded=await snapshotLibraryEntry(entry);check();let row=rows.get(entry.id);
      if(row&&JSON.stringify(row.data)===JSON.stringify(encoded.data))continue;
-     await blobs.ensureUploaded(encoded.blobBytes);check();
-     const result=await client.call(row?'asset.save':'asset.create',row?{id:row.id,data:encoded.data,baseVersion:row.version}:{kind:'image',title:entry.name,data:encoded.data});check();
+     await blobs.ensureUploaded(encoded.blobBytes,{expectedUserId:owner});check();
+     const result=await client.call(row?'asset.save':'asset.create',row?{id:row.id,data:encoded.data,baseVersion:row.version}:{kind:'image',title:entry.name,data:encoded.data},{expectedUserId:owner});check();
      row={id:row?.id??result.id,owner,kind:'image',title:entry.name,data:encoded.data,version:result.version,visibility:row?.visibility??'private',deleted_at:null};rows.set(entry.id,row);await preserve();check();
     }
-    const ids=new Set(snapshot.entries.map(entry=>entry.id));for(const [id,row] of rows)if(!ids.has(id)){await client.call('asset.delete',{id:row.id});check();rows.delete(id);}
+    const ids=new Set(snapshot.entries.map(entry=>entry.id));for(const [id,row] of rows)if(!ids.has(id)){await client.call('asset.delete',{id:row.id},{expectedUserId:owner});check();rows.delete(id);}
     await pendingCache?.set(null);check();publish({mode:'cloud',pending:false,message:null});return snapshot;
    }catch(error){if(!disposed)publish({mode:'error',pending:true,message:error.message});throw error;}
   });},

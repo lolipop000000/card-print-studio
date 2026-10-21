@@ -24,6 +24,40 @@ async function setup(){
  return {timer,store,client,blobs,session,calls,remote,faults,edit:name=>store.edit('이름',p=>p.name=name)};
 }
 const count=(calls,action)=>calls.filter(call=>call.action===action).length;
+test('account switch or external sign-out during upload prevents old private content reaching a new identity',async()=>{
+ for(const next of ['other',null]){const x=await setup();try{
+  x.store.load(createProject());x.edit('A 계정의 비공개');let release;const gate=new Promise(resolve=>release=resolve);x.blobs.ensureUploaded=async()=>gate;
+  const saving=x.session.save();await new Promise(setImmediate);x.client.session=async()=>next?{user:{id:next},accessToken:'next'}:null;release();
+  await assert.rejects(saving);assert.equal(count(x.calls,'work.create'),0);assert.equal(x.store.getProject().name,'A 계정의 비공개');assert.equal(x.store.isDirty(),true);
+  assert.equal(x.session.state().status,'read-only');x.session.resumeWrites();await assert.rejects(x.session.save());assert.equal(count(x.calls,'work.create'),0);
+ }finally{x.session.dispose();}}
+});
+test('account change during open hydration does not load another accounts private deck',async()=>{
+ const x=await setup();try{
+  let release;const gate=new Promise(resolve=>release=resolve),select=x.client.select;x.client.select=async(...args)=>{const row=await select(...args);if(args[0]==='work_drafts')await gate;return row;};
+  x.edit('현재 덱 보존');const opening=x.session.open('w');await new Promise(setImmediate);x.client.session=async()=>({user:{id:'other'},accessToken:'other'});release();
+  await assert.rejects(opening);assert.equal(x.store.getProject().name,'현재 덱 보존');
+ }finally{x.session.dispose();}
+});
+test('account boundary cancels in-flight create results and queued saves without marking recovery clean',async()=>{
+ const x=await setup();try{
+  x.store.load(createProject());x.edit('A 소유 내용');let release;const gate=new Promise(resolve=>release=resolve),call=x.client.call;
+  x.client.call=async(...args)=>{if(args[0]==='work.create'){assert.equal(args[2].expectedUserId,'u');await gate;}return call(...args);};
+  const first=x.session.save(),second=x.session.save();first.catch(()=>{});second.catch(()=>{});await new Promise(setImmediate);
+  x.client.session=async()=>({user:{id:'other'},accessToken:'other'});x.session.setIdentity('other');release();
+  await assert.rejects(first);await assert.rejects(second);assert.equal(count(x.calls,'work.create'),1);assert.equal(x.session.state().workId,null);assert.equal(x.store.isDirty(),true);
+ }finally{x.session.dispose();}
+});
+test('account boundary cancels queued autosave while preserving the current document',async()=>{
+ const x=await setup();try{
+  let release;const gate=new Promise(resolve=>release=resolve);x.blobs.ensureUploaded=async()=>gate;x.edit('A 초안');const save=x.session.save();save.catch(()=>{});await new Promise(setImmediate);
+  const ticking=x.timer.advance(30000);await new Promise(setImmediate);x.client.session=async()=>null;x.session.setIdentity(null);release();
+  await assert.rejects(save);await ticking;assert.equal(count(x.calls,'work.saveDraft'),0);assert.equal(count(x.calls,'work.save'),0);assert.equal(x.store.getProject().name,'A 초안');assert.equal(x.store.isDirty(),true);
+ }finally{x.session.dispose();}
+});
+test('account boundary retains public view-only mode until another document is opened',async()=>{
+ const x=await setup();try{x.remote.work.owner='friend';await x.session.open('w');assert.equal(x.session.state().viewing,true);x.session.setIdentity(null);assert.equal(x.session.state().viewing,true);assert.equal(x.session.state().status,'read-only');}finally{x.session.dispose();}
+});
 test('account read-only cancels delayed writes and can resume after approval',async()=>{
  const x=await setup();try{
   let release;const gate=new Promise(resolve=>release=resolve);x.blobs.ensureUploaded=async()=>gate;x.edit('승인 전');const saving=x.session.save();await new Promise(setImmediate);x.session.setReadOnly();release();await saving.catch(()=>{});
@@ -65,7 +99,7 @@ test('open prefers the draft and marks it dirty until confirmed',async()=>{
 });
 test('refreshes expired session once before surfacing a repeated 401',async()=>{
  const timer=clock(),store=createStore(createProject());let attempts=0,refreshes=0;
- const client=createCloudClient({config:{url:'https://example.supabase.co',anonKey:'public'},location:{protocol:'https:'},createSupabase:()=>({auth:{async getSession(){return {data:{session:{user:{id:'u'},access_token:'expired'}}};},async refreshSession(){refreshes++;return {data:{session:{user:{id:'u'},access_token:'new'}}};}}}),fetchImpl:async()=>{attempts++;return new Response(JSON.stringify({ok:false,code:'unauthenticated',message:'로그인 만료'}),{status:401});}});
+ const client=createCloudClient({config:{url:'https://example.supabase.co',anonKey:'public'},location:{protocol:'https:'},createSupabase:()=>({auth:{onAuthStateChange(){return {data:{subscription:{unsubscribe(){}}}};},async getSession(){return {data:{session:{user:{id:'u'},access_token:'expired'}}};},async refreshSession(){refreshes++;return {data:{session:{user:{id:'u'},access_token:'new'}}};}}}),fetchImpl:async()=>{attempts++;return new Response(JSON.stringify({ok:false,code:'unauthenticated',message:'로그인 만료'}),{status:401});}});
  const session=createCloudSession({store,client,blobs:{async ensureUploaded(){}},now:timer.now,setTimer:timer.setTimer});try{store.edit('미저장',p=>p.name='유지');await assert.rejects(session.createFromCurrent('유지'));assert.equal(attempts,2);assert.equal(refreshes,1);assert.equal(session.state().status,'error');assert.equal(store.isDirty(),true);}finally{session.dispose();}
 });
 test('edits during an in-flight save remain dirty and schedule a later draft',async()=>{

@@ -18,6 +18,8 @@ export function memoryRepo({now=()=>Date.now()}={}){
    const assets=new Map(state.assets);if(changes.asset)assets.set(changes.asset.id,changes.asset);
    for(const row of assets.values())if(row.owner===id&&!row.deleted_at)add(row);
    for(const ref of changes.extraRefs??[])refs.add(ref);
+   const attached=new Set([...state.works.values(),...state.drafts.values(),...state.assets.values(),...[...state.versions.values()].flat()].flatMap(row=>row.blob_refs??[]));
+   for(const row of state.blobs.values())if(row.uploader===id&&!attached.has(row.sha256))refs.add(row.sha256);
    let bytes=0;for(const ref of refs)bytes+=changes.extraSizes?.[ref]??state.blobs.get(ref)?.bytes??0;
    return {cards,blob_bytes:bytes};
   },

@@ -9,11 +9,16 @@ const config={url:'https://example.supabase.co',anonKey:'public-test-key',pagesO
 const location={protocol:'https:',origin:config.pagesOrigin,pathname:'/card-print-studio/',search:'?code=abc',hash:''};
 function fakeSdk(){
  const calls=[],sdk={auth:{async getSession(){return {data:{session:{user:{id:'u'},access_token:'old'}}};},async refreshSession(){calls.push('refresh');return {data:{session:{user:{id:'u'},access_token:'new'}}};},async signInWithOAuth(value){calls.push(value);return {data:{},error:null};},async signOut(){calls.push('sign-out');return {error:null};},onAuthStateChange(fn){sdk.authCallback=fn;return {data:{subscription:{unsubscribe(){calls.push('unsubscribe');}}}};}},
-  from(table){calls.push({table});const query={select(columns){calls.push({columns});return query;},eq(key,value){calls.push({eq:[key,value]});return query;},is(key,value){calls.push({is:[key,value]});return query;},order(key,value){calls.push({order:[key,value]});return query;},limit(value){calls.push({limit:value});return query;},maybeSingle(){return Promise.resolve({data:{id:'u',nickname:'카드',status:'member'},error:null});},then(resolve,reject){return Promise.resolve({data:[{id:'row'}],error:null}).then(resolve,reject);}};return query;},
+  from(table){calls.push({table});const query={select(columns){calls.push({columns});return query;},eq(key,value){calls.push({eq:[key,value]});return query;},is(key,value){calls.push({is:[key,value]});return query;},order(key,value){calls.push({order:[key,value]});return query;},limit(value){calls.push({limit:value});return query;},range(start,end){calls.push({range:[start,end]});return query;},maybeSingle(){return Promise.resolve({data:{id:'u',nickname:'카드',status:'member'},error:null});},then(resolve,reject){return Promise.resolve({data:[{id:'row'}],error:null}).then(resolve,reject);}};return query;},
   channel(name){calls.push({channel:name});const channel={on(type,filter,fn){calls.push({type,filter});sdk.feedCallback=fn;return channel;},subscribe(){calls.push('subscribe');return channel;}};return channel;},removeChannel(){calls.push('remove-channel');}
  };return {sdk,calls,createSupabase:(url,key,options)=>{calls.push({url,key,options});return sdk;}};
 }
 const response=(status,result,code='unauthenticated')=>new Response(JSON.stringify(status===200?{ok:true,result}:{ok:false,code,message:'안내'}),{status,headers:{'Content-Type':'application/json'}});
+test('collection reads use stable pages beyond the REST 1000 row cap',async()=>{
+ const rows=Array.from({length:2003},(_,i)=>({id:String(i).padStart(5,'0')})),ranges=[],orders=[];
+ const client=createCloudClient({config,location,createSupabase:()=>({from(){let start=0,end=999;const q={select(){return q;},order(key){orders.push(key);return q;},range(a,b){ranges.push([a,b]);start=a;end=b;return q;},then(resolve,reject){return Promise.resolve({data:rows.slice(start,end+1),error:null}).then(resolve,reject);}};return q;}})});
+ const found=await client.select('shared_assets');assert.equal(found.length,2003);assert.equal(found.at(-1).id,'02002');assert.deepEqual(ranges,[[0,999],[1000,1999],[2000,2999]]);assert.ok(orders.every(key=>key==='id'));
+});
 test('file protocol and empty config are unavailable with reasons',()=>{
  assert.deepEqual(cloudAvailability({protocol:'file:'},config),{available:false,reason:'file'});
  assert.deepEqual(cloudAvailability(location,{url:'',anonKey:''}),{available:false,reason:'unconfigured'});
@@ -26,6 +31,11 @@ test('call retries once after refreshing an expired session and never loops',asy
  assert.equal(requests[0].init.headers.apikey,config.anonKey);assert.equal(requests[0].url,config.url+'/functions/v1/api');
  const denied=fakeSdk();let attempts=0;const bad=createCloudClient({config,location,createSupabase:denied.createSupabase,fetchImpl:async()=>{attempts++;return response(401);}});
  await assert.rejects(bad.call('work.save',{}),e=>e instanceof CloudError&&e.status===401);assert.equal(attempts,2);assert.equal(denied.calls.filter(c=>c==='refresh').length,1);
+});
+test('an expired request never retries its private body under another refreshed account',async()=>{
+ const fake=fakeSdk();let requests=0;fake.sdk.auth.refreshSession=async()=>({data:{session:{user:{id:'other'},access_token:'other-token'}}});
+ const client=createCloudClient({config,location,createSupabase:fake.createSupabase,fetchImpl:async()=>{requests++;return response(401);}});
+ await assert.rejects(client.call('work.create',{data:{private:'A'}},{expectedUserId:'u'}),e=>e.code==='account-changed');assert.equal(requests,1);
 });
 test('call surfaces not-member without retry and network errors are actionable',async()=>{
  const fake=fakeSdk();let attempts=0;const client=createCloudClient({config,location,createSupabase:fake.createSupabase,fetchImpl:async()=>{attempts++;return response(403,null,'not-member');}});

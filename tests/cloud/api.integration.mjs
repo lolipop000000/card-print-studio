@@ -39,6 +39,11 @@ function expect(result,status,code,label='HTTP API'){
  return result.body.result;
 }
 const ok=async(role,action,payload,options)=>expect(await request(role,action,payload,options),200);
+test('trial pending image uploads cannot bypass the cumulative 15 MiB quota',async()=>{
+ const role=f.roles.find(role=>role.name==='trial'),images=[0,1].map(()=>Buffer.concat([uniquePng(f.png),Buffer.alloc(8*1024*1024)])),hashes=images.map(hash);f.hashes.push(...hashes);
+ try{expect(await request(role,'blob.upload',{}, {bytes:images[0]}),200);expect(await request(role,'blob.upload',{}, {bytes:images[1]}),429,'limit-bytes');}
+ finally{await f.admin.storage.from('blobs').remove(hashes);must(await f.admin.from('blobs').delete().in('sha256',hashes),'clean quota upload metadata');}
+});
 
 test('full permission matrix over HTTP',async()=>{
  const expected={anon:[401,'unauthenticated'],pending:[403,'not-member'],revoked:[403,'not-member'],trial:[200],memberA:[200],memberB:[200]};

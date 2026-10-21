@@ -5,6 +5,13 @@ import {createVisualEffects,makeVisualEffectLayer} from '../src/model/visual-eff
 import {saveCardTemplate} from '../src/model/card-templates.js';
 import {createAssetLibrary,createLibraryEntry} from '../src/model/asset-library.js';
 import {snapshotAsset,applySharedAsset,snapshotLibraryEntry,applyLibraryEntry,createCloudLibraryStorage} from '../src/cloud/shared-assets.js';
+import {createCloudClient} from '../src/cloud/client.js';
+test('image library never sends an old owners pending snapshot with a new account token',async()=>{
+ let identity='u',release,started;const gate=new Promise(resolve=>release=resolve),ready=new Promise(resolve=>started=resolve),requests=[];
+ const client=createCloudClient({config:{url:'https://example.supabase.co',anonKey:'public'},location:{protocol:'https:'},createSupabase:()=>({auth:{async getSession(){return {data:{session:{user:{id:identity},access_token:identity}}};}}}),fetchImpl:async(url,init)=>{requests.push(init);return new Response(JSON.stringify({ok:true,result:{id:'wrong-owner-copy',version:1}}));}});
+ client.select=async()=>[];const cache={load:async()=>({format:'card-print-studio-assets',version:1,entries:[]}),save:async()=>{},destroy(){}},storage=createCloudLibraryStorage({cache,client,blobs:{async ensureUploaded(){started();await gate;}},owner:'u'});
+ try{const library=await storage.load();library.entries.push(createLibraryEntry(art(),'A 개인 그림'));const saving=storage.save(library);await ready;identity='other';release();await assert.rejects(saving,error=>error.code==='account-changed');assert.equal(requests.length,0);}finally{storage.destroy();}
+});
 const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5EE2cAAAAASUVORK5CYII=';
 const art=()=>({id:'art',mime:'image/png',dataUrl:png,width:1,height:1,paintingId:null});
 function project(){const p=createProject();p.assets.art=art();p.keywords=[{id:'kw',name:'별빛',description:'반짝이는 효과',color:'#3355aa',iconAssetId:'art'}];const recipe=createVisualEffects();recipe.layers.push(makeVisualEffectLayer('sprite',{params:{assetId:'art'}}));p.visualEffectPresets=[{id:'fx',name:'별 입자',recipe}];p.cards[0].elements.push({id:'decor',type:'image',binding:null,assetId:'art',rect:{x:0,y:0,w:5,h:5},style:{}});saveCardTemplate(p,p.cards[0].id,'별 서식');return p;}
