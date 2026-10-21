@@ -44,7 +44,7 @@
 **Files:**
 - Create: `docs/cloud-setup.md`
 
-- [ ] **Step 1:** `docs/cloud-setup.md`에 순서를 작성한다.
+- [x] **Step 1:** `docs/cloud-setup.md`에 순서를 작성한다. (2026-10-21 작성 완료. 상세 절차는 그 문서를 보고, 아래는 요약이다.)
   1. Supabase 프로젝트 두 개를 만든다. 운영용 `card-studio`와 테스트용 `card-studio-test`이며, 무료 플랜 2개를 다 쓴다.
   2. Supabase 계정과 관리자 Google 계정에 2단계 인증을 켠다.
   3. Google Cloud Console에서 OAuth 클라이언트(웹)를 만든다. 승인된 리디렉션 URI는 운영 프로젝트의 `https://<ref>.supabase.co/auth/v1/callback`이다.
@@ -54,12 +54,8 @@
   7. 비공개 저장소 `card-print-studio-backup`을 만들고, 쓰기 권한이 있는 fine-grained PAT를 발급한다.
   8. GitHub Actions secrets: `SUPABASE_DB_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `BACKUP_REPO_TOKEN`
   9. 로컬 테스트용 환경 변수 파일 `.env.cloud-test`(gitignore에 추가): `CLOUD_TEST_URL`, `CLOUD_TEST_ANON_KEY`, `CLOUD_TEST_SERVICE_KEY`, `CLOUD_TEST_DB_URL`
-- [ ] **Step 2:** `.gitignore`에 `.env.cloud-test`를 추가하고 커밋한다.
-
-```bash
-git add docs/cloud-setup.md .gitignore
-git commit -m "docs: add cloud operator setup checklist"
-```
+- [x] **Step 2:** `.env.cloud-test`는 기존 `.gitignore`의 `.env.*` 규칙으로 이미 제외된다. `git check-ignore .env.cloud-test`로 확인한다.
+- [ ] **Step 3 (사용자):** 사용자가 `docs/cloud-setup.md`의 체크 항목을 모두 끝냈다고 알려 줄 때까지 원격 단계(Task 3·5·12·14·15)를 시작하지 않는다. 원격 없이 가능한 작업은 부록 D를 본다.
 
 ---
 
@@ -127,6 +123,8 @@ git commit -m "docs: add cloud operator setup checklist"
 
 ### Task 3: 데이터베이스 스키마, RLS, 공개 피드
 
+> 마이그레이션 원문은 **부록 A**, 테스트 기대값은 **부록 B**에 있다. 아래 Interfaces는 요약이다.
+
 **Files:**
 - Create: `supabase/config.toml` (`npx supabase init` 결과)
 - Create: `supabase/migrations/20261021000001_cloud_schema.sql`
@@ -178,6 +176,8 @@ git commit -m "docs: add cloud operator setup checklist"
 
 ### Task 4: API 핸들러 (순수 로직)
 
+> 요청·응답 형식, 동시성 규칙, 한국어 오류 문구는 **부록 C**, 금지 사항은 **부록 E**에 있다.
+
 **Files:**
 - Create: `supabase/functions/_shared/handlers.js`
 - Create: `supabase/functions/_shared/limits.js`
@@ -214,7 +214,7 @@ git commit -m "docs: add cloud operator setup checklist"
 
 - [ ] **Step 1: 실패하는 테스트 작성** (메모리 repo 사용, 대표 assertion)
   - `pending and revoked users get not-member for every write action`: 모든 action에 대해 반복한다.
-  - `member cannot save, delete or change visibility of another member's work`: `forbidden`
+  - `member cannot save, delete or change visibility of another member's work`: 대상이 비공개면 `not-found`(404), 공개면 `forbidden`(403). 부록 B와 같다.
   - `trial 11th card is rejected via create, save, draft, copy and import`: `limit-cards`. 10장째까지는 성공한다.
   - `member 121st card is rejected`
   - `demoted member over limit keeps existing work but cannot add cards`: 120장에서 trial로 강등된 사용자가 그대로 저장하면 성공하고, 카드를 늘리면 `limit-cards`이다.
@@ -490,6 +490,7 @@ git commit -m "docs: add cloud operator setup checklist"
   - `built html has csp meta with script hash matching inline script`
   - `connect-src contains supabase https and wss and every host the app fetches` (상수 목록과 비교)
   - `dist/index.html equals dist/card-print-studio.html`
+  - `no secret key strings in src or dist` (부록 E)
 - [ ] **Step 2:** FAIL을 확인한다.
 - [ ] **Step 3:** 구현한다.
 - [ ] **Step 4:** 위 테스트와 기존 세 spec이 PASS인지 확인한다(CSP 때문에 기존 기능이 깨지지 않는지 확인).
@@ -529,3 +530,294 @@ git commit -m "docs: add cloud operator setup checklist"
 - [ ] **Step 2:** 테스트 프로젝트에서 실제 Edge 두 개(다른 프로필)로 시나리오를 수동 확인한다: 멤버 A 공개 → 멤버 B 목록에 실시간으로 뜸 → 사본 → 준멤버 11장째 거부 → 해제된 계정 즉시 차단. 스크린샷을 남긴다.
 - [ ] **Step 3:** 운영 프로젝트 반영은 **사용자 확인 후** 진행한다. `db push`, `functions deploy`(api, export-manifest, maintenance), `cloud.json`에 운영 값을 넣고 버전을 1.6.0으로 올린 뒤 Pages를 배포한다. 기존 `release.json`과 `update.json` 절차를 따른다.
 - [ ] **Step 4:** 커밋한다: `chore: cloud sharing verification records`
+
+---
+
+## 부록 A. 마이그레이션 SQL (Task 3, 9) — 그대로 사용
+
+보안의 핵심이므로 아래 원문을 그대로 쓴다. 바꿔야 하면 이유를 커밋 메시지에 적는다.
+
+### A-1. `supabase/migrations/20261021000001_cloud_schema.sql`
+
+```sql
+create extension if not exists pgcrypto;
+
+create table public.tier_limits(
+  tier text primary key check (tier in ('trial','member')),
+  max_cards int not null check (max_cards >= 0),
+  max_blob_bytes bigint not null check (max_blob_bytes >= 0));
+insert into public.tier_limits values ('trial',10,15728640),('member',120,157286400);
+
+create table public.profiles(
+  id uuid primary key references auth.users(id) on delete cascade,
+  nickname text check (nickname is null or char_length(nickname) between 2 and 20),
+  status text not null default 'pending' check (status in ('pending','trial','member','revoked')),
+  created_at timestamptz not null default now());
+create unique index profiles_nickname_ci on public.profiles (lower(nickname)) where nickname is not null;
+
+create function public.handle_new_user() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  insert into public.profiles(id) values (new.id) on conflict (id) do nothing;
+  return new;
+end $$;
+create trigger on_auth_user_created after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+create table public.blobs(
+  sha256 text primary key check (sha256 ~ '^[0-9a-f]{64}$'),
+  mime text not null check (mime in ('image/png','image/jpeg','image/webp')),
+  bytes bigint not null check (bytes > 0 and bytes <= 20971520),
+  uploader uuid not null references public.profiles(id),
+  created_at timestamptz not null default now());
+
+create table public.works(
+  id uuid primary key default gen_random_uuid(),
+  owner uuid not null references public.profiles(id) on delete cascade,
+  title text not null check (char_length(title) between 1 and 120),
+  visibility text not null default 'private' check (visibility in ('private','public')),
+  data jsonb not null,
+  card_count int not null check (card_count >= 0),
+  blob_refs text[] not null default '{}',
+  version int not null default 1 check (version >= 1),
+  source_work_id uuid,
+  source_owner uuid,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  deleted_at timestamptz);
+create index works_owner on public.works(owner);
+create index works_public on public.works(updated_at desc) where visibility = 'public' and deleted_at is null;
+
+create table public.work_drafts(
+  work_id uuid primary key references public.works(id) on delete cascade,
+  owner uuid not null references public.profiles(id) on delete cascade,
+  data jsonb not null,
+  card_count int not null check (card_count >= 0),
+  blob_refs text[] not null default '{}',
+  saved_at timestamptz not null default now());
+
+create table public.work_versions(
+  id bigserial primary key,
+  work_id uuid not null references public.works(id) on delete cascade,
+  version int not null,
+  data jsonb not null,
+  blob_refs text[] not null default '{}',
+  created_at timestamptz not null default now(),
+  unique (work_id, version));
+
+create table public.shared_assets(
+  id uuid primary key default gen_random_uuid(),
+  owner uuid not null references public.profiles(id) on delete cascade,
+  kind text not null check (kind in ('effect_template','image','card_template','keyword')),
+  title text not null check (char_length(title) between 1 and 120),
+  visibility text not null default 'private' check (visibility in ('private','public')),
+  data jsonb not null,
+  blob_refs text[] not null default '{}',
+  version int not null default 1 check (version >= 1),
+  source_asset_id uuid,
+  source_owner uuid,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  deleted_at timestamptz);
+create index assets_owner on public.shared_assets(owner);
+
+create table public.audit_log(
+  id bigserial primary key,
+  actor uuid,
+  action text not null,
+  target uuid,
+  ok boolean not null,
+  detail jsonb not null default '{}',
+  created_at timestamptz not null default now());
+create index audit_actor_time on public.audit_log(actor, action, created_at desc);
+
+create table public.import_runs(
+  id bigserial primary key,
+  owner uuid not null references public.profiles(id) on delete cascade,
+  token text not null unique,
+  decks int not null default 0,
+  blobs int not null default 0,
+  started_at timestamptz not null default now(),
+  expires_at timestamptz not null);
+
+create table public.public_feed(
+  item_id uuid primary key,
+  kind text not null check (kind in ('work','asset')),
+  asset_kind text,
+  owner uuid not null,
+  nickname text,
+  title text not null,
+  version int not null,
+  updated_at timestamptz not null);
+
+-- 테이블마다 별도 함수 (plpgsql은 없는 컬럼 참조를 실행 시점에 오류로 냄)
+create function public.feed_from_work() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if tg_op = 'DELETE' then delete from public.public_feed where item_id = old.id; return old; end if;
+  if new.visibility = 'public' and new.deleted_at is null then
+    insert into public.public_feed(item_id,kind,asset_kind,owner,nickname,title,version,updated_at)
+    values (new.id,'work',null,new.owner,(select nickname from public.profiles where id = new.owner),new.title,new.version,new.updated_at)
+    on conflict (item_id) do update set title = excluded.title, nickname = excluded.nickname,
+      version = excluded.version, updated_at = excluded.updated_at;
+  else
+    delete from public.public_feed where item_id = new.id;
+  end if;
+  return new;
+end $$;
+create trigger works_feed after insert or update or delete on public.works
+  for each row execute function public.feed_from_work();
+
+create function public.feed_from_asset() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if tg_op = 'DELETE' then delete from public.public_feed where item_id = old.id; return old; end if;
+  if new.visibility = 'public' and new.deleted_at is null then
+    insert into public.public_feed(item_id,kind,asset_kind,owner,nickname,title,version,updated_at)
+    values (new.id,'asset',new.kind,new.owner,(select nickname from public.profiles where id = new.owner),new.title,new.version,new.updated_at)
+    on conflict (item_id) do update set title = excluded.title, nickname = excluded.nickname,
+      version = excluded.version, updated_at = excluded.updated_at;
+  else
+    delete from public.public_feed where item_id = new.id;
+  end if;
+  return new;
+end $$;
+create trigger assets_feed after insert or update or delete on public.shared_assets
+  for each row execute function public.feed_from_asset();
+
+create function public.feed_nickname() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  update public.public_feed set nickname = new.nickname where owner = new.id;
+  return new;
+end $$;
+create trigger profiles_feed_nickname after update of nickname on public.profiles
+  for each row execute function public.feed_nickname();
+
+create function public.owner_usage(uid uuid) returns table(cards int, blob_bytes bigint)
+language sql stable security definer set search_path = '' as $$
+  with w as (
+    select greatest(w.card_count, coalesce(d.card_count, 0)) as c,
+           w.blob_refs || coalesce(d.blob_refs, '{}') as refs
+    from public.works w left join public.work_drafts d on d.work_id = w.id
+    where w.owner = uid and w.deleted_at is null),
+  a as (select blob_refs as refs from public.shared_assets where owner = uid and deleted_at is null),
+  h as (select distinct unnest(refs) as sha from (select refs from w union all select refs from a) x)
+  select coalesce((select sum(c) from w), 0)::int,
+         coalesce((select sum(b.bytes) from h join public.blobs b on b.sha256 = h.sha), 0)::bigint
+$$;
+
+insert into storage.buckets(id, name, public, file_size_limit, allowed_mime_types)
+values ('blobs', 'blobs', true, 20971520, array['image/png','image/jpeg','image/webp'])
+on conflict (id) do nothing;
+```
+
+### A-2. `supabase/migrations/20261021000002_cloud_policies.sql`
+
+```sql
+alter table public.tier_limits   enable row level security;
+alter table public.profiles      enable row level security;
+alter table public.blobs         enable row level security;
+alter table public.works         enable row level security;
+alter table public.work_drafts   enable row level security;
+alter table public.work_versions enable row level security;
+alter table public.shared_assets enable row level security;
+alter table public.audit_log     enable row level security;
+alter table public.import_runs   enable row level security;
+alter table public.public_feed   enable row level security;
+
+-- 쓰기 권한 자체를 회수 (RLS에 더한 이중 방어). 쓰기는 service role만.
+revoke insert, update, delete, truncate on all tables in schema public from anon, authenticated;
+revoke all on public.audit_log, public.blobs, public.import_runs from anon, authenticated;
+alter default privileges in schema public revoke insert, update, delete, truncate on tables from anon, authenticated;
+
+create policy works_read on public.works for select to anon, authenticated
+  using ((visibility = 'public' and deleted_at is null) or owner = (select auth.uid()));
+create policy assets_read on public.shared_assets for select to anon, authenticated
+  using ((visibility = 'public' and deleted_at is null) or owner = (select auth.uid()));
+create policy drafts_read on public.work_drafts for select to authenticated
+  using (owner = (select auth.uid()));
+create policy versions_read on public.work_versions for select to authenticated
+  using (exists (select 1 from public.works w where w.id = work_id and w.owner = (select auth.uid())));
+create policy feed_read on public.public_feed for select to anon, authenticated using (true);
+create policy tiers_read on public.tier_limits for select to anon, authenticated using (true);
+create policy profiles_self on public.profiles for select to authenticated using (id = (select auth.uid()));
+
+-- 닉네임만 공개하는 뷰 (뷰 소유자 권한으로 읽으므로 id, nickname 두 열만 노출)
+create view public.public_profiles as select id, nickname from public.profiles;
+grant select on public.public_profiles to anon, authenticated;
+
+revoke execute on function public.owner_usage(uuid) from public, anon, authenticated;
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
+
+-- Realtime: 가벼운 피드만
+alter publication supabase_realtime add table public.public_feed;
+```
+
+`storage.objects`에는 `blobs` 버킷에 대한 insert·update·delete 정책을 **만들지 않는다**. 공개 버킷이라 읽기는 공개 URL로 하고, 쓰기는 service role만 한다.
+
+### A-3. `supabase/migrations/20261021000003_my_usage.sql` (Task 9)
+
+```sql
+create function public.my_usage() returns table(cards int, blob_bytes bigint)
+language sql stable security definer set search_path = '' as $$
+  select * from public.owner_usage((select auth.uid()))
+$$;
+revoke execute on function public.my_usage() from public, anon;
+grant execute on function public.my_usage() to authenticated;
+```
+
+## 부록 B. 권한 행렬 (Task 3·4·5 테스트의 기대값)
+
+✓ = 성공, ✗ = 거부(HTTP 오류 또는 RLS로 0행·오류), ○ = 본인 것만 성공
+
+| 동작 | anon | pending | revoked | trial | member |
+|---|---|---|---|---|---|
+| 공개 work·asset·feed 읽기 | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 다른 사람의 비공개 work·초안·버전 읽기 | ✗ | ✗ | ✗ | ✗ | ✗ |
+| 내 비공개 work·초안·버전 읽기 | — | ○ | ○ | ○ | ○ |
+| 표에 직접 insert·update·delete (REST) | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Storage 직접 업로드 | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `api`의 모든 쓰기 action | 401 | 403 `not-member` | 403 `not-member` | ○ (카드 10장·15 MiB) | ○ (120장·150 MiB) |
+| 다른 사람 work의 수정·삭제·공개 전환 | 401 | 403 | 403 | 404 `not-found` | 404 `not-found` |
+| 공개 work 복사 | 401 | 403 | 403 | ✓ (한도 내) | ✓ (한도 내) |
+| 다른 사람의 비공개 work 복사 | 401 | 403 | 403 | 404 `not-found` | 404 `not-found` |
+| `export-manifest` | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `maintenance` (service key가 아니면) | 401 | 401 | 401 | 401 | 401 |
+
+다른 사람의 비공개 대상과 남의 작업 수정 요청에는 **404**로 응답한다. 존재 여부를 알려 주지 않기 위해서다. 남의 **공개** 작업을 수정·삭제하려 할 때는 `403 forbidden`이다.
+
+## 부록 C. `api` 함수 계약 (Task 4·5·6)
+
+- 요청: `POST /functions/v1/api`, 헤더는 `Authorization: Bearer <사용자 access token>`, `apikey: <anon>`이다.
+  - JSON 본문 `{"action": "...", "payload": {...}}`, 최대 8.5 MiB(작업 8 MiB + 여유)
+  - blob 업로드: `POST /functions/v1/api?action=blob.upload&sha=<hex>`, `Content-Type`은 실제 mime, 본문은 원시 바이트
+- 응답: 성공은 `200 {"ok":true,"result":{...}}`, 실패는 `{"ok":false,"code":"...","message":"한국어 안내"}`와 해당 상태 코드다.
+- CORS: `ALLOWED_ORIGINS` 환경 변수(쉼표 구분, `npx supabase secrets set`)에 있는 출처만 허용한다. 운영은 `https://lolipop000000.github.io`이고, 테스트 프로젝트는 여기에 `http://localhost:4173`을 더한다. `OPTIONS` 요청에 응답한다.
+- 시간 기준: 서버 `now()`만 쓴다. 클라이언트 시각은 믿지 않는다.
+- 낙관적 동시성:
+  - `work.save`: `update works set …, version = version + 1, updated_at = now() where id = $1 and owner = $uid and version = $base and deleted_at is null returning version`. 0행이면 존재와 소유를 다시 확인해서 `404` 또는 `409 conflict`로 응답한다.
+  - `work.saveDraft`: `baseSavedAt`이 null이면 초안 행이 없어야 하고, 값이 있으면 `saved_at`이 같아야 한다. 다르면 `409`
+- 작업실이 그대로 보여 줄 한국어 오류 문구:
+  - `not-member`: "관리자 승인 후 저장과 공유를 쓸 수 있어요."
+  - `limit-cards`: "카드는 최대 {n}장까지 저장할 수 있어요. (지금 {m}장)"
+  - `limit-bytes`: "이미지는 최대 {n} MB까지 저장할 수 있어요."
+  - `limit-rate`: "잠시 후 다시 시도하세요. 한 시간에 저장할 수 있는 횟수를 넘었어요."
+  - `limit-import`: "PC 작업 올리기는 하루에 한 번만 할 수 있어요."
+  - `conflict`: "다른 곳에서 먼저 저장했어요."
+  - `unknown-blob`: "그림 업로드가 끝나지 않았어요. 다시 저장하세요."
+  - `not-found`: "찾을 수 없거나 볼 수 없는 항목이에요."
+
+## 부록 D. 구현 순서와 원격 의존
+
+- 원격 없이 먼저 할 수 있는 것: Task 1, 2, 4, 6, 7, 그리고 Task 8~11의 가짜 클라이언트 기반 UI
+- 테스트 프로젝트가 필요한 것: Task 3, 5, 12의 통합 테스트, Task 14 백업 확인
+- 운영 프로젝트: Task 15 Step 3에서만, 관리자 확인 후
+
+## 부록 E. 하지 말 것 (리뷰어가 확인)
+
+- 작업실 코드(`src/`, `dist/`)에 `service_role`·`secret` 키 문자열이나 `SUPABASE_SERVICE_ROLE_KEY` 참조를 넣지 않는다. Task 13에 `no secret key strings in src or dist` 테스트를 추가해서 `sb_secret_`, `service_role`, JWT 형태로 `"role":"service_role"`이 들어간 문자열을 검사한다.
+- Edge Function은 사용자가 보낸 `owner`, `card_count`, `blob_refs`, `version`(기준 버전 외), `status`를 믿지 않는다. 모두 서버가 계산하거나 JWT에서 얻는다.
+- 받은 데이터를 `eval`, `new Function`, `innerHTML`에 넣지 않는다. 작업실은 기존처럼 `textContent`와 캔버스 텍스트만 쓴다.
+- 클라이언트에서 버튼을 숨기는 걸 권한 검사로 여기지 않는다. 모든 거부는 부록 B의 서버 테스트로 증명한다.
+- `.env.cloud-test`, DB 비밀번호, 토큰을 커밋하거나 로그에 찍지 않는다(`.gitignore`의 `.env.*`가 이미 막고 있음).
