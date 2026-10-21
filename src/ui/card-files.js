@@ -4,7 +4,7 @@ import {el,button,field,showMessage,typing} from './dom.js';
 import {openDialog} from './dialogs.js';
 import {download} from './files.js';
 
-export function createCardFileControls({store,workspaceFiles,card,onAdded}){
+export function createCardFileControls({store,workspaceFiles,card,onAdded,canExport=()=>true}){
  const storage=workspaceFiles.storage;let library=null,disposed=false,pendingPrompt=null,adding=false,saving=false;
  async function chooseDuplicate(name,entries,mode){
   let selected=0;
@@ -41,6 +41,7 @@ export function createCardFileControls({store,workspaceFiles,card,onAdded}){
  }
  async function connected(){return workspaceFiles.ensureConnected();}
  async function save(){
+  if(!canExport()){showMessage('보기만 가능해요.');return;}
   if(typing(document.activeElement))document.activeElement.blur();
   const current=card();if(!current){showMessage('저장할 카드를 선택하세요.');return;}
   if(saving||disposed)return;saving=true;
@@ -51,6 +52,7 @@ export function createCardFileControls({store,workspaceFiles,card,onAdded}){
   }catch(error){showMessage(error.message);}finally{saving=false;}
  }
  function exportFile(){
+  if(!canExport()){showMessage('보기만 가능해요.');return;}
   if(typing(document.activeElement))document.activeElement.blur();const current=card();if(!current)return;
   try{download(exportCardFile(store.getProject(),current.id),(current.name||'카드').replace(/[<>:"/\\|?*\x00-\x1f]/g,'_')+'.card.json','application/json');}catch(error){showMessage(error.message);}
  }

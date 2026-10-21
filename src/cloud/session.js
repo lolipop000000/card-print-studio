@@ -2,7 +2,7 @@ import {toCloudProject,fromCloudProject} from './cloud-format.js';
 import {CloudError} from './client.js';
 
 export function createCloudSession({store,client,blobs,now=Date.now,setTimer=(fn,ms)=>setTimeout(fn,ms),draftIntervalMs=30000}){
- let current={workId:null,status:'idle',version:null,draftSavedAt:null,hasUnsavedDraft:false,error:null};
+ let current={workId:null,status:'idle',version:null,draftSavedAt:null,hasUnsavedDraft:false,error:null,viewing:false};
  let epoch=0,disposed=false,muted=false,cancelTimer=null,queue=Promise.resolve();
  let documentId=store.getDocumentId(),observed=store.getProject(),lastDraftProject=observed,lastDraftTime=now();
  const listeners=new Set();
@@ -49,7 +49,7 @@ export function createCloudSession({store,client,blobs,now=Date.now,setTimer=(fn
   const token=epoch,snapshot=store.getProject();cancel();emit({status:'saving',error:null});
   try{
    const data=await encoded(snapshot,token),result=await client.call('work.create',{title,data});assertCurrent(token);
-   emit({workId:result.id,version:result.version});markConfirmed(snapshot);return result.id;
+   emit({workId:result.id,version:result.version,viewing:false});markConfirmed(snapshot);return result.id;
   }catch(error){errorState(error,token);throw error;}
  }
  async function open(id){
@@ -64,7 +64,7 @@ export function createCloudSession({store,client,blobs,now=Date.now,setTimer=(fn
     if(disposed||token!==epoch||store.getProject()!==before||store.getDocumentId()!==beforeId)throw stale();
     muted=true;try{store.load(project,{dirty:!!draft});}finally{muted=false;}
     documentId=store.getDocumentId();observed=store.getProject();lastDraftProject=observed;lastDraftTime=draft?Date.parse(draft.saved_at):now();
-    emit({workId:id,version:work.version,draftSavedAt:draft?.saved_at??null,hasUnsavedDraft:!!draft,status:!own?'read-only':draft?'draft-saved':'saved',error:null});
+    emit({workId:id,version:work.version,draftSavedAt:draft?.saved_at??null,hasUnsavedDraft:!!draft,viewing:!own,status:!own?'read-only':draft?'draft-saved':'saved',error:null});
    }catch(error){errorState(error,token);throw error;}
   });
  }
@@ -72,7 +72,7 @@ export function createCloudSession({store,client,blobs,now=Date.now,setTimer=(fn
   if(muted||disposed)return;
   if(store.getDocumentId()!==documentId){
    epoch++;cancel();documentId=store.getDocumentId();observed=store.getProject();lastDraftProject=observed;lastDraftTime=now();
-   emit({workId:null,status:'idle',version:null,draftSavedAt:null,hasUnsavedDraft:false,error:null});return;
+   emit({workId:null,status:'idle',version:null,draftSavedAt:null,hasUnsavedDraft:false,error:null,viewing:false});return;
   }
   if(observed===store.getProject())return;
   observed=store.getProject();emit({hasUnsavedDraft:!!current.workId});

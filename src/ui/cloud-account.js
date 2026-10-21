@@ -52,6 +52,7 @@ export function createCloudAccountControls(ctx,{client,session}){
  const stopSession=session.onChange(render),stopAuth=client.onAuthChange(()=>refresh());render();void refresh();
  return {
   node,refresh,getProfile:()=>profile?{...profile}:null,
+  canWrite:()=>availability.available&&loggedIn&&['trial','member'].includes(profile?.status),
   isCloudSaveActive:()=>availability.available&&loggedIn&&['trial','member'].includes(profile?.status)&&session.state().status!=='read-only',
   notifyLocalSave(){if(!notified&&profile&&['pending','revoked'].includes(profile.status)){notified=true;node.append(el('small',{id:'cloud-local-notice',class:'cloud-notice'},'관리자 승인 전에는 기존 파일 저장을 사용해요.'));}},
   destroy(){disposed=true;generation++;stopAuth();stopSession();if(dialog){dialog.close();dialog.remove();dialog=null;}node.remove();}
