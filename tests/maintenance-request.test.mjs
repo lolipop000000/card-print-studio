@@ -67,6 +67,13 @@ test('modern server keys use the apikey header instead of JWT bearer authenticat
  assert.equal(actualHeaders.authorization,undefined);
 });
 
+test('authorization diagnostics retain only the fixed mismatch categories',async t=>{
+ for(const code of ['unauthorized-admin-header-missing','unauthorized-modern-config-unavailable','unauthorized-modern-key-mismatch','unauthorized-legacy-key-mismatch']){
+  const result=await run(t,(_request,response)=>{response.writeHead(401);response.end(JSON.stringify({ok:false,code,secret:key}));});
+  assert.equal(result.exitCode,1);assert.deepEqual(result.report,{ok:false,status:401,code});
+ }
+});
+
 test('unknown errors and invalid success payloads never become diagnostic content',async t=>{
  for(const [status,body] of [[401,{ok:false,code:key}],[200,{ok:true,result:{trashed:-1,blobs:0,audits:0}}]]){
   const result=await run(t,(_request,response)=>{response.writeHead(status);response.end(JSON.stringify(body));});

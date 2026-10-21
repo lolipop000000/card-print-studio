@@ -61,6 +61,8 @@ update public.tier_limits set max_cards=120,max_blob_bytes=157286400 where tier=
 
 정리 호출 결과는 Actions의 `maintenance-result` 첨부 파일에 7일 보관한다. HTTP 상태, 허용된 오류 코드, 성공 시 정리 수량만 포함하며 응답 원문·접속 주소·비밀 값·예외 메시지는 기록하지 않는다. 실패한 호출을 성공으로 처리하지 않으며, 백업 푸시가 실패하면 정리를 호출하지 않는다. 전체 실패 로그를 내려받을 필요 없이 이 결과부터 확인한다.
 
+인증 거부는 관리 헤더 누락(`unauthorized-admin-header-missing`), 서버 키 사전 미설정(`unauthorized-modern-config-unavailable`), 새 서버 키 불일치(`unauthorized-modern-key-mismatch`), 기존 관리 키 불일치(`unauthorized-legacy-key-mismatch`)로 구별한다. 모두 HTTP 401이며 실제 키·이름·해시·길이를 응답하지 않는다. 이 분류는 인증을 완화하지 않는다. 실행 없이 관리자 인식만 확인하려면 같은 인증으로 GET을 보내며, 일치한 관리자에게만 405가 반환된다.
+
 복원 절차: [restore-backup.md](../scripts/restore-backup.md). 운영 배포와 첫 수동 워크플로 실행은 사용자 승인 뒤에 진행한다.
 
 ## 로컬 복원 검증 기록

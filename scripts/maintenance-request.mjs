@@ -2,7 +2,7 @@ import {writeFile} from 'node:fs/promises';
 
 // Reports are public Actions artifacts. Never copy response bodies, URLs,
 // credentials, exception messages or stack traces into them.
-const allowedCodes=new Set(['unauthorized','method-not-allowed','maintenance-failed']);
+const allowedCodes=new Set(['unauthorized','unauthorized-admin-header-missing','unauthorized-modern-config-unavailable','unauthorized-modern-key-mismatch','unauthorized-legacy-key-mismatch','method-not-allowed','maintenance-failed']);
 
 async function requestMaintenance(env){
  if(!env.SUPABASE_URL||!env.SUPABASE_SERVICE_ROLE_KEY)return {ok:false,status:0,code:'configuration-missing'};

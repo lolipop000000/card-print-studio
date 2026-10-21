@@ -8,6 +8,23 @@ const module=await import('../supabase/functions/_shared/maintenance-auth.js').c
 const config={legacyKey:'legacy-admin-test',secretKeys:JSON.stringify({default:'sb_secret_current-test',rotated:'sb_secret_rotated-test'})};
 const request=headers=>new Request('https://example.test/maintenance',{method:'POST',headers});
 
+test('authorization failures identify only a bounded credential mismatch category',async()=>{
+ assert.equal(typeof module.checkMaintenanceAuthorization,'function');
+ const checks=[
+  [{},config,'unauthorized-admin-header-missing'],
+  [{apikey:'sb_secret_current-test'},{},'unauthorized-modern-config-unavailable'],
+  [{apikey:'sb_secret_current-test'},{secretKeys:'{broken'},'unauthorized-modern-config-unavailable'],
+  [{apikey:'sb_secret_other-test'},config,'unauthorized-modern-key-mismatch'],
+  [{apikey:'sb_secret_other-test',Authorization:'Bearer gateway-anon-test'},config,'unauthorized-modern-key-mismatch'],
+  [{Authorization:'Bearer other-legacy-test'},config,'unauthorized-legacy-key-mismatch']
+ ];
+ for(const [headers,environment,code] of checks){
+  assert.deepEqual(await module.checkMaintenanceAuthorization(request(headers),environment),{ok:false,code});
+ }
+ assert.deepEqual(await module.checkMaintenanceAuthorization(request({apikey:'sb_secret_current-test'}),config),{ok:true});
+ assert.deepEqual(await module.checkMaintenanceAuthorization(request({Authorization:'Bearer legacy-admin-test'}),config),{ok:true});
+});
+
 test('maintenance accepts an exact configured modern server key on apikey',async()=>{
  assert.equal(typeof module.authorizeMaintenance,'function','modern maintenance authorization is missing');
  assert.equal(await module.authorizeMaintenance(request({apikey:'sb_secret_current-test'}),config),true);
