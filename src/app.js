@@ -38,7 +38,6 @@ import {createCloudClient} from './cloud/client.js';
 import {createBlobStore} from './cloud/blobs.js';
 import {createCloudSession} from './cloud/session.js';
 import {createCloudAccountControls} from './ui/cloud-account.js';
-import {openCloudPanel} from './ui/cloud-panel.js';
 import {createCloudAssetControls} from './ui/cloud-assets.js';
 import {openCloudImport} from './ui/cloud-import.js';
 
@@ -100,6 +99,7 @@ export function mountEditor(root,store,{cloudClient=createCloudClient()}={}){
  ctx.openAssetLibrary=options=>assetLibrary.open(options);
  const imageDestination=(mode,elementId)=>({mode,elementId,cardId:state.activeCardId,back:state.back,documentId:store.getDocumentId()});
  ctx.applyLibraryAsset=(asset,options={})=>{
+  if(viewingPublic){viewNotice();return false;}
   const destination=options.documentId===undefined?imageDestination(options.mode||'art',options.elementId):options;
   try{
    if(destination.documentId!==store.getDocumentId())throw Error('그림을 고르는 동안 덱이 바뀌었어요. 적용할 카드를 다시 선택하세요.');
@@ -133,9 +133,16 @@ export function mountEditor(root,store,{cloudClient=createCloudClient()}={}){
  const cloudAssetControls=createCloudAssetControls(ctx,{client:cloudClient,blobs:cloudBlobs,account:cloudAccount,assetLibrary});
  ctx.openCloudImport=()=>{ctx.closeCloudPanel?.();return openCloudImport(ctx,{client:cloudClient,blobs:cloudBlobs,workspace:ctx.workspaceFiles.storage,assetLibrary:ctx.assetLibrary});};
  ctx.canExport=()=>!viewingPublic||cloudAccount.canWrite();
- const updateView=()=>{viewingPublic=cloudSession.state().viewing;for(const node of root.querySelectorAll('[data-cloud-export]'))node.hidden=!ctx.canExport();};
+ ctx.canApplyLibraryAsset=()=>!viewingPublic;
+ const librarySaveStatus=button('',()=>{void ctx.openAssetLibrary({account:true});},{id:'library-save-status',class:'library-save-status',hidden:true});
+ const updateView=()=>{
+  const status=cloudSession.state();viewingPublic=status.viewing;for(const node of root.querySelectorAll('[data-cloud-export]'))node.hidden=!ctx.canExport();
+  const mobileSave=root.querySelector('#mobile-save');if(mobileSave)mobileSave.disabled=viewingPublic;
+  librarySaveStatus.textContent=({'draft-saving':'클라우드 저장 중',saving:'클라우드 저장 중','draft-saved':'초안 저장됨',saved:'클라우드 저장됨',error:'저장 실패 · 계정 열기',conflict:'저장 충돌 · 해결하기','read-only':'클라우드 읽기 전용'})[status.status]??'';
+  librarySaveStatus.hidden=!librarySaveStatus.textContent;librarySaveStatus.dataset.state=status.status;librarySaveStatus.title=status.error?.message??'내 계정과 저장 상태 열기';
+ };
  const stopCloudView=cloudSession.onChange(updateView);
- const readonlyClick=event=>{if(!viewingPublic)return;const node=event.target.closest('button');if(node&&['asset-library','card-templates','keyword-manager','load-card','work-recovery'].includes(node.id)){event.preventDefault();event.stopImmediatePropagation();viewNotice();}};
+ const readonlyClick=event=>{if(!viewingPublic)return;const node=event.target.closest('button');if(node&&['card-templates','keyword-manager','load-card','work-recovery'].includes(node.id)){event.preventDefault();event.stopImmediatePropagation();viewNotice();}};
  root.addEventListener('click',readonlyClick,true);
  const save=async()=>{
   if(typing(document.activeElement))document.activeElement.blur();
@@ -151,10 +158,9 @@ export function mountEditor(root,store,{cloudClient=createCloudClient()}={}){
  const exportProject=()=>{if(!ctx.canExport()){viewNotice();return;}return saveProjectFile(store,{markSaved:!workspaceFiles.storage.getState().folderName}).catch(e=>showMessage(e.message));};
  const top=el('header',{class:'topbar'},
   el('div',{class:'brand'},el('span',{class:'brand-symbol'},'▤'),el('div',{},el('strong',{},'PP Monster'),el('small',{},'내가 만든 카드, 내가 그린 그림'))),
-  el('div',{class:'deck-heading'},deckName,el('span',{id:'save-state',class:'save-state'},'저장됨'),workspaceFiles.status,recovery.status),
+  el('div',{class:'deck-heading'},deckName,el('span',{id:'save-state',class:'save-state'},'저장됨'),workspaceFiles.status,recovery.status,librarySaveStatus),
   el('div',{class:'top-actions'},
-   themeControl,cloudAccount.node,updates.button,
-   button('클라우드',()=>{void openCloudPanel(ctx,{client:cloudClient,session:cloudSession,account:cloudAccount}).catch(error=>showMessage(error.message));},{id:'cloud-open',disabled:!cloudClient.availability.available}),
+   themeControl,updates.button,
    recovery.button,cardTemplates.button,assetLibrary.button,
    button('키워드 관리',()=>ctx.openKeywords(),{id:'keyword-manager'}),
    button('새 덱',async()=>{if(await confirmReplacement(store,{save})){workspaceFiles.storage.unbind();ctx.closeVisualEffects?.({force:true});const p=createProject();p.cards[0]=applyTemplate(p.cards[0],p.settings,'monster-standard');state.activeCardId=p.cards[0].id;setElementSelection(state,[]);state.back=false;store.load(p);ctx.cardLibrary?.reset();cardCanvas.resetTime();}}, {'aria-label':'새 덱'}),
@@ -211,11 +217,11 @@ export function mountEditor(root,store,{cloudClient=createCloudClient()}={}){
  const center=el('main',{class:'workspace'},el('nav',{class:'workspace-tabs'},el('div',{class:'tab-group'},cardTab,paperTab),el('div',{class:'tab-group'},frontTab,backTab)),cardArea,paperRoot);
  const inspector=el('aside',{id:'inspector',class:'inspector'});
  const message=el('div',{id:'message',hidden:true,role:'alert',class:'message'},el('span',{}),button('×',()=>message.hidden=true,{'aria-label':'메시지 닫기'}));
- root.append(top,recovery.notice,el('div',{class:'workspace-grid'},sidebar,center,inspector),message,projectFile,artFile,cardFiles.input);
+ root.append(top,el('div',{id:'library-account-home',hidden:true},cloudAccount.node),recovery.notice,el('div',{class:'workspace-grid'},sidebar,center,inspector),message,projectFile,artFile,cardFiles.input);
  const cardCanvas=mountCardCanvas(canvasHost,ctx);ctx.cardCanvas=cardCanvas;ctx.paperRoot=paperRoot;
  const paperView=mountPaperView(paperRoot,store);ctx.onPaper=()=>{if(state.mode==='paper')paperView.refresh();};
  let phoneFitted=false;
- const mobileWorkspace=mountMobileWorkspace(root,{onChange:()=>{refresh();if(mobileWorkspace.isPhone()&&mobileWorkspace.isPreviewVisible()&&!phoneFitted){cardCanvas.fit();phoneFitted=true;}}});
+ const mobileWorkspace=mountMobileWorkspace(root,{save,openLibrary:()=>{void ctx.openAssetLibrary();},onChange:()=>{refresh();if(mobileWorkspace.isPhone()&&mobileWorkspace.isPreviewVisible()&&!phoneFitted){cardCanvas.fit();phoneFitted=true;}}});
  const phoneFitFrame=requestAnimationFrame(()=>{if(mobileWorkspace.isPhone()&&mobileWorkspace.isPreviewVisible()){cardCanvas.fit();phoneFitted=true;}});
  const fileDrop=mountJsonFileDrop(root,{getContext:()=>store.getProject(),onProject:importProjectFile,onCard:(file,isCurrent)=>cardFiles.importFile(file,isCurrent),onError:message=>showMessage(message)});
  ctx.addElement=type=>{

@@ -4,7 +4,9 @@ import {cloudAvailability} from '../cloud/config.js';
 export function createCloudAccountControls(ctx,{client,session}){
  const node=el('div',{id:'cloud-account',class:'cloud-account'}),badge=el('span',{id:'cloud-account-status'}),saveState=el('small',{id:'cloud-save-state',role:'status'});
  const feedback=el('small',{class:'cloud-notice',role:'status'}),nicknameButton=button('닉네임 변경',()=>openNickname(),{id:'cloud-edit-nickname'});
- let profile=null,loggedIn=false,disposed=false,generation=0,dialog=null,notified=false,resolving=false;
+ let profile=null,loggedIn=false,disposed=false,generation=0,dialog=null,notified=false,resolving=false,ready=false;
+ const readyWaiters=new Set();
+ function releaseReady(){ready=true;for(const resolve of readyWaiters)resolve();readyWaiters.clear();}
  const conflict=el('span',{id:'cloud-conflict',class:'cloud-notice',hidden:true},'다른 곳에서 먼저 저장했어요. 서버 내용을 불러오면 현재 편집을 교체해요. ',button('서버 내용 불러오기',()=>resolve('load-server'),{id:'cloud-conflict-load'}),button('현재 내용을 사본으로 저장',()=>resolve('save-as-copy'),{id:'cloud-conflict-copy'}));
  async function resolve(choice){if(resolving)return;resolving=true;render();try{await session.resolveConflict(choice);}catch(error){showMessage(error.message);}finally{resolving=false;render();}}
  const availability=client.availability??cloudAvailability(globalThis.location,client.config);
@@ -31,7 +33,7 @@ export function createCloudAccountControls(ctx,{client,session}){
   feedback.textContent=state.error?.code==='account-changed'?state.error.message:state.status==='read-only'?'클라우드 저장이 중지됐어요. 편집 내용은 이 기기에 남아 있어요.':profile&&['pending','revoked'].includes(profile.status)?'관리자 승인 후 저장과 공유를 쓸 수 있어요.':'';
  }
  async function refresh(){
-  const token=++generation;
+  const token=++generation;ready=false;delete node.dataset.refreshed;
   try{
    if(!availability.available){render();return;}
    const auth=await client.session();if(disposed||token!==generation)return;session.setIdentity(auth?.user.id??null);
@@ -42,7 +44,7 @@ export function createCloudAccountControls(ctx,{client,session}){
    render();
    if(loggedIn&&profile?.nickname===null&&['trial','member'].includes(profile.status))openNickname();
   }catch(error){if(!disposed&&token===generation)feedback.textContent=error.message;}
-  finally{if(!disposed&&token===generation)node.dataset.refreshed='true';}
+  finally{if(!disposed&&token===generation){node.dataset.refreshed='true';releaseReady();}}
  }
  function openNickname(){
   if(disposed||dialog||!profile)return;
@@ -59,10 +61,10 @@ export function createCloudAccountControls(ctx,{client,session}){
  }
  const stopSession=session.onChange(render),stopAuth=client.onAuthChange(()=>refresh());render();void refresh();
  return {
-  node,refresh,getProfile:()=>profile?{...profile}:null,
+  node,refresh,whenReady:()=>ready?Promise.resolve():new Promise(resolve=>readyWaiters.add(resolve)),getProfile:()=>profile?{...profile}:null,
   canWrite:()=>availability.available&&loggedIn&&['trial','member'].includes(profile?.status),
   isCloudSaveActive:()=>availability.available&&loggedIn&&['trial','member'].includes(profile?.status)&&session.state().status!=='read-only',
   notifyLocalSave(){if(!notified&&profile&&['pending','revoked'].includes(profile.status)){notified=true;node.append(el('small',{id:'cloud-local-notice',class:'cloud-notice'},'관리자 승인 전에는 기존 파일 저장을 사용해요.'));}},
-  destroy(){disposed=true;generation++;stopAuth();stopSession();if(dialog){dialog.close();dialog.remove();dialog=null;}node.remove();}
+  destroy(){disposed=true;generation++;releaseReady();stopAuth();stopSession();if(dialog){dialog.close();dialog.remove();dialog=null;}node.remove();}
  };
 }

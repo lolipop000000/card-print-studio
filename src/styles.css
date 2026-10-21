@@ -244,3 +244,47 @@
 .cloud-account{display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-size:11px;max-width:450px}.cloud-account small{color:var(--muted)}.cloud-notice{flex-basis:100%}.cloud-dialog{width:min(440px,calc(100vw - 24px));border:1px solid var(--line);border-radius:14px;padding:20px;background:var(--paper);color:var(--ink)}.cloud-dialog input{display:block;width:100%;margin:8px 0 14px}.cloud-dialog::backdrop{background:#152b2b99}
 .cloud-tabs,.cloud-row-actions{display:flex;gap:6px;flex-wrap:wrap}.cloud-tabs [aria-pressed=true]{background:var(--ink);color:var(--paper)}.cloud-list{display:grid;gap:10px;max-height:55vh;overflow:auto;margin:14px 0}.cloud-row{border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;gap:12px;align-items:center;justify-content:space-between}.cloud-row strong,.cloud-row small{display:block;overflow-wrap:anywhere}.cloud-row small{opacity:.7;margin-top:4px}.cloud-row-actions{flex-shrink:0}
 #cloud-import-list input[type=checkbox]{width:auto;flex:none;margin:0 10px 0 0}.cloud-import-offer{flex-basis:100%}
+
+/* One library for images, personal materials and public materials. */
+.mobile-quick-actions,.library-detail-back{display:none}
+.library-account{margin:16px 0 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+.library-account>summary{padding:13px 16px;cursor:pointer;font-size:13px;font-weight:650;min-height:48px}
+.library-account-body{padding:0 16px 14px}.library-account-body .cloud-account{max-width:none;gap:8px;font-size:13px}
+.library-account-body #cloud-account-status{flex-basis:100%;font-weight:650}.library-account-body .cloud-notice{line-height:1.7}
+.library-account-body .cloud-notice button{margin:4px 4px 0 0}.library-account-body #cloud-usage{margin:12px 0 0;line-height:1.6}
+.library-location-tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);padding:0 0 10px}
+.library-location-tabs>button{flex:1;min-height:48px;min-width:0;background:transparent;font-weight:600}
+.library-location-tabs>button[aria-selected=true]{background:var(--accent-soft);border-color:var(--accent);color:var(--ink)}
+.library-cloud-panel[hidden],.library-images[hidden]{display:none!important}
+.library-filter-bar{display:grid;grid-template-columns:minmax(150px,1fr) 150px auto;gap:10px;align-items:center;margin:16px 0}
+.library-filter-bar output{font-size:12px;color:var(--muted);white-space:nowrap}.library-cloud-panel .cloud-list{min-height:180px}
+.library-cloud-actions{display:flex;justify-content:flex-end;gap:8px;padding-top:10px;border-top:1px solid var(--line)}
+.library-cloud-panel .cloud-row>div:first-child{min-width:0}.library-item-title{display:block;max-width:100%;white-space:normal;text-align:left;font-size:14px;font-weight:650;background:transparent;border-color:transparent;padding:5px 0;overflow-wrap:anywhere}
+.library-item-title:hover{text-decoration:underline}.library-save-status{font-size:11px;padding:3px 7px;white-space:normal}
+.library-save-status[data-state=conflict],.library-save-status[data-state=error]{color:var(--ink);border-color:var(--accent);background:var(--accent-soft)}
+.library-location-tabs button:focus-visible,.library-account summary:focus-visible,.library-item-title:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(max-width:620px){
+ .mobile-quick-actions{display:flex;gap:8px;padding:4px 8px 8px;flex:none;background:var(--paper);border-bottom:1px solid var(--line)}
+ .mobile-quick-actions>button{flex:1;min-height:48px;font-size:13px}.mobile-quick-actions #mobile-library{background:var(--accent-soft);border-color:var(--accent)}
+ .library-save-status{min-height:24px!important;font-size:10px}
+ .asset-library-dialog{width:100vw;height:100dvh;max-width:100vw;max-height:100dvh;margin:0;padding:14px;border:0;border-radius:0;overscroll-behavior:contain;scroll-padding-block:14px}
+ .asset-library-top{align-items:center;gap:8px}.asset-library-top h2{font-size:20px}.asset-library-top .hint{margin:4px 0 0;font-size:11px}
+ .asset-library-dialog button,.asset-library-dialog select,.asset-library-dialog input:not([type=checkbox]){min-height:48px}
+ #asset-library-close{min-width:48px;flex:none}.library-account{margin-top:12px}.library-account>summary{padding:14px 12px}
+ .library-account-body{padding:0 12px 12px}.library-account-body .cloud-account>button{flex:1 0 auto;font-size:12px}
+ .library-location-tabs{gap:4px;padding-bottom:8px}.library-location-tabs>button{padding:5px 3px;font-size:12px}
+ .asset-library-toolbar{margin-top:12px;gap:8px}.asset-library-toolbar button{font-size:11px;white-space:normal;min-width:90px}
+ .asset-storage{padding:10px}.asset-storage .asset-action-row{gap:8px}.asset-storage .asset-action-row button{flex:1 0 auto;min-height:48px;font-size:11px}
+ .asset-library-grid{display:block;min-height:0;margin-top:14px}.asset-list{max-height:none;grid-template-columns:repeat(auto-fill,minmax(100px,1fr))}
+ .asset-details{padding:0;border:0}.asset-preview{height:220px}.asset-action-row button{flex:1}
+ .library-detail-back{display:block;margin-bottom:12px;min-height:48px}
+ .asset-library-dialog[data-image-detail=false] .asset-details{display:none}
+ .asset-library-dialog[data-image-detail=true] .asset-browser{display:none}
+ .asset-library-dialog[data-image-detail=true] .asset-library-toolbar,.asset-library-dialog[data-image-detail=true] .asset-storage{display:none}
+ .library-filter-bar{grid-template-columns:minmax(0,1fr) 120px;gap:8px;margin:12px 0}.library-filter-bar output{grid-column:1/-1}
+ .library-cloud-panel .cloud-list{max-height:none;overflow:visible;margin-top:8px}.library-cloud-panel .cloud-row{display:block;padding:12px}
+ .library-item-title{width:100%;font-size:16px;min-height:48px}.library-cloud-panel .cloud-row-actions{gap:8px;margin-top:14px;flex-wrap:wrap}.library-cloud-panel .cloud-row-actions>button{flex:1}
+ .library-cloud-panel[data-detail=false] .cloud-row-actions,.library-cloud-panel[data-detail=false] #library-back{display:none}
+ .library-cloud-panel[data-detail=true] .cloud-row:not([data-selected=true]),.library-cloud-panel[data-detail=true] .library-filter-bar{display:none}
+ .library-cloud-actions{gap:8px}.library-cloud-actions>button{flex:1}
+}

@@ -25,22 +25,25 @@ export function createCloudAssetControls(ctx,{client,blobs,account,assetLibrary}
   if(account.getProfile().id!==user||ctx.store.getDocumentId()!==documentId||ctx.store.getProject()!==before)throw Error('에셋을 읽는 동안 덱이 바뀌었어요. 사본은 내 에셋에 남아 있어요. 다시 적용하세요.');
   ctx.store.edit('공유 에셋 적용',draft=>Object.assign(draft,project));
  }
- ctx.renderCloudAssets=(list,{assets,act,refresh})=>{
+ ctx.renderCloudAssets=(list,{assets,act,refresh,trash=false,openImages,openMine})=>{
   const owner=account.getProfile()?.id,canWrite=account.canWrite();
-  for(const item of assets.filter(row=>!row.deleted_at&&(row.owner===owner||row.visibility==='public'))){
+  for(const item of assets.filter(row=>trash?row.deleted_at&&row.owner===owner:!row.deleted_at&&(row.owner===owner||row.visibility==='public'))){
    const actions=[],mine=item.owner===owner;
    const action=(label,run,attrs={})=>button(label,()=>{void act(run);},attrs);
-   if(mine&&canWrite&&item.kind!=='image')actions.push(action('현재 덱에 적용',async()=>{await applyOwned(item);showMessage('열린 덱에 독립 사본을 추가했어요.','success');},{'data-cloud-asset-apply':item.id}));
-   if(mine&&canWrite)actions.push(action(item.visibility==='public'?'비공개로':'공개하기',async()=>{await client.call('asset.setVisibility',{id:item.id,visibility:item.visibility==='public'?'private':'public'},{expectedUserId:owner});await refresh();}),action('삭제',async()=>{await client.call('asset.delete',{id:item.id},{expectedUserId:owner});await refresh();}));
-   if(!mine&&canWrite)actions.push(action('내 보관함에 가져오기',async()=>{
+   const remaining=trash?Math.max(0,Math.ceil(30-(Date.now()-Date.parse(item.deleted_at))/86400000)):0;
+   if(trash&&canWrite&&remaining>0)actions.push(action('복구',async()=>{await client.call('asset.restore',{id:item.id},{expectedUserId:owner});await refresh();if(item.kind==='image')await assetLibrary.reload();},{'data-cloud-asset-restore':item.id}));
+   if(!trash&&mine&&canWrite&&item.kind!=='image')actions.push(action('현재 덱에 적용',async()=>{await applyOwned(item);showMessage('열린 덱에 독립 사본을 추가했어요.','success');},{'data-cloud-asset-apply':item.id}));
+   if(!trash&&mine&&canWrite&&item.kind==='image')actions.push(action('이미지에서 열기',async()=>{await applyOwned(item);openImages?.();},{'data-cloud-asset-image':item.id}));
+   if(!trash&&mine&&canWrite)actions.push(action(item.visibility==='public'?'비공개로':'공개하기',async()=>{await client.call('asset.setVisibility',{id:item.id,visibility:item.visibility==='public'?'private':'public'},{expectedUserId:owner});await refresh();}),action('삭제',async()=>{await client.call('asset.delete',{id:item.id},{expectedUserId:owner});await refresh();}));
+   if(!trash&&!mine&&canWrite)actions.push(action('내 보관함에 가져오기',async()=>{
     requireMember();const user=account.getProfile().id,origin={user,before:ctx.store.getProject(),documentId:ctx.store.getDocumentId()};
     if(ctx.cloudSession.state().viewing&&item.kind!=='image')throw Error('내 작업이나 새 덱을 열고 에셋을 가져오세요.');
     const result=await client.call('asset.copy',{sourceId:item.id},{expectedUserId:user});
     requireMember();if(account.getProfile().id!==user)throw Error('계정이 바뀌었어요. 새 계정의 에셋 목록을 여세요.');
-    try{await applyOwned({...item,id:result.id},origin);}catch(error){await refresh();throw Error('사본은 내 에셋에 남아 있어요. 현재 덱에 적용을 눌러 다시 시도하세요. '+error.message);}
+    try{await applyOwned({...item,id:result.id},origin);}catch(error){await refresh();openMine?.();throw Error('사본은 내 자료에 남아 있어요. 현재 덱에 적용을 눌러 다시 시도하세요. '+error.message);}
     await refresh();showMessage(item.kind==='image'?'내 이미지 보관함에 사본을 추가했어요.':'열린 덱에 독립 사본을 추가했어요.','success');
    },{'data-cloud-asset-take':item.id}));
-   list.append(el('article',{class:'cloud-row','data-cloud-asset':item.id},el('div',{},el('strong',{},item.title),el('small',{},({keyword:'키워드',image:'이미지',card_template:'카드 서식',effect_template:'이펙트'}[item.kind]??item.kind)+' · '+(mine?'내 에셋':item.visibility==='public'?'공개 에셋':'비공개')+' · v'+item.version)),el('div',{class:'cloud-row-actions'},actions)));
+   list.append(el('article',{class:'cloud-row','data-cloud-asset':item.id},el('div',{},el('strong',{},item.title),el('small',{},({keyword:'키워드',image:'이미지',card_template:'카드 서식',effect_template:'이펙트'}[item.kind]??item.kind)+' · '+(trash?'휴지통 · '+remaining+'일 남음':mine?'내 에셋':item.visibility==='public'?'공개 에셋':'비공개')+' · v'+item.version)),el('div',{class:'cloud-row-actions'},actions)));
   }
   if(!list.children.length)list.append(el('p',{},'공유한 에셋이 없어요. 키워드·서식·내 이펙트·이미지 보관함에서 공유할 수 있어요.'));
  };

@@ -157,6 +157,19 @@ test('pixel snap cursor matches the real square brush and eraser footprints at f
  }finally{await browser.close();}
 });
 
+test('a queued undo redraw preserves a zoom value being typed before blur',async()=>{
+ const {browser,page,errors}=await openMemoryPainter();try{
+  await fixture(page);await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  await page.locator('#paint-zoom').fill('200');await page.locator('#paint-zoom').press('Tab');
+  const canvas=await page.locator('#paint-canvas').boundingBox();await page.mouse.click(canvas.x+canvas.width/2,canvas.y+canvas.height/2);await idle(page);
+  await page.evaluate(()=>{const native=requestAnimationFrame,pending=[];window.requestAnimationFrame=callback=>{pending.push(callback);return 0;};window.flushZoomRedraw=()=>{window.requestAnimationFrame=native;const count=pending.length;for(const callback of pending)callback(performance.now());return count;};});
+  await page.locator('#paint-undo').click();await idle(page);await page.locator('#paint-zoom').fill('50');
+  assert.ok(await page.evaluate(()=>window.flushZoomRedraw())>0,'undo schedules a real history redraw');
+  assert.equal(await page.locator('#paint-zoom').inputValue(),'50','a history redraw must preserve an uncommitted zoom input');
+  await page.locator('#paint-zoom').press('Tab');assert.equal((await page.locator('#paint-canvas').boundingBox()).width,256);assert.equal(await page.locator('#paint-canvas').evaluate(c=>getComputedStyle(c).imageRendering),'auto');assert.deepEqual(errors,[]);
+ }finally{await browser.close();}
+});
+
 test('small original canvases keep sharp source pixels at 200 and 800 percent without altering saved pixels',async()=>{
  const {browser,page,errors}=await openMemoryPainter();try{
   await page.evaluate(()=>{const a=window.paintApi,p=a.createProject(),c=a.newCanvas(64,64),x=c.getContext('2d');for(let y=0;y<64;y++)for(let xx=0;xx<64;xx++){x.fillStyle=(xx+y)%2?'#ffffff':'#000000';x.fillRect(xx,y,1,1);}const png=c.toDataURL(),saved={id:'small-original',width:64,height:64,activeLayerId:'small-layer',layers:[{id:'small-layer',name:'64px 원본',visible:true,locked:false,opacity:1,png}]};p.paintings[saved.id]=saved;p.assets['small-art']={id:'small-art',mime:'image/png',width:64,height:64,dataUrl:png,paintingId:saved.id};p.cards[0].artAssetId='small-art';window.paintStore=a.createStore(p);window.paintCardId=p.cards[0].id;window.smallOriginal=png;void a.openPaintingEditor(document.body,window.paintStore,window.paintCardId);});

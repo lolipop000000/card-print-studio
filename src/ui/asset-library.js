@@ -6,6 +6,7 @@ import {download} from './files.js';
 import {openDialog} from './dialogs.js';
 import {openImageCropper} from './image-crop.js';
 import {createCloudLibraryStorage} from '../cloud/shared-assets.js';
+import {mountLibraryHub} from './cloud-panel.js';
 
 const MAX_BATCH_PIXELS=32_000_000,MAX_IMAGE_FILES=64;
 const cleanName=value=>Array.from(String(value||'그림').normalize('NFC').replace(/[\x00-\x1f\x7f]/g,' ').replace(/\.(png|jpe?g|webp)$/i,'').trim()||'그림').slice(0,120).join('');
@@ -24,7 +25,7 @@ export function createAssetLibraryControls(ctx,{workspace}={}){
  }
  const storage={getState:()=>chosenStorage().getState(),identity:()=>{chosenStorage();return cloudOwner?'cloud:'+cloudOwner:'local';},load:options=>chosenStorage().load(options),save:value=>chosenStorage().save(value),subscribe(fn){storageListeners.add(fn);return ()=>storageListeners.delete(fn);},destroy(){stopLocalStorage();cloudStorage?.destroy();localStorage.destroy();storageListeners.clear();}};
  let library=createAssetLibrary(),loaded=false,dirty=false,disposed=false,busy=false,selected=null,session=null,lastError=null,prompt=null,cropDialog=null;
- const trigger=button('에셋 보관함',()=>{void open();},{id:'asset-library',title:'그림을 자르고 여러 덱에서 함께 사용해요.'});
+ const trigger=button('에셋 보관함',()=>{void open();},{id:'asset-library',title:'그림과 내 자료, 친구들의 공개 자료를 한곳에서 찾아요.'});
  const active=origin=>!disposed&&(!origin||session===origin&&origin.dialog.open);
  const guard=origin=>{if(!active(origin))throw canceled();};
  const selectedEntry=()=>library.entries.find(entry=>entry.id===selected);
@@ -34,7 +35,7 @@ export function createAssetLibraryControls(ctx,{workspace}={}){
   session.status.dataset.mode=mode;session.status.textContent=(busy?'작업 중…':dirty?'변경사항 저장 필요':value.mode==='cloud'?'클라우드 저장됨':value.mode==='disk'?'폴더 저장됨':value.mode==='error'?'저장 오류':'브라우저 임시 보관')+' · '+(value.location||'브라우저');
   session.storageNote.textContent=value.message||'보관함에서 삭제해도 카드에 이미 적용한 그림은 유지돼요.';
   session.dialog.dataset.busy=String(busy);session.dialog.setAttribute('aria-busy',String(busy));
-  for(const node of session.dialog.querySelectorAll('[data-asset-action]'))node.disabled=busy||(node.dataset.needsLoaded==='true'&&!loaded)||(node.dataset.needsSelection==='true'&&!selectedEntry())||(node.dataset.needsApply==='true'&&typeof ctx.applyLibraryAsset!=='function');
+  for(const node of session.dialog.querySelectorAll('[data-asset-action]'))node.disabled=busy||(node.dataset.needsLoaded==='true'&&!loaded)||(node.dataset.needsSelection==='true'&&!selectedEntry())||(node.dataset.needsApply==='true'&&(typeof ctx.applyLibraryAsset!=='function'||ctx.canApplyLibraryAsset?.()===false));
   session.resume.hidden=!workspace?.getState?.().folderName;session.connect.disabled=busy||!workspace?.getState?.().supported;
  }
  const unsubscribe=storage.subscribe(refreshStatus),unsubscribeWorkspace=workspace?.subscribe?.(refreshStatus);
@@ -76,16 +77,17 @@ export function createAssetLibraryControls(ctx,{workspace}={}){
  }
  function finish(value=null){
   const current=session;if(!current)return;session=null;prompt?.dispatchEvent(new Event('cancel',{cancelable:true}));prompt=null;cropDialog?.dispatchEvent(new Event('cancel',{cancelable:true}));cropDialog=null;
-  if(current.dialog.open)current.dialog.close();current.dialog.remove();current.resolve(value);if(current.previousFocus?.isConnected)current.previousFocus.focus({preventScroll:true});if(!disposed)ctx.refresh?.();
+  current.hub?.destroy();if(current.dialog.open)current.dialog.close();current.dialog.remove();current.resolve(value);if(current.previousFocus?.isConnected)current.previousFocus.focus({preventScroll:true});if(!disposed)ctx.refresh?.();
  }
  function renderList(){
   const current=session;if(!current)return;const query=current.search.value.normalize('NFC').toLocaleLowerCase(),entries=library.entries.filter(entry=>entry.name.normalize('NFC').toLocaleLowerCase().includes(query));
-  current.list.replaceChildren(...entries.map(entry=>button(el('span',{},el('span',{class:'asset-thumbnail'},el('img',{src:entry.asset.dataUrl,alt:'',loading:'lazy'})),el('strong',{},entry.name),el('small',{},entry.asset.width+' × '+entry.asset.height+' px')),()=>{selected=entry.id;render();},{class:'asset-entry'+(entry.id===selected?' selected':''),'data-asset-id':entry.asset.id,'data-entry-id':entry.id,'data-asset-action':'','aria-pressed':String(entry.id===selected)})));
+  current.list.replaceChildren(...entries.map(entry=>button(el('span',{},el('span',{class:'asset-thumbnail'},el('img',{src:entry.asset.dataUrl,alt:'',loading:'lazy'})),el('strong',{},entry.name),el('small',{},entry.asset.width+' × '+entry.asset.height+' px')),()=>{selected=entry.id;current.listScroll=current.list.scrollTop;current.dialogScroll=current.dialog.scrollTop;current.dialog.dataset.imageDetail='true';render();if(matchMedia('(max-width:620px)').matches){current.dialog.scrollTop=0;current.details.querySelector('#asset-back')?.focus({preventScroll:true});}else [...current.list.querySelectorAll('[data-entry-id]')].find(node=>node.dataset.entryId===entry.id)?.focus({preventScroll:true});},{class:'asset-entry'+(entry.id===selected?' selected':''),'data-asset-id':entry.asset.id,'data-entry-id':entry.id,'data-asset-action':'','aria-pressed':String(entry.id===selected)})));
   if(!entries.length)current.list.append(el('p',{class:'empty-note'},library.entries.length?'검색한 그림이 없어요.':'그림을 가져오거나 원본을 잘라 보관하세요.'));current.count.textContent=library.entries.length+'개';refreshStatus();
  }
  function renderDetails(){
   const current=session;if(!current)return;const entry=selectedEntry();current.details.replaceChildren();
-  if(!entry){current.details.append(el('p',{class:'empty-note'},'목록에서 사용할 그림을 선택하세요.'));return;}
+  if(!entry){current.dialog.dataset.imageDetail='false';current.details.append(el('p',{class:'empty-note'},'목록에서 사용할 그림을 선택하세요.'));return;}
+  current.details.append(button('‹ 그림 목록으로',()=>{current.dialog.dataset.imageDetail='false';current.list.scrollTop=current.listScroll??0;current.dialog.scrollTop=current.dialogScroll??0;[...current.list.querySelectorAll('[data-entry-id]')].find(node=>node.dataset.entryId===selected)?.focus({preventScroll:true});},{id:'asset-back',class:'library-detail-back'}));
   const action=(label,run,id,extra={})=>button(label,ui(run),{id,'data-asset-action':'','data-needs-selection':'true',...extra});
   const name=el('input',{id:'asset-name',value:entry.name,maxLength:120,'data-asset-action':''});
   if(ctx.cloudAccount?.canWrite())current.details.append(action('에셋으로 공유',()=>ctx.shareLibraryEntry(entry),'asset-share'));
@@ -102,10 +104,10 @@ export function createAssetLibraryControls(ctx,{workspace}={}){
   else current.details.append(el('div',{class:'asset-apply-actions'},...['art','element'].map(mode=>action(mode==='art'?'카드 그림으로 사용':'새 이미지 요소로 추가',()=>{guard(current);if(ctx.applyLibraryAsset?.(createLibraryEntry(entry.asset,entry.name).asset,{mode})===true)finish();else throw Error('그림을 적용할 카드나 요소를 다시 선택하세요.');},mode==='art'?'asset-use-art':'asset-use-element',{'data-needs-apply':'true',class:mode==='art'?'primary':''}))));
  }
  function render(){if(!session)return;renderList();renderDetails();session.feedback.textContent=lastError||'';refreshStatus();}
- function open({pick=false,title}={}){
+ function open({pick=false,title,account=false}={}){
   if(disposed)return Promise.resolve(null);if(session){session.dialog.focus();return Promise.resolve(null);}
   let resolve;const result=new Promise(done=>resolve=done),dialog=el('dialog',{id:'asset-library-dialog',class:'asset-library-dialog','aria-labelledby':'asset-library-title',tabIndex:-1});
-  const current={dialog,resolve,pick,previousFocus:document.activeElement};session=current;
+  const current={dialog,resolve,pick,previousFocus:document.activeElement};session=current;dialog.dataset.imageDetail='false';
   const toolbarButton=(label,run,id,attrs={})=>button(label,ui(run),{id,'data-asset-action':'',...attrs});
   current.feedback=el('p',{id:'asset-library-feedback',class:'asset-feedback',role:'alert'});current.status=el('p',{id:'asset-library-status',class:'asset-storage-status',role:'status'});current.storageNote=el('p',{class:'hint'});current.count=el('small');current.list=el('div',{class:'asset-list'});current.details=el('section',{class:'asset-details','aria-label':'선택한 그림'});
   let composing=false;current.search=el('input',{id:'asset-search',type:'search',placeholder:'그림 이름 검색','aria-label':'그림 이름 검색',oncompositionstart:()=>{composing=true;},oncompositionend:()=>{composing=false;renderList();},oninput:event=>{if(!composing&&!event.isComposing)renderList();}});
@@ -120,13 +122,16 @@ export function createAssetLibraryControls(ctx,{workspace}={}){
   }});
   current.resume=toolbarButton('기억한 폴더 다시 연결',async()=>{if(!workspace?.resume)throw Error('연결할 저장 폴더가 없어요.');const connected=await workspace.resume();guard(current);if(connected)current.feedback.textContent='폴더를 연결했어요. 현재 목록은 유지돼요. 다시 불러오기 또는 저장 재시도를 선택하세요.';},'asset-resume');
   current.connect=toolbarButton('저장 폴더 선택',async()=>{if(!workspace?.connect)throw Error('이 브라우저에서는 폴더 연결을 지원하지 않아요. 보관함 JSON으로 공유하세요.');const connected=await workspace.connect();guard(current);current.feedback.textContent=connected?'폴더를 연결했어요. 다시 불러오기를 눌러 이 폴더의 보관함을 확인하세요.':'폴더 선택을 취소했어요. 현재 보관함을 유지해요.';},'asset-connect');
-  dialog.append(el('header',{class:'asset-library-top'},el('div',{},el('h2',{id:'asset-library-title'},title||(pick?'에셋에서 그림 선택':'에셋 보관함')),el('p',{class:'hint'},'이미지를 자르고 보관해 여러 덱에서 함께 사용해요.')),button('닫기',()=>finish(),{id:'asset-library-close'})),
+  const header=el('header',{class:'asset-library-top'},el('div',{},el('h2',{id:'asset-library-title'},title||(pick?'에셋에서 그림 선택':'에셋 보관함')),el('p',{class:'hint'},pick?'사용할 그림을 선택하거나 원본을 잘라 보관하세요.':'내 그림과 공유 자료를 한곳에서 찾아요.')),button('닫기',()=>finish(),{id:'asset-library-close'}));
+  const images=el('section',{id:'library-images',class:'library-images','aria-label':'이미지 보관함'});
+  images.append(
    el('div',{class:'asset-library-toolbar'},toolbarButton('그림 가져오기',()=>files.click(),'asset-import',{'data-needs-loaded':'true',class:'primary'}),toolbarButton('보관함 JSON 가져오기',()=>json.click(),'asset-import-json',{'data-needs-loaded':'true'}),toolbarButton('보관함 JSON 내보내기',()=>{guard(current);download(serializeAssetLibrary(library),'asset-library.json','application/json');},'asset-export-json',{'data-needs-loaded':'true'})),
    el('section',{class:'asset-storage'},current.status,current.storageNote,el('div',{class:'asset-action-row'},current.resume,current.connect,toolbarButton('다시 불러오기',async()=>{
     if((dirty||storage.getState().pending)&&!await confirm('현재 보관함을 다시 불러올까요?','저장하지 못한 보관함 변경을 버리고 저장된 목록을 열어요. 필요하면 먼저 JSON으로 내보내세요.','다시 불러오기',current))return;
     return loadLibrary({discardPending:true},current);
    },'asset-reload'),toolbarButton('저장 재시도',async()=>{await ensureLoaded(current);return persist(current);},'asset-retry'))),
-   el('div',{class:'asset-library-grid'},el('section',{class:'asset-browser'},el('div',{class:'asset-search-row'},current.search,current.count),current.list),current.details),current.feedback,files,json);
+   el('div',{class:'asset-library-grid'},el('section',{class:'asset-browser'},el('div',{class:'asset-search-row'},current.search,current.count),current.list),current.details),current.feedback);
+  dialog.append(header,images,files,json);if(!pick&&ctx.cloudAccount)current.hub=mountLibraryHub(ctx,{dialog,images,header,onClose:()=>finish(),initialAccount:account});
   dialog.addEventListener('cancel',event=>{event.preventDefault();if(session===current)finish();});dialog.addEventListener('close',()=>{if(session===current)finish();});document.body.append(dialog);render();dialog.showModal();if(!loaded||loadedIdentity!==storage.identity())void perform(()=>ensureLoaded(current)).catch(()=>{});return result;
  }
  return {button:trigger,open,addAssets,getLocalLibrary:()=>localStorage.load(),getLibrary:async()=>{await ensureLoaded();return structuredClone(library);},reload:()=>perform(()=>loadLibrary()),destroy(){if(disposed)return;disposed=true;finish();unsubscribe();unsubscribeWorkspace?.();storage.destroy();trigger.remove();}};
