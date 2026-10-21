@@ -33,6 +33,7 @@ import {openImageCropper} from './ui/image-crop.js';
 import {placeImageAsset} from './model/asset-placement.js';
 import {textRangeOwners,remapTextRanges} from './model/text-ranges.js';
 import {mountMobileWorkspace} from './ui/mobile-workspace.js';
+import {createThemeControl} from './ui/theme.js';
 import {createCloudClient} from './cloud/client.js';
 import {createBlobStore} from './cloud/blobs.js';
 import {createCloudSession} from './cloud/session.js';
@@ -42,6 +43,7 @@ import {createCloudAssetControls} from './ui/cloud-assets.js';
 import {openCloudImport} from './ui/cloud-import.js';
 
 export function mountEditor(root,store,{cloudClient=createCloudClient()}={}){
+ const themeControl=createThemeControl();
  let ignoreOutputWarnings=false;try{ignoreOutputWarnings=localStorage.getItem('card-print-studio:ignore-output-warnings:v1')==='true';}catch{}
  const state={ignoreOutputWarnings,activeCardId:store.getProject().cards[0]?.id,selectedElementId:null,selectedElementIds:[],back:false,mode:'card',cardScale:5.3,paintOpen:false,effectOpen:false};
  let generation=0,viewingPublic=false;
@@ -151,7 +153,7 @@ export function mountEditor(root,store,{cloudClient=createCloudClient()}={}){
   el('div',{class:'brand'},el('span',{class:'brand-symbol'},'▤'),el('div',{},el('strong',{},'카드 작업실'),el('small',{},'내가 만든 카드, 내가 그린 그림'))),
   el('div',{class:'deck-heading'},deckName,el('span',{id:'save-state',class:'save-state'},'저장됨'),workspaceFiles.status,recovery.status),
   el('div',{class:'top-actions'},
-   cloudAccount.node,updates.button,
+   themeControl,cloudAccount.node,updates.button,
    button('클라우드',()=>{void openCloudPanel(ctx,{client:cloudClient,session:cloudSession,account:cloudAccount}).catch(error=>showMessage(error.message));},{id:'cloud-open',disabled:!cloudClient.availability.available}),
    recovery.button,cardTemplates.button,assetLibrary.button,
    button('키워드 관리',()=>ctx.openKeywords(),{id:'keyword-manager'}),
