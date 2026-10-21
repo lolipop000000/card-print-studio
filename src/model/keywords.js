@@ -1,6 +1,6 @@
 import {newId} from './types.js';
 import {replaceSkillText} from './skill-references.js';
-import {replaceText} from './text-ranges.js';
+import {replaceText,mergeTextSpans} from './text-ranges.js';
 export const inlineDisplay=ref=>ref.display==='inline'||ref.display==='both';
 export const badgeDisplay=ref=>ref.display==='badge'||ref.display==='both';
 const titleField=field=>field==='title'||field==='name';
@@ -23,6 +23,23 @@ export function tokenizeKeywords(text,keywords){
   else plain+=text[at++];
  }
  flush();return runs;
+}
+export function keywordsInText(text,keywords){
+ const found=new Map();for(const run of tokenizeKeywords(String(text),keywords))if(run.keyword)found.set(run.keyword.id,run.keyword);return [...found.values()];
+}
+export function keywordsForText(project,target,display,text){
+ const linked=selectedKeywords(project,target,display),ids=new Set(linked.map(keyword=>keyword.id));
+ return [...linked,...keywordsInText(text,project.keywords||[]).filter(keyword=>!ids.has(keyword.id))];
+}
+/** Shared recipes keep underlying typography; explicit skill-name characters take priority. */
+export function keywordTextSpans(text,keywords,skillSpans=[]){
+ const spans=[];let at=0;
+ for(const run of tokenizeKeywords(String(text),keywords)){
+  const keyword=run.keyword;
+  if(keyword)spans.push({id:'keyword:'+keyword.id+':'+at,keywordId:keyword.id,start:at,end:at+run.text.length,style:{color:keyword.color,...(keyword.visualEffects?.layers.some(layer=>layer.enabled&&layer.opacity>0)?{visualEffects:keyword.visualEffects}:{})}});
+  at+=run.text.length;
+ }
+ return spans.length?mergeTextSpans(text,[...skillSpans.filter(span=>span.rangeId),...spans,...skillSpans.filter(span=>!span.rangeId)]):skillSpans;
 }
 export function addKeyword(project){
  const list=project.keywords??(project.keywords=[]);let name='새 키워드',n=2;

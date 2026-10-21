@@ -202,6 +202,7 @@ var VISUAL_EFFECT_CATALOG = {
   bloom: { name: "Bloom \xB7 \uBC1D\uC740 \uBE5B \uBC88\uC9D0", hint: "\uBC1D\uAE30 \uAE30\uC900\uC744 \uB118\uB294 \uBD80\uBD84\uB9CC \uACE8\uB77C \uBE5B\uC744 \uD37C\uB728\uB824\uC694. \uBC1D\uC740 \uAE00\uC790\xB7\uADF8\uB9BC \uB610\uB294 \uBD88\uAF43 \uB4A4\uC5D0 \uACB9\uCCD0\uBCF4\uC138\uC694.", animated: false, filter: true, fields: { threshold: numeric2("\uBC1D\uAE30 \uAE30\uC900", 0.55, 0, 1, 0.05), knee: numeric2("\uAE30\uC900 \uACBD\uACC4 \uBD80\uB4DC\uB7EC\uC6C0", 0.35, 0, 1, 0.05), radius: numeric2("\uBC88\uC9D0 \uBC18\uACBD", 2, 0, 12, 0.1, "mm"), strength: numeric2("\uBE5B \uAC15\uB3C4", 1.1, 0, 3, 0.1), color: color("\uBE5B \uC0C9", "#ffffff") } },
   directionalBlur: { name: "\uBC29\uD5A5 \uD750\uB9BC", hint: "\uC815\uD55C \uBC29\uD5A5\uC73C\uB85C \uC794\uC0C1\uC744 \uD3B4\uC694. \uC0D8\uD50C \uC218\uB97C \uB192\uC774\uBA74 \uBD80\uB4DC\uB7EC\uC6CC\uC9C0\uACE0 \uACC4\uC0B0 \uC2DC\uAC04\uC774 \uB298\uC5B4\uB098\uC694.", animated: false, filter: true, fields: { distance: numeric2("\uC794\uC0C1 \uAE38\uC774", 1, 0, 8, 0.1, "mm"), angle: numeric2("\uC794\uC0C1 \uBC29\uD5A5", 0, -180, 180, 5, "\xB0"), samples: numeric2("\uC0D8\uD50C \uC218", 9, 3, 25, 1), strength: numeric2("\uAC15\uB3C4", 1, 0, 1, 0.05) } },
   displacement: { name: "\uAD50\uCC28 \uC77C\uB801\uC784", hint: "\uAC00\uB85C\xB7\uC138\uB85C \uC6C0\uC9C1\uC784\uC744 \uACB9\uCCD0 \uC5F4\uAE30\uB098 \uBB3C\uC18D\uCC98\uB7FC \uC77C\uB801\uC5EC\uC694. \uC6C0\uC9C1\uC784\uC744 \uB044\uBA74 \uAC19\uC740 \uBAA8\uC591\uC73C\uB85C \uACE0\uC815\uB3FC\uC694.", animated: true, filter: true, fields: { amount: numeric2("\uD754\uB4E4\uB9BC \uAC70\uB9AC", 0.45, 0, 3, 0.05, "mm"), wavelength: numeric2("\uBB34\uB2AC \uAC04\uACA9", 4, 0.5, 20, 0.5, "mm"), axis: choice2("\uBCC0\uD615 \uCD95", "both", [["both", "\uAC00\uB85C + \uC138\uB85C"], ["x", "\uAC00\uB85C"], ["y", "\uC138\uB85C"]]) } },
+  heatHaze: { name: "\uC774\uAE00\uAC70\uB9BC \xB7 \uC5F4\uAE30 \uC65C\uACE1", hint: "\uBD88\uADDC\uCE59\uD55C \uC5F4\uAE30\uAC00 \uD750\uB974\uBA70 \uAE00\uC790\uB098 \uADF8\uB9BC\uC774 \uC544\uB978\uAC70\uB824\uC694. \uBD88\uAF43\xB7\uBC1C\uAD11 \uB4A4\uC5D0 \uACB9\uCCD0\uBCF4\uC138\uC694. \uC6C0\uC9C1\uC784\uC744 \uB044\uBA74 \uAC19\uC740 \uC7A5\uBA74\uC73C\uB85C \uACE0\uC815\uB3FC\uC694.", animated: true, filter: true, fields: { amount: numeric2("\uC774\uAE00\uAC70\uB9BC \uC138\uAE30", 0.22, 0, 3, 0.02, "mm"), wavelength: numeric2("\uC5F4\uAE30 \uBB34\uB2AC \uD06C\uAE30", 2.4, 0.5, 20, 0.1, "mm"), detail: numeric2("\uC794\uBB3C\uACB0", 0.65, 0, 1, 0.05), direction: numeric2("\uC5F4\uAE30 \uC774\uB3D9 \uBC29\uD5A5", -90, -180, 180, 5, "\xB0") } },
   sprite: { name: "\uC774\uBBF8\uC9C0\xB7\uB3C4\uD615 \uC785\uC790", hint: "\uB8EC\xB7\uBCC4\xB7\uAF43\uC78E \uB610\uB294 \uC9C1\uC811 \uAC00\uC838\uC628 \uADF8\uB9BC\uC744 \uB0A0\uB824\uC694. \uD06C\uAE30\xB7\uC774\uB3D9 \uAC70\uB9AC\uB294 \uB300\uC0C1 \uB192\uC774 \uAE30\uC900\uC774\uBA70, \uB05D \uD06C\uAE30\uB97C \uC904\uC774\uBA74 \uC791\uC544\uC838\uC694. \uBC30\uCE58 \uBCC0\uD654 0\uC740 \uAC19\uC740 \uACBD\uB85C\uB97C \uBC18\uBCF5\uD574\uC694.", animated: true, generative: true, fields: {
     shape: choice2("\uC785\uC790 \uBAA8\uC591", "star", [["image", "\uB0B4 \uC774\uBBF8\uC9C0"], ["star", "\uBCC4"], ["circle", "\uC6D0"], ["rune", "\uB8EC"], ["diamond", "\uC218\uC815"], ["petal", "\uAF43\uC78E"], ["snowflake", "\uB208 \uACB0\uC815"]]),
     assetId: { type: "asset", label: "\uC785\uC790 \uC774\uBBF8\uC9C0", value: null },
@@ -311,7 +312,12 @@ var VISUAL_EFFECT_PRESETS = {
     { kind: "glow", params: { color: "#ff7f24", radius: 0.5, strength: 0.65 } },
     { kind: "flame", params: { count: 60, height: 0.52, size: 0.075, width: 0.1, life: 1.8 } },
     { kind: "ember", params: { count: 14, size: 0.015, tail: 0.07 } },
-    { kind: "displacement", params: { amount: 0.1, wavelength: 2, axis: "x" } }
+    { kind: "heatHaze", params: { amount: 0.16, wavelength: 1.8, detail: 0.7, direction: -90 } }
+  ] },
+  heatShimmer: { name: "\uC774\uAE00\uAC70\uB9AC\uB294 \uC5F4\uAE30", category: "\uAE00\uC790\xB7\uC9C8\uAC10", layers: [
+    { kind: "gradient", params: { color: "#fff3ae", color2: "#e87928", angle: 90 } },
+    { kind: "glow", scope: "outside", params: { color: "#ed652e", radius: 0.65, strength: 0.55 } },
+    { kind: "heatHaze", params: { amount: 0.3, wavelength: 2.4, detail: 0.7, direction: -90 } }
   ] },
   frost: { name: "\uC11C\uB9AC \uC624\uB77C", layers: [{ kind: "aura", params: { color: "#70cfff" } }, { kind: "particle", params: { color: "#659cbc", shape: "snow" }, placement: "front" }, { kind: "glow", scope: "outside", params: { color: "#85dfff" } }] },
   poison: { name: "\uB3C5\uC548\uAC1C", layers: [{ kind: "smoke", params: { color: "#9759cc" } }, { kind: "mist", params: { color: "#ac6ed4" } }, { kind: "glow", scope: "outside", params: { color: "#9a48de" } }] },
@@ -1085,6 +1091,7 @@ function validateProject(p) {
     if (typeof kw.description !== "string") invalid("keyword", context, "\uC124\uBA85", kw.description, "\uBB38\uC790\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4");
     if (typeof kw.color !== "string" || !/^#[0-9a-f]{6}$/i.test(kw.color)) invalid("keyword", context, "\uC0C9", kw.color, "#RRGGBB \uD615\uC2DD\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4 (\uC608: #427963)");
     if (!assetRef(kw.iconAssetId)) invalid("keyword", context, "\uC544\uC774\uCF58 \uADF8\uB9BC ID", kw.iconAssetId, "\uD504\uB85C\uC81D\uD2B8 \uADF8\uB9BC \uC790\uB8CC\uC5D0 \uC874\uC7AC\uD558\uB294 ID\uC5EC\uC57C \uD569\uB2C8\uB2E4");
+    if (kw.visualEffects !== void 0) effectRecipe(kw.visualEffects, "text", {}, context + " \xB7 \uC804\uC6A9 \uC774\uD399\uD2B8");
   }
   const keywordRefs = (refs, extra, context) => {
     if (refs === void 0) return;

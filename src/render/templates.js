@@ -1,6 +1,6 @@
 import {preserveTemplateVisualEffects} from '../model/visual-effects.js';
 import {clone,cardAttributes} from '../model/types.js';
-import {selectedKeywords} from '../model/keywords.js';
+import {selectedKeywords,keywordsForText,keywordTextSpans} from '../model/keywords.js';
 import {resolveSkillEffect} from '../model/skill-references.js';
 import {skillNameSpans} from '../model/skill-name-styles.js';
 import {PT_MM,graphemes,textLineHeight} from './text.js';
@@ -38,10 +38,11 @@ function skillRows(card,s,keywords,previous){
   const title=(card.passives?.includes(sk)?'패시브':'액티브')+' · '+sk.name;
   const titleStyle=authoredStyle(previous,'skill.name',sk.id,{fontPt:9.2,fontWeight:720},s.minFontPt),bodyStyle=authoredStyle(previous,'skill.effect',sk.id,{fontPt:8.5},s.minFontPt);
   const badgeStyle=authoredStyle(previous,'skill.keywords',sk.id,{fontPt:8.5},s.minFontPt),diceStyle=authoredStyle(previous,'skill.dice',sk.id,{fontPt:7.5},s.minFontPt);
-  const titleH=Math.max(4.5*sy,textHeight(ctx,title,w,titleStyle,s.minFontPt,selectedKeywords(project,sk,'title'),[],skillNameSpans(card,title,{titleSkillId:sk.id})));
+  const titleSpans=keywordTextSpans(title,keywords,skillNameSpans(card,title,{titleSkillId:sk.id}));
+  const titleH=Math.max(4.5*sy,textHeight(ctx,title,w,titleStyle,s.minFontPt,keywordsForText(project,sk,'title',title),[],titleSpans));
   const badges=selectedKeywords(project,sk,'badge'),badgeH=badges.length?(ctx?fitKeywordBadges(ctx,badges,{w,h:Infinity},badgeStyle,badgeStyle.fontPt).heightMm:textLineHeight(badgeStyle.fontPt,badgeStyle)+.8):0;
   const diceW=sk.dice?Math.min(16*sx,w*.36):0,effectW=w-(sk.dice?diceW+.8*sx:0);
-  const effect=resolveSkillEffect(card,sk),shared=skillNameSpans(card,effect.text,{skillReferences:effect.skillReferences}),ranges=effect.textRanges?.effect||[],textH=textHeight(ctx,effect.text,effectW,bodyStyle,s.minFontPt,selectedKeywords(project,sk,'inline'),effect.skillReferences,ranges.length?mergeTextSpans(effect.text,shared,ranges):shared);
+  const effect=resolveSkillEffect(card,sk),shared=keywordTextSpans(effect.text,keywords,skillNameSpans(card,effect.text,{skillReferences:effect.skillReferences})),ranges=effect.textRanges?.effect||[],textH=textHeight(ctx,effect.text,effectW,bodyStyle,s.minFontPt,keywordsForText(project,sk,'inline',effect.text),effect.skillReferences,ranges.length?mergeTextSpans(effect.text,shared,ranges):shared);
   const diceH=sk.dice?ctx?diceContentHeight(ctx,sk.dice,diceW,diceStyle.fontPt):7.7:0,bodyH=Math.max(textH,diceH);
   return {sk,titleH,badgeH,bodyH,diceW,effectW,gap,titleStyle,bodyStyle,badgeStyle,diceStyle,total:titleH+gap+(badgeH?badgeH+gap:0)+bodyH};
  });
@@ -74,7 +75,7 @@ function addItemEffect(card,s,keywords,top,previous=new Map()){
   const style=authoredStyle(previous,'item.keywords',null,{fontPt:8.5},s.minFontPt),height=ctx?fitKeywordBadges(ctx,badges,{w,h:Infinity},style,style.fontPt).heightMm:4.5*sy;
   add('keywords','keywords',{x:4*sx,y,w,h:Math.max(.1,height)},'item.keywords',style);y+=height+.5*sy;
  }
- const style=authoredStyle(previous,'item.effect',null,{fontPt:10},s.minFontPt),height=textHeight(ctx,card.effect,w,style,style.fontPt,selectedKeywords({keywords},card,'inline'),[],mergeTextSpans(card.effect,[],getTextRanges(card,'effect')));
+ const style=authoredStyle(previous,'item.effect',null,{fontPt:10},s.minFontPt),height=textHeight(ctx,card.effect,w,style,style.fontPt,keywordsForText({keywords},card,'inline',card.effect),[],mergeTextSpans(card.effect,keywordTextSpans(card.effect,keywords),getTextRanges(card,'effect')));
  add('effect','text',{x:4*sx,y,w,h:Math.max(.1,84*sy-y,height)},'item.effect',style);
 }
 export function applyTemplate(input,s,variant,keywords=[]){

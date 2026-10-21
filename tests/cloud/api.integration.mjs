@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {randomUUID,createHash} from 'node:crypto';
 import {cloudFixture,must} from './helpers.mjs';
 import {createProject,createCard} from '../../src/model/project.js';
+import {createVisualEffects,makeVisualEffectLayer} from '../../src/model/visual-effects.js';
 
 let f;
 const project=(count=1)=>{const p=createProject();p.cards=Array.from({length:count},()=>createCard('monster',p));return p;};
@@ -39,6 +40,18 @@ function expect(result,status,code,label='HTTP API'){
  return result.body.result;
 }
 const ok=async(role,action,payload,options)=>expect(await request(role,action,payload,options),200);
+test('keyword effect recipes and sprite dependencies survive sharing and invalid recipes are rejected',async()=>{
+ const role=member(),sha=hash(f.png),recipe=createVisualEffects();recipe.layers=[makeVisualEffectLayer('heatHaze'),makeVisualEffectLayer('sprite',{params:{shape:'image',assetId:'spark'}})];
+ await ok(role,'blob.upload',{}, {bytes:f.png});
+ const data={...keyword(),item:{...keyword().item,visualEffects:recipe},assets:{spark:{id:'spark',mime:'image/png',width:1,height:1,paintingId:null,dataUrl:'blob:sha256:'+sha}},paintings:{},blobs:[sha]};
+ const created=await ok(role,'asset.create',{title:'이글거리는 키워드',kind:'keyword',data});await ok(role,'asset.setVisibility',{id:created.id,visibility:'public'});
+ const copy=await ok(f.source,'asset.copy',{sourceId:created.id}),copied=must(await f.source.client.from('shared_assets').select('data,blob_refs').eq('id',copy.id).single(),'copied keyword effects');
+ assert.deepEqual(copied.data,data);assert.deepEqual(copied.blob_refs,[sha]);
+ const invalid=structuredClone(data);invalid.item.visualEffects.layers[0].opacity=2;
+ expect(await request(role,'asset.create',{title:'잘못된 이펙트',kind:'keyword',data:invalid}),400,'invalid');
+ const deck=project();deck.keywords=[invalid.item];deck.assets=data.assets;
+ expect(await request(role,'work.create',{title:'잘못된 키워드 포함',data:deck}),400,'invalid');
+});
 test('trial pending image uploads cannot bypass the cumulative 15 MiB quota',async()=>{
  const role=f.roles.find(role=>role.name==='trial'),images=[0,1].map(()=>Buffer.concat([uniquePng(f.png),Buffer.alloc(8*1024*1024)])),hashes=images.map(hash);f.hashes.push(...hashes);
  try{expect(await request(role,'blob.upload',{}, {bytes:images[0]}),200);expect(await request(role,'blob.upload',{}, {bytes:images[1]}),429,'limit-bytes');}

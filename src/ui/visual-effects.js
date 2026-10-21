@@ -4,7 +4,7 @@ import {clone,newId} from '../model/types.js';
 import {importAsset,decodeImage} from '../model/assets.js';
 import {VISUAL_EFFECT_PRESETS,createVisualEffects,validateVisualEffects,readTargetEffects,writeTargetEffects,readTargetTextColor,writeTargetTextColor,saveVisualEffectPreset,removeVisualEffectPreset,getEffectFrameSec,upgradeVisualEffects} from '../model/visual-effects.js';
 import {createVisualEffectsForTarget} from '../model/effect-emission.js';
-import {renderCard} from '../render/card.js';
+import {renderCard,resolveElement} from '../render/card.js';
 import {createEffectCache,renderVisualEffects} from '../render/effects/composite.js';
 import {makeSurface} from '../render/effects/masks.js';
 import {getBloomAccelerationStatus} from '../render/effects/gpu-bloom.js';
@@ -53,7 +53,11 @@ export function openVisualEffectsEditor(ctx,initialTarget){
    targets.push([value,'선택 글자 · “'+text.slice(range.start,range.end)+'” · '+targetLabel(card,element,index)]);
   }
  }
- const targetValue=t=>[...definitions].find(([,d])=>t.textRangeId?d.textRangeId===t.textRangeId&&d.elementId===t.elementId:t.skillId?d.skillId===t.skillId:!d.skillId&&!d.textRangeId&&d.elementId===(t.elementId||null))?.[0];
+ if(!initialTarget.back)for(const keyword of p.keywords||[]){
+  let value='keyword:'+keyword.id;while(definitions.has(value))value='_'+value;
+  definitions.set(value,{cardId:card.id,back:false,elementId:null,keywordId:keyword.id});targets.push([value,'키워드 · '+keyword.name]);
+ }
+ const targetValue=t=>[...definitions].find(([,d])=>t.keywordId?d.keywordId===t.keywordId:t.textRangeId?d.textRangeId===t.textRangeId&&d.elementId===t.elementId:t.skillId?d.skillId===t.skillId:!d.keywordId&&!d.skillId&&!d.textRangeId&&d.elementId===(t.elementId||null))?.[0];
  const initialValue=targetValue(initialTarget);
  const initialFrame=getEffectFrameSec(p),drafts=new Map(),past=[],future=[];
  const stagedAssets=new Map(),stagedImages=new Map(),assetNames=new Map(),previewAssets=new Map(ctx.assets);let pendingImage=null,pendingImports=0;
@@ -76,7 +80,7 @@ export function openVisualEffectsEditor(ctx,initialTarget){
  const redoButton=button('↷ 다시 실행',()=>moveHistory(true),{id:'effect-redo',disabled:true,onpointerdown:event=>{if(pendingControl())event.preventDefault();},title:'Ctrl+Shift+Z / Ctrl+Y / ⌘⇧Z'});
  const zoom=field('확대','effect-preview-zoom','1',value=>setZoom(value),{options:[['0.5','50%'],['0.75','75%'],['1','100%'],['1.5','150%'],['2','200%'],['3','300%'],['4','400%'],['6','600%'],['8','800%']]});
  const compare=button('원본 비교 · 누르기',()=>{},{id:'effect-compare','aria-pressed':false,title:'누르는 동안 선택한 대상의 이펙트를 빼고 봅니다. 저장 내용은 바뀌지 않아요.',onpointerdown:event=>{event.preventDefault();showOriginal(true);},onpointerup:()=>showOriginal(false),onpointercancel:()=>showOriginal(false),onkeydown:event=>{if([' ','Enter'].includes(event.key)){event.preventDefault();showOriginal(true);}},onkeyup:event=>{if([' ','Enter'].includes(event.key)){event.preventDefault();showOriginal(false);}},onblur:()=>showOriginal(false)});
- const focus=button('선택 대상 확대',()=>{setZoom('2');const e=previewTarget.elements.find(e=>target.skillId?e.binding?.field==='skill.name'&&e.binding.skillId===target.skillId:e.id===target.elementId),rect=renderGeometry?.rect??e?.rect;if(!rect)return;const viewport=canvas.parentElement,scale=canvas.getBoundingClientRect().width/p.settings.cardWidthMm;viewport.scrollTo({left:canvas.offsetLeft+(rect.x+rect.w/2)*scale-viewport.clientWidth/2,top:canvas.offsetTop+(rect.y+rect.h/2)*scale-viewport.clientHeight/2});},{id:'effect-focus-target'});
+ const focus=button('선택 대상 확대',()=>{setZoom('2');const e=previewTarget.elements.find(e=>target.keywordId?matchesKeyword(e):target.skillId?e.binding?.field==='skill.name'&&e.binding.skillId===target.skillId:e.id===target.elementId),rect=renderGeometry?.rect??e?.rect;if(!rect)return;const viewport=canvas.parentElement,scale=canvas.getBoundingClientRect().width/p.settings.cardWidthMm;viewport.scrollTo({left:canvas.offsetLeft+(rect.x+rect.w/2)*scale-viewport.clientWidth/2,top:canvas.offsetTop+(rect.y+rect.h/2)*scale-viewport.clientHeight/2});},{id:'effect-focus-target'});
  function setZoom(value){previewView?.setZoom(value);}
  function showOriginal(value){if(disposed||comparing===value)return;comparing=value;compare.setAttribute('aria-pressed',value);draw();}
  function releaseComparison(){showOriginal(false);}
@@ -142,7 +146,7 @@ export function openVisualEffectsEditor(ctx,initialTarget){
  function activate(value){
   if(!definitions.has(value))throw Error('효과를 붙일 대상을 다시 선택하세요.');
   currentKey=value;target={...definitions.get(value)};
-  targetType=target.skillId?'text':target.elementId?card.elements.find(e=>e.id===target.elementId).type:'frame';
+  targetType=target.skillId||target.keywordId?'text':target.elementId?card.elements.find(e=>e.id===target.elementId).type:'frame';
   if(!drafts.has(value)){
    const original=readTargetEffects(ctx.store.getProject(),target);
    drafts.set(value,{target:{...target},original,originalColor:readTargetTextColor(ctx.store.getProject(),target),color:readTargetTextColor(ctx.store.getProject(),target),originalStyle:readTargetTextStyle(ctx.store.getProject(),target),style:readTargetTextStyle(ctx.store.getProject(),target),recipe:clone(original),selected:original.layers[0]?.id,savedId:null,presetName:''});
@@ -224,13 +228,23 @@ export function openVisualEffectsEditor(ctx,initialTarget){
   syncEffectTimeInput(time,timeline.getTime());timeLabel.textContent=timeline.getTime().toFixed(2)+'초';play.textContent=timeline.isPlaying()?'일시정지':'재생';play.setAttribute('aria-pressed',timeline.isPlaying());
   frameLabel.textContent='인쇄 '+draftFrame.toFixed(2)+'초';dialog.dataset.effectDirty=String(dirty());updateHistoryControls();
  }
+ function matchesKeyword(element){
+  const keyword=previewProject.keywords.find(k=>k.id===target.keywordId),value=resolveElement(previewProject,previewTarget,element);
+  return keyword&&(element.type==='text'&&String(value||'').includes(keyword.name)||element.type==='keywords'&&Array.isArray(value)&&value.some(k=>k.id===keyword.id));
+ }
  function prepare(){
   remember();const p=ctx.store.getProject(),copy=clone(target.back?p.back:p.cards.find(c=>c.id===target.cardId));
   previewAssets.clear();for(const [id,image] of ctx.assets)previewAssets.set(id,image);for(const [id,image] of stagedImages)previewAssets.set(id,image);
-  previewProject={...p,assets:{...p.assets,...Object.fromEntries(stagedAssets)},cards:target.back?p.cards:p.cards.map(c=>c.id===target.cardId?copy:c),back:target.back?copy:p.back};
+  previewProject={...p,keywords:clone(p.keywords||[]),assets:{...p.assets,...Object.fromEntries(stagedAssets)},cards:target.back?p.cards:p.cards.map(c=>c.id===target.cardId?copy:c),back:target.back?copy:p.back};
   applyDrafts(previewProject);renderGeometry=null;
-  previewTarget=target.back?previewProject.back:previewProject.cards.find(c=>c.id===target.cardId);comparisonTarget=clone(previewTarget);comparisonProject={...previewProject,cards:target.back?previewProject.cards:previewProject.cards.map(c=>c.id===target.cardId?comparisonTarget:c),back:target.back?comparisonTarget:previewProject.back};
-  writeTargetEffects(comparisonProject,target,createVisualEffects());if(targetType==='text')writeTargetTextColor(comparisonProject,target,drafts.get(currentKey).originalColor);focus.disabled=!target.elementId&&!target.skillId;cache.clear();dialog.dataset.effectDirty=String(dirty());transform?.refresh();
+  previewTarget=target.back?previewProject.back:previewProject.cards.find(c=>c.id===target.cardId);
+  if(target.keywordId){
+   const keyword=previewProject.keywords.find(k=>k.id===target.keywordId);
+   const used=previewTarget.elements.some(matchesKeyword);
+   if(!used)previewTarget.elements=[{id:'keyword-preview',type:'text',content:keyword.name,keywords:[{keywordId:keyword.id,display:'inline'}],rect:{x:5,y:p.settings.cardHeightMm/2-8,w:p.settings.cardWidthMm-10,h:16},style:{fontPt:26,align:'center',color:keyword.color}}];
+  }
+  comparisonTarget=clone(previewTarget);comparisonProject={...previewProject,keywords:clone(previewProject.keywords),cards:target.back?previewProject.cards:previewProject.cards.map(c=>c.id===target.cardId?comparisonTarget:c),back:target.back?comparisonTarget:previewProject.back};
+  writeTargetEffects(comparisonProject,target,createVisualEffects());if(targetType==='text')writeTargetTextColor(comparisonProject,target,drafts.get(currentKey).originalColor);focus.disabled=!target.elementId&&!target.skillId&&!target.keywordId;cache.clear();dialog.dataset.effectDirty=String(dirty());transform?.refresh();
  }
  function draw(){
   clearTimeout(timer);if(disposed||!previewTarget)return;
@@ -238,7 +252,9 @@ export function openVisualEffectsEditor(ctx,initialTarget){
   if(dpi!==lastDpi){cache.clear();lastDpi=dpi;}
   const report=renderCard(canvas.getContext('2d',{willReadFrequently:false}),comparing?comparisonProject:previewProject,comparing?comparisonTarget:previewTarget,previewAssets,dpi,{timeSec:timeline.getTime(),playbackTarget:selectedPlayback.checked?target:null,frozenTimeSec:draftFrame,effectCache:cache,onEffectGeometry:entry=>{
    if(comparing)return;
-   if(target.textRangeId){
+   if(target.keywordId){
+    if(entry.keywordId===target.keywordId&&!renderGeometry)renderGeometry=entry;
+   }else if(target.textRangeId){
     if(entry.textRangeId===target.textRangeId&&(!renderGeometry||entry.elementId===target.elementId))renderGeometry=entry;
    }else if(target.skillId){
     const title=previewTarget.elements.find(e=>e.binding?.field==='skill.name'&&e.binding.skillId===target.skillId);
@@ -269,10 +285,10 @@ export function openVisualEffectsEditor(ctx,initialTarget){
    button('스프라이트 시트 자르기',()=>processSpriteImage(sprite.id,true),{id:'effect-sprite-crop-sheet',class:'wide',disabled:pendingImports>0||!sprite.params.assetId}),
    el('p',{class:'hint'},'선택한 조각은 한 시트로 묶어요. 여러 컷 재생에서 반복이나 랜덤 소환을 고를 수 있어요.')));
   if(targetType==='text')fields.prepend(el('section',{class:'inspector-group'},el('h3',{},'글자 꾸미기'),
-   ...textStyleFields(textStyle,(key,value)=>{editDraft(()=>textStyle={...textStyle,[key]:value});prepare();renderFields();scheduleDraw();updateTransport();},{idPrefix:'effect-text',minFontPt:p.settings.minFontPt,inline:!!target.skillId||!!target.textRangeId}),
-   field('글자 색','effect-text-color',textColor||'#253d32',value=>{editDraft(()=>textColor=value);prepare();scheduleDraw();updateTransport();},{type:'color'}),
+   ...target.keywordId?[]:textStyleFields(textStyle,(key,value)=>{editDraft(()=>textStyle={...textStyle,[key]:value});prepare();renderFields();scheduleDraw();updateTransport();},{idPrefix:'effect-text',minFontPt:p.settings.minFontPt,inline:!!target.skillId||!!target.textRangeId}),
+   field('글자 색','effect-text-color',textColor||(target.keywordId?'#427963':'#253d32'),value=>{editDraft(()=>textColor=value);prepare();scheduleDraw();updateTransport();},{type:'color'}),
    button('기본 글자 색 사용',()=>{editDraft(()=>textColor=undefined);prepare();renderFields();scheduleDraw();updateTransport();},{id:'effect-text-color-reset',disabled:textColor===undefined}),
-   target.textRangeId?el('p',{class:'hint'},'선택한 글자 구간에만 적용돼요. 스킬 이름에 지정하면 설명 속 같은 스킬 이름에도 함께 적용돼요.'):target.skillId?el('p',{class:'hint'},'이 스킬의 제목 이름과 설명 속 같은 이름에 함께 적용돼요.'):null));
+   target.keywordId?el('p',{class:'hint'},'같은 키워드의 제목·본문·배지에 함께 적용돼요. 사용 전 키워드는 미리보기에서 이름만 보여줘요.'):target.textRangeId?el('p',{class:'hint'},'선택한 글자 구간에만 적용돼요. 스킬 이름에 지정하면 설명 속 같은 스킬 이름에도 함께 적용돼요.'):target.skillId?el('p',{class:'hint'},'이 스킬의 제목 이름과 설명 속 같은 이름에 함께 적용돼요.'):null));
   });
   for(const input of fields.querySelectorAll('input[type=number],input[type=color]'))input.dataset.effectCommitted=input.value;
   updateHistoryControls();

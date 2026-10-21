@@ -86,15 +86,18 @@ export function textRangeTarget(project,{cardId,back=false,elementId,textRangeId
  if(!range)throw Error('효과를 줄 글자 구간이 없어졌어요. 글자를 다시 선택하세요.');
  return {card,element,...field,range};
 }
-/** Explicit character choices override shared skill-name styling only where selected. */
+/** Earlier shared styles take priority; explicit character choices override only where selected. */
 export function mergeTextSpans(text,shared=[],ranges=[],offset=0){
  const visible=ranges.filter(r=>Object.entries(r.style||{}).some(([key,value])=>key==='visualEffects'?value?.layers?.some(layer=>layer.enabled&&layer.opacity>0):value!==undefined));
  const explicit=visible.map(r=>({...r,start:r.start+offset,end:r.end+offset,rangeId:r.id})),all=[...shared,...explicit];if(!all.length)return [];
  const boundaries=[...new Set(all.flatMap(r=>[Math.max(0,r.start),Math.min(text.length,r.end)]))].sort((a,b)=>a-b),result=[];
  for(let i=0;i<boundaries.length-1;i++){
   const start=boundaries[i],end=boundaries[i+1];if(start>=end)continue;
-  const base=shared.find(r=>r.start<=start&&r.end>=end),own=explicit.find(r=>r.start<=start&&r.end>=end);if(!base&&!own)continue;
-  const source=own||base;result.push({...source,start,end,style:{...base?.style,...own?.style},id:source.id+':'+start});
+  const bases=shared.filter(r=>r.start<=start&&r.end>=end),base=bases[0],own=explicit.find(r=>r.start<=start&&r.end>=end);if(!base&&!own)continue;
+  const baseStyle=Object.assign({},...[...bases].reverse().map(span=>span.style));
+  // Color-only shared spans may inherit a recipe; its owner keeps playback and geometry identity.
+  const source=own||(base?.rangeId?base:bases.find(span=>span.style?.visualEffects)||base);
+  result.push({...source,start,end,style:{...baseStyle,...own?.style},id:source.id+':'+start});
  }
  return result;
 }

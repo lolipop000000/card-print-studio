@@ -17,3 +17,11 @@ test('character playback follows the same range across title and skill-name ment
  assert.equal(api.effectPlaybackTime(opts,{elementId:'title',textRangeId:'other'}),1.2);
  assert.equal(api.effectPlaybackTime(opts,{elementId:'title'}),1.2);
 });
+
+test('keyword playback animates its repeated labels while other words and the frame stay frozen',()=>{
+ const options={timeSec:4,frozenTimeSec:1.2,playbackTarget:{keywordId:'fire-word'}};
+ for(const elementId of ['title','description','badges'])assert.equal(api.effectPlaybackTime(options,{elementId,keywordId:'fire-word'}),4);
+ assert.equal(api.effectPlaybackTime(options,{elementId:'title',keywordId:'ice-word'}),1.2);
+ assert.equal(api.effectPlaybackTime(options,{elementId:'title'}),1.2);
+ assert.equal(api.effectPlaybackTime(options,{elementId:null}),1.2);
+});

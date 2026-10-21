@@ -1,8 +1,9 @@
 /** Preview-only targeting; neither recipes nor the saved print frame are changed. */
-export function isEffectPlaybackTarget(playbackTarget,{elementId=null,skillId=null,textRangeId=null}={}){
+export function isEffectPlaybackTarget(playbackTarget,{elementId=null,skillId=null,textRangeId=null,keywordId=null}={}){
  if(!playbackTarget)return true;
  if(playbackTarget.textRangeId)return playbackTarget.textRangeId===textRangeId;
  if(playbackTarget.skillId)return playbackTarget.skillId===skillId;
+ if(playbackTarget.keywordId)return playbackTarget.keywordId===keywordId;
  return (playbackTarget.elementId||null)===(elementId||null);
 }
 export function effectPlaybackTime({timeSec,frozenTimeSec,playbackTarget},identity){

@@ -8,6 +8,7 @@ const fields={keyword:'keywords',effect_template:'visualEffectPresets',card_temp
 function dependencies(project,item,kind){
  const ids=new Set();
  if(kind==='keyword'&&item.iconAssetId)ids.add(item.iconAssetId);
+ if(kind==='keyword')for(const layer of item.visualEffects?.layers||[])if(layer.params?.assetId)ids.add(layer.params.assetId);
  if(kind==='effect_template')for(const layer of item.recipe.layers)if(layer.params?.assetId)ids.add(layer.params.assetId);
  const assets={},paintings={};
  for(const id of ids){const asset=project.assets[id];if(!asset)throw Error('공유할 에셋에 연결된 그림이 없어요.');assets[id]=structuredClone(asset);if(asset.paintingId){const original=project.paintings[asset.paintingId];if(!original)throw Error('공유할 그림의 편집 원본이 없어요.');paintings[original.id]=structuredClone(original);}}
@@ -25,7 +26,7 @@ export async function applySharedAsset(project,data,fetchBlob){
  validateCloudAsset(data.kind,data);const field=fields[data.kind];if(!field)throw Error('이미지는 내 이미지 보관함에 가져오세요.');
  const decoded=await fromCloudProject(data.kind==='card_template'?data.item:data,fetchBlob),item=structuredClone(data.kind==='card_template'?decoded:decoded.item),resources=remapTemplateResources({...decoded,assets:decoded.assets??{},paintings:decoded.paintings??{}},()=>newId());
  item.id=newId();item.name=uniqueName(item.name,project[field]??[]);
- if(data.kind==='keyword'){if(item.iconAssetId)item.iconAssetId=resources.assetMap.get(item.iconAssetId);}
+ if(data.kind==='keyword'){if(item.iconAssetId)item.iconAssetId=resources.assetMap.get(item.iconAssetId);if(item.visualEffects)item.visualEffects=resources.mapEffect(item.visualEffects,'text');}
  else if(data.kind==='effect_template')item.recipe=resources.mapEffect(item.recipe,'any');
  else{
   item.assets=resources.assets;item.paintings=resources.paintings;

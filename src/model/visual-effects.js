@@ -20,6 +20,7 @@ export const VISUAL_EFFECT_CATALOG={
  bloom:{name:'Bloom · 밝은 빛 번짐',hint:'밝기 기준을 넘는 부분만 골라 빛을 퍼뜨려요. 밝은 글자·그림 또는 불꽃 뒤에 겹쳐보세요.',animated:false,filter:true,fields:{threshold:numeric('밝기 기준',.55,0,1,.05),knee:numeric('기준 경계 부드러움',.35,0,1,.05),radius:numeric('번짐 반경',2,0,12,.1,'mm'),strength:numeric('빛 강도',1.1,0,3,.1),color:color('빛 색','#ffffff')}},
  directionalBlur:{name:'방향 흐림',hint:'정한 방향으로 잔상을 펴요. 샘플 수를 높이면 부드러워지고 계산 시간이 늘어나요.',animated:false,filter:true,fields:{distance:numeric('잔상 길이',1,0,8,.1,'mm'),angle:numeric('잔상 방향',0,-180,180,5,'°'),samples:numeric('샘플 수',9,3,25,1),strength:numeric('강도',1,0,1,.05)}},
  displacement:{name:'교차 일렁임',hint:'가로·세로 움직임을 겹쳐 열기나 물속처럼 일렁여요. 움직임을 끄면 같은 모양으로 고정돼요.',animated:true,filter:true,fields:{amount:numeric('흔들림 거리',.45,0,3,.05,'mm'),wavelength:numeric('무늬 간격',4,.5,20,.5,'mm'),axis:choice('변형 축','both',[['both','가로 + 세로'],['x','가로'],['y','세로']])}},
+ heatHaze:{name:'이글거림 · 열기 왜곡',hint:'불규칙한 열기가 흐르며 글자나 그림이 아른거려요. 불꽃·발광 뒤에 겹쳐보세요. 움직임을 끄면 같은 장면으로 고정돼요.',animated:true,filter:true,fields:{amount:numeric('이글거림 세기',.22,0,3,.02,'mm'),wavelength:numeric('열기 무늬 크기',2.4,.5,20,.1,'mm'),detail:numeric('잔물결',.65,0,1,.05),direction:numeric('열기 이동 방향',-90,-180,180,5,'°')}},
  sprite:{name:'이미지·도형 입자',hint:'룬·별·꽃잎 또는 직접 가져온 그림을 날려요. 크기·이동 거리는 대상 높이 기준이며, 끝 크기를 줄이면 작아져요. 배치 변화 0은 같은 경로를 반복해요.',animated:true,generative:true,fields:{
   shape:choice('입자 모양','star',[['image','내 이미지'],['star','별'],['circle','원'],['rune','룬'],['diamond','수정'],['petal','꽃잎'],['snowflake','눈 결정']]),
   assetId:{type:'asset',label:'입자 이미지',value:null},tint:choice('이미지 색 처리','original',[['original','원본 색 유지'],['tint','기본 색으로 칠하기'],['lifetime','수명에 따라 두 색 전환']]),
@@ -103,7 +104,12 @@ export const VISUAL_EFFECT_PRESETS={
   {kind:'glow',params:{color:'#ff7f24',radius:.5,strength:.65}},
   {kind:'flame',params:{count:60,height:.52,size:.075,width:.1,life:1.8}},
   {kind:'ember',params:{count:14,size:.015,tail:.07}},
-  {kind:'displacement',params:{amount:.1,wavelength:2,axis:'x'}}
+  {kind:'heatHaze',params:{amount:.16,wavelength:1.8,detail:.7,direction:-90}}
+ ]},
+ heatShimmer:{name:'이글거리는 열기',category:'글자·질감',layers:[
+  {kind:'gradient',params:{color:'#fff3ae',color2:'#e87928',angle:90}},
+  {kind:'glow',scope:'outside',params:{color:'#ed652e',radius:.65,strength:.55}},
+  {kind:'heatHaze',params:{amount:.3,wavelength:2.4,detail:.7,direction:-90}}
  ]},
  frost:{name:'서리 오라',layers:[{kind:'aura',params:{color:'#70cfff'}},{kind:'particle',params:{color:'#659cbc',shape:'snow'},placement:'front'},{kind:'glow',scope:'outside',params:{color:'#85dfff'}}]},
  poison:{name:'독안개',layers:[{kind:'smoke',params:{color:'#9759cc'}},{kind:'mist',params:{color:'#ac6ed4'}},{kind:'glow',scope:'outside',params:{color:'#9a48de'}}]},
@@ -447,12 +453,14 @@ export function upgradeProjectVisualEffects(project){
  }
  for(const element of project.back?.elements||[]){upgradeElement(element);for(const ranges of Object.values(element.textRanges||{}))for(const range of ranges)if(range.style?.visualEffects!==undefined)range.style.visualEffects=upgradeVisualEffects(range.style.visualEffects,'text');}
  for(const preset of project.visualEffectPresets||[])preset.recipe=upgradeVisualEffects(preset.recipe);
+ for(const keyword of project.keywords||[])if(keyword.visualEffects!==undefined)keyword.visualEffects=upgradeVisualEffects(keyword.visualEffects,'text');
  return project;
 }
 
 export const getEffectFrameSec=project=>bounded(project.print?.effectFrameSec,0,Infinity)?project.print.effectFrameSec:1.2;
 export const hasEffectMotion=recipe=>!!recipe?.layers.some(layer=>layer.enabled&&layer.motion.enabled&&(VISUAL_EFFECT_CATALOG[layer.kind]?.animated||layer.kind==='textWarp'&&layer.params.wave>0));
-function effectTarget(project,{cardId,back=false,elementId=null,skillId=null,textRangeId=null},{write=false}={}){
+function effectTarget(project,{cardId,back=false,elementId=null,skillId=null,textRangeId=null,keywordId=null},{write=false}={}){
+ if(keywordId!==null){const keyword=project.keywords?.find(k=>k.id===keywordId);if(!keyword)throw Error('이펙트를 적용할 키워드가 없어졌어요. 키워드를 다시 선택하세요.');return {owner:keyword,type:'text',keyword};}
  const card=back?project.back:project.cards.find(c=>c.id===cardId);if(!card)throw Error('이펙트를 적용할 카드를 찾을 수 없어요.');
  if(textRangeId!==null){const selected=textRangeTarget(project,{cardId,back,elementId,textRangeId});return {card,owner:selected.range.style,type:'text'};}
  if(skillId!==null){
@@ -465,14 +473,14 @@ function effectTarget(project,{cardId,back=false,elementId=null,skillId=null,tex
 }
 export function readTargetEffects(project,target){const selected=effectTarget(project,target);return upgradeVisualEffects(selected.owner.visualEffects||createVisualEffects(),selected.type);}
 export function writeTargetEffects(project,target,recipe){
- const selected=effectTarget(project,target,{write:true});selected.owner.visualEffects=upgradeVisualEffects(recipe,selected.type);if(target.elementId&&!target.skillId&&!target.textRangeId&&selected.card.kind)selected.card.template='custom';
+ const selected=effectTarget(project,target,{write:true});selected.owner.visualEffects=upgradeVisualEffects(recipe,selected.type);if(target.elementId&&!target.skillId&&!target.textRangeId&&!target.keywordId&&selected.card.kind)selected.card.template='custom';
 }
 export function readTargetTextColor(project,target){const selected=effectTarget(project,target);return selected.type==='text'?selected.owner.color:undefined;}
 export function writeTargetTextColor(project,target,color){
  if(color!==undefined&&(typeof color!=='string'||!/^#[0-9a-f]{6}$/i.test(color)))throw Error('글자 색을 올바르게 선택하세요.');
  const selected=effectTarget(project,target,{write:true});if(selected.type!=='text')throw Error('글자 색은 텍스트에만 적용할 수 있어요.');
- if(color===undefined)delete selected.owner.color;else selected.owner.color=color;
- if(target.elementId&&!target.skillId&&!target.textRangeId&&selected.card.kind)selected.card.template='custom';
+ if(color===undefined){if(selected.keyword)selected.owner.color='#427963';else delete selected.owner.color;}else selected.owner.color=color;
+ if(target.elementId&&!target.skillId&&!target.textRangeId&&!target.keywordId&&selected.card.kind)selected.card.template='custom';
 }
 export function saveVisualEffectPreset(project,name,recipe,id=null){
  const label=typeof name==='string'?name.trim():'';if(!label||label.length>120||/[\r\n]/.test(label))throw Error('내 이펙트 이름을 1~120자로 입력하세요.');

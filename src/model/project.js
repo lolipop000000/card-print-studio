@@ -152,6 +152,7 @@ export function validateProject(p){
     if(typeof kw.description!=='string')invalid('keyword',context,'설명',kw.description,'문자열이어야 합니다');
     if(typeof kw.color!=='string'||!/^#[0-9a-f]{6}$/i.test(kw.color))invalid('keyword',context,'색',kw.color,'#RRGGBB 형식이어야 합니다 (예: #427963)');
     if(!assetRef(kw.iconAssetId))invalid('keyword',context,'아이콘 그림 ID',kw.iconAssetId,'프로젝트 그림 자료에 존재하는 ID여야 합니다');
+    if(kw.visualEffects!==undefined)effectRecipe(kw.visualEffects,'text',{},context+' · 전용 이펙트');
   }
   const keywordRefs=(refs,extra,context)=>{
     if(refs===undefined)return;

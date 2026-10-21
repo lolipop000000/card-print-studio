@@ -12,7 +12,7 @@ export function renderVisualEffectFields(host,{recipe,selectedLayerId,targetType
  const spriteGroupState=new Map([...host.querySelectorAll('[data-sprite-group]')].map(group=>[group.dataset.spriteGroup,group.open]));
  const merged=new Set(['particle','rune','petal','leaf','snowflake','crystal','confetti']);
  const kinds=Object.entries(VISUAL_EFFECT_CATALOG).filter(([kind,d])=>!merged.has(kind)&&(!d.textOnly||targetType==='text'));
- const group=d=>d.generative?'입자·자연':d.textOnly||['waveDistort','displacement','glitch','pixelate','erode'].includes(d.kind)?'형태·왜곡':'빛·색·질감';
+ const group=d=>d.generative?'입자·자연':d.textOnly||['waveDistort','displacement','heatHaze','glitch','pixelate','erode'].includes(d.kind)?'형태·왜곡':'빛·색·질감';
  const picker=el('select',{id:'effect-layer-kind','aria-label':'추가할 효과'},['입자·자연','빛·색·질감','형태·왜곡'].map(label=>el('optgroup',{label},kinds.filter(([kind,d])=>group({...d,kind})===label).map(([kind,d])=>el('option',{value:kind,disabled:d.textOnly&&recipe.layers.some(l=>l.kind===kind)},d.name)))));
 
  picker.value='outline';
