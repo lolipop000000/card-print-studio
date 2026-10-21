@@ -14,22 +14,23 @@
 
 > 관리자 계정이 털리면 서버 전체가 털린다. 이 단계를 건너뛰지 않는다.
 
-## 2. Supabase 프로젝트 두 개 만들기
+## 2. Supabase 운영 프로젝트 만들기
 
-https://supabase.com/dashboard → New project. 무료 플랜은 프로젝트 2개까지라 둘 다 여기에 쓴다.
+https://supabase.com/dashboard → New project. **운영용 하나만** 만든다. 개발과 테스트는 PC 안의 로컬 Supabase(아래 5번)에서 한다.
 
-| 항목 | 운영용 | 테스트용 |
-|---|---|---|
-| Name | `PP Monster` | `PP Monster Test` |
-| Region | Northeast Asia (Seoul) | Northeast Asia (Seoul) |
-| Database Password | 긴 무작위 값(비밀번호 관리자에 저장) | 긴 무작위 값 |
-| Plan | Free | Free |
+| 항목 | 값 |
+|---|---|
+| Name | `PP Monster` |
+| Region | Northeast Asia (Seoul) |
+| Database Password | 긴 무작위 값(비밀번호 관리자에 저장) |
+| Plan | Free |
+| Enable automatic RLS | 켬 |
 
-만든 뒤 각 프로젝트에서 값을 적어 둔다:
+만든 뒤 값을 적어 둔다:
 - **Project ref**: 주소 `https://supabase.com/dashboard/project/<ref>`의 `<ref>`
 - **Project URL**: Project Settings → API (또는 Data API) → `https://<ref>.supabase.co`
 - **공개 키**: Project Settings → API Keys → `anon`(legacy) 또는 `publishable` 키. 작업실에 들어가는 키이고 공개돼도 괜찮다.
-- **비밀 키**: 같은 화면의 `service_role`(legacy) 또는 `secret` 키. **절대 작업실 코드, 채팅, 깃허브 커밋에 넣지 않는다.** GitHub Actions secret과 로컬 `.env.cloud-test`(테스트용만)에만 넣는다.
+- **비밀 키**: 같은 화면의 `service_role`(legacy) 또는 `secret` 키. **절대 작업실 코드, 채팅, 깃허브 커밋에 넣지 않는다.** GitHub Actions secret에만 넣는다.
 - **DB 접속 주소**: 상단 Connect 버튼 → Connection string → **Session pooler** 주소
   - GitHub Actions에는 IPv6가 없어서 Direct connection이 안 되므로 pooler를 쓴다.
   - 형식: `postgresql://postgres.<ref>:<비밀번호>@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres`
@@ -59,11 +60,6 @@ https://console.cloud.google.com
    - Site URL: `https://lolipop000000.github.io/card-print-studio/`
    - Redirect URLs: `https://lolipop000000.github.io/card-print-studio/**`
 
-### 3-3. 테스트용 프로젝트
-- Google 공급자는 켜지 않아도 된다(자동 테스트는 이메일·비밀번호 계정을 씀).
-- **Email 공급자를 켜고 "Confirm email"을 끈다.** 테스트가 확인 메일 없이 계정을 만들기 위해서다.
-- URL Configuration의 Redirect URLs에 `http://localhost:4173/**`를 추가한다(로컬 수동 확인용).
-
 ## 4. GitHub 설정
 
 1. **Pages**: 저장소 `card-print-studio` → Settings → Pages → Build and deployment → Source: **GitHub Actions**
@@ -81,21 +77,61 @@ https://console.cloud.google.com
 | `SUPABASE_DB_URL` | 운영 Session pooler 주소 |
 | `BACKUP_REPO_TOKEN` | 3번 토큰 |
 
-## 5. Supabase CLI 연결 (개발 PC)
+## 5. 로컬 Supabase (개발·테스트용, 내 PC 안)
 
-Docker 없이 원격 프로젝트에 바로 반영한다.
+테스트용 클라우드 프로젝트 대신 **PC 안에 똑같은 Supabase를 띄워서** 개발하고 테스트한다. 운영 데이터와 완전히 분리되고 무료다.
+
+### 5-1. Docker Desktop 설치 (WSL2 사용)
+1. https://www.docker.com/products/docker-desktop/ → Windows용 설치 파일을 받아 실행한다.
+2. 설치 중 **"Use WSL 2 instead of Hyper-V"**를 체크한다(Windows 11 Home은 WSL2만 가능).
+3. 설치 후 재부팅하고 Docker Desktop을 실행한다. Settings → General에서 **"Use the WSL 2 based engine"**이 켜져 있는지 확인한다.
+4. 새 터미널에서 확인한다. 버전이 출력되면 된다.
+
+```bash
+docker --version
+```
+
+> 개인 용도와 소규모 사용에는 Docker Desktop을 무료로 쓸 수 있다. 메모리를 많이 쓰면 Settings → Resources에서 줄일 수 있다.
+
+### 5-2. 로컬 Supabase 실행
+저장소 폴더(`card-print-studio-cloud`)에서 실행한다. 처음에는 이미지를 받느라 몇 분 걸린다.
+
+```bash
+npx supabase@2.121.0 start
+```
+
+끝나면 로컬 주소와 키가 출력된다. 다시 보려면 아래 명령을 쓴다.
+
+```bash
+npx supabase@2.121.0 status
+```
+
+- API URL `http://127.0.0.1:54321`, Studio(로컬 대시보드) `http://127.0.0.1:54323`
+- 로컬 anon 키와 service_role 키는 **모든 PC에서 같은 공개 개발용 값**이라 비밀이 아니다. 그래도 운영 키와 섞지 않는다.
+- 로컬은 이메일·비밀번호 로그인이 기본으로 켜져 있어서 자동 테스트가 계정을 만들 수 있다(확인 메일 없음, `supabase/config.toml` 기본값).
+- 끄기: `npx supabase stop`. 데이터를 처음 상태로 되돌리고 마이그레이션 다시 적용: `npx supabase db reset`
+
+### 5-3. 로컬 테스트 환경 변수
+저장소 루트에 `.env.cloud-test`를 만들고(`.gitignore`의 `.env.*` 규칙으로 커밋 제외), `supabase status` 값을 넣는다.
+
+```text
+CLOUD_TEST_URL=http://127.0.0.1:54321
+CLOUD_TEST_ANON_KEY=<status의 anon key>
+CLOUD_TEST_SERVICE_KEY=<status의 service_role key>
+CLOUD_TEST_DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+```
+
+## 6. 운영 프로젝트 연결 (출시할 때만)
+
+개발과 테스트가 모두 통과한 뒤, 관리자 확인을 받고 실행한다.
 
 ```bash
 npx supabase@2.121.0 login
 ```
 
-(브라우저가 열리면 로그인. 토큰은 PC에만 저장된다.)
-
 ```bash
-npx supabase@2.121.0 link --project-ref <테스트 ref>
+npx supabase@2.121.0 link --project-ref <운영 ref>
 ```
-
-(DB 비밀번호를 물으면 테스트 프로젝트 비밀번호 입력.) 이후 개발 중 반영 명령:
 
 ```bash
 npx supabase@2.121.0 db push
@@ -105,18 +141,7 @@ npx supabase@2.121.0 db push
 npx supabase@2.121.0 functions deploy api --use-api
 ```
 
-운영 반영은 개발이 끝나고 검증이 통과한 뒤에만 `link --project-ref <운영 ref>`로 바꿔서 같은 명령을 실행한다.
-
-## 6. 로컬 테스트 환경 변수
-
-저장소 루트에 `.env.cloud-test`를 만든다(이미 `.gitignore`에 들어 있음, 커밋 금지). **테스트 프로젝트 값만** 넣는다.
-
-```text
-CLOUD_TEST_URL=https://<테스트 ref>.supabase.co
-CLOUD_TEST_ANON_KEY=<테스트 공개 키>
-CLOUD_TEST_SERVICE_KEY=<테스트 비밀 키>
-CLOUD_TEST_DB_URL=<테스트 Session pooler 주소>
-```
+(DB 비밀번호를 물으면 운영 프로젝트 비밀번호를 직접 입력한다. 채팅이나 파일에 적지 않는다.)
 
 ## 7. 작업실에 들어가는 공개 값
 
@@ -136,8 +161,7 @@ CLOUD_TEST_DB_URL=<테스트 Session pooler 주소>
 
 ## 체크
 - [ ] Google, GitHub, Supabase 2단계 인증
-- [ ] Supabase 운영·테스트 프로젝트, 값 기록
-- [ ] Google OAuth 클라이언트(Testing + Test users), Supabase Google 공급자, URL 설정
-- [ ] 테스트 프로젝트 Email 공급자(확인 메일 끔)
+- [ ] Supabase 운영 프로젝트 `PP Monster`(automatic RLS 켬), 값 기록
+- [ ] Google OAuth 클라이언트(Testing + Test users), Supabase Google 공급자, URL 설정, 운영 Email 공급자 끔
 - [ ] GitHub Pages(Actions), 백업 저장소, 토큰, Actions secrets 4개
-- [ ] CLI login/link, `.env.cloud-test`
+- [ ] Docker Desktop(WSL2), `npx supabase start` 성공, `.env.cloud-test`(로컬 값)

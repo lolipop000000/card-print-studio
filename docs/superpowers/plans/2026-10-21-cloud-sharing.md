@@ -4,9 +4,9 @@
 
 **Goal:** 승인된 멤버가 작업을 Supabase 클라우드에 저장·공개·복사·삭제하고, 공개 목록이 실시간으로 갱신되며, 게임이 공개 결과물을 증분 다운로드할 수 있게 한다.
 
-**Architecture:** 모든 쓰기는 Edge Function `api` 하나를 통과하고, 클라이언트의 직접 쓰기는 RLS와 버킷 정책으로 전부 막는다. 함수의 판단 로직은 DOM·Deno에 의존하지 않는 순수 JS(`supabase/functions/_shared/`)로 짜서 Node 테스트에서 메모리 저장소로 검증한다. 그 다음 Deno 어댑터와 실제 테스트 프로젝트에서 권한 행렬을 검증한다. 그림은 SHA-256 내용 주소 blob으로 분리해서 프로젝트 JSON에는 참조만 둔다. 작업실 쪽은 `src/cloud/`의 세션 계층과 `src/ui/cloud-*.js` 화면으로 나눈다.
+**Architecture:** 모든 쓰기는 Edge Function `api` 하나를 통과하고, 클라이언트의 직접 쓰기는 RLS와 버킷 정책으로 전부 막는다. 함수의 판단 로직은 DOM·Deno에 의존하지 않는 순수 JS(`supabase/functions/_shared/`)로 짜서 Node 테스트에서 메모리 저장소로 검증한다. 그 다음 Deno 어댑터를 **PC 안의 로컬 Supabase(Docker, WSL2)**에 띄워 권한 행렬을 검증한다. 클라우드 테스트 프로젝트는 만들지 않는다(사용자 결정). 그림은 SHA-256 내용 주소 blob으로 분리해서 프로젝트 JSON에는 참조만 둔다. 작업실 쪽은 `src/cloud/`의 세션 계층과 `src/ui/cloud-*.js` 화면으로 나눈다.
 
-**Tech Stack:** 기존 ES modules·esbuild 0.28.2·Node 24 `node:test`·Playwright 1.62.1(Edge). 새로 쓰는 것: `@supabase/supabase-js` 2.118.0(작업실 번들), Supabase CLI 2.121.0(`npx supabase`, Docker 없이 원격 프로젝트에 `db push`·`functions deploy --use-api`), Supabase Edge Functions(Deno), GitHub Actions(Pages, 백업).
+**Tech Stack:** 기존 ES modules·esbuild 0.28.2·Node 24 `node:test`·Playwright 1.62.1(Edge). 새로 쓰는 것: `@supabase/supabase-js` 2.118.0(작업실 번들), Supabase CLI 2.121.0(`npx supabase`. 개발·테스트는 Docker Desktop(WSL2) 위의 로컬 스택 `supabase start`, 운영 반영만 `db push`·`functions deploy --use-api`), Supabase Edge Functions(Deno), GitHub Actions(Pages, 백업).
 
 **Spec:** `docs/superpowers/specs/2026-10-21-cloud-sharing-design.md`
 
@@ -45,15 +45,15 @@
 - Create: `docs/cloud-setup.md`
 
 - [x] **Step 1:** `docs/cloud-setup.md`에 순서를 작성한다. (2026-10-21 작성 완료. 상세 절차는 그 문서를 보고, 아래는 요약이다.)
-  1. Supabase 프로젝트 두 개를 만든다. 운영용 `PP Monster`와 테스트용 `PP Monster Test`이며, 무료 플랜 2개를 다 쓴다.
+  1. Supabase **운영 프로젝트 하나**(`PP Monster`, automatic RLS 켬)를 만든다. 테스트 프로젝트는 만들지 않는다.
   2. Supabase 계정과 관리자 Google 계정에 2단계 인증을 켠다.
   3. Google Cloud Console에서 OAuth 클라이언트(웹)를 만든다. 승인된 리디렉션 URI는 운영 프로젝트의 `https://<ref>.supabase.co/auth/v1/callback`이다.
   4. Supabase Auth → Providers → Google을 켜고 클라이언트 ID와 비밀값을 넣는다. Site URL과 Redirect URLs에 `https://lolipop000000.github.io/card-print-studio/`를 넣는다.
-  5. 테스트 프로젝트에서만 Email 공급자를 켠다. 통합 테스트가 비밀번호 계정을 만들기 때문이다.
+  5. Docker Desktop(WSL2 엔진)을 설치하고 `npx supabase start`로 로컬 스택이 뜨는지 확인한다. 로컬은 이메일·비밀번호 로그인이 기본으로 켜져 있어 통합 테스트가 계정을 만든다.
   6. GitHub 저장소 Settings → Pages → Source를 "GitHub Actions"로 설정한다.
   7. 비공개 저장소 `card-print-studio-backup`을 만들고, 쓰기 권한이 있는 fine-grained PAT를 발급한다.
   8. GitHub Actions secrets: `SUPABASE_DB_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `BACKUP_REPO_TOKEN`
-  9. 로컬 테스트용 환경 변수 파일 `.env.cloud-test`(gitignore에 추가): `CLOUD_TEST_URL`, `CLOUD_TEST_ANON_KEY`, `CLOUD_TEST_SERVICE_KEY`, `CLOUD_TEST_DB_URL`
+  9. 로컬 테스트용 환경 변수 파일 `.env.cloud-test`(`.env.*`로 이미 제외됨)에 `supabase status`의 로컬 값: `CLOUD_TEST_URL=http://127.0.0.1:54321`, `CLOUD_TEST_ANON_KEY`, `CLOUD_TEST_SERVICE_KEY`, `CLOUD_TEST_DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres`
 - [x] **Step 2:** `.env.cloud-test`는 기존 `.gitignore`의 `.env.*` 규칙으로 이미 제외된다. `git check-ignore .env.cloud-test`로 확인한다.
 - [ ] **Step 3 (사용자):** 사용자가 `docs/cloud-setup.md`의 체크 항목을 모두 끝냈다고 알려 줄 때까지 원격 단계(Task 3·5·12·14·15)를 시작하지 않는다. 원격 없이 가능한 작업은 부록 D를 본다.
 
@@ -129,7 +129,7 @@
 - Create: `supabase/config.toml` (`npx supabase init` 결과)
 - Create: `supabase/migrations/20261021000001_cloud_schema.sql`
 - Create: `supabase/migrations/20261021000002_cloud_policies.sql`
-- Create: `tests/cloud/helpers.mjs`: 테스트 프로젝트 클라이언트, 사용자 생성(`auth.admin.createUser` + 비밀번호 로그인), 상태 지정
+- Create: `tests/cloud/helpers.mjs`: 로컬 Supabase 클라이언트(`CLOUD_TEST_URL`이 `127.0.0.1`/`localhost`가 아니면 **즉시 중단**해서 운영 서버에 테스트가 돌지 않게 한다), 사용자 생성(`auth.admin.createUser` + 비밀번호 로그인), 상태 지정
 - Test: `tests/cloud/rls.integration.mjs`
 - Modify: `package.json`: `"test:cloud": "node --env-file=.env.cloud-test --test --test-concurrency=1 tests/cloud/*.integration.mjs"`
 
@@ -167,8 +167,8 @@
   - `feed row appears on publish and disappears on unpublish and soft delete`
   - `owner_usage counts max of saved and draft cards and unique blob bytes`
   - `realtime delivers feed changes only`: anon 구독을 연다. 비공개 작업 저장에는 메시지가 0개이고, 공개 전환에는 INSERT 1개, 비공개 전환에는 DELETE 1개가 온다.
-- [ ] **Step 2:** `npx supabase link --project-ref <test-ref> && npx supabase db push` 전에 `npm run test:cloud`를 실행해서 FAIL(표 없음)을 확인한다.
-- [ ] **Step 3:** 두 마이그레이션을 작성하고 테스트 프로젝트에 `db push`한다.
+- [ ] **Step 2:** `npx supabase start` 후 마이그레이션 없이 `npm run test:cloud`를 실행해서 FAIL(표 없음)을 확인한다.
+- [ ] **Step 3:** 두 마이그레이션을 작성하고 `npx supabase db reset`으로 로컬에 적용한다.
 - [ ] **Step 4:** `npm run test:cloud`가 PASS인지 확인한다.
 - [ ] **Step 5:** 커밋한다: `feat(cloud): schema, row level security and public feed`
 
@@ -255,7 +255,7 @@
   - `revoking a member blocks the very next write`
   - `end to end: create → upload blobs → save → publish → anon reads feed and work → copy by memberB`
 - [ ] **Step 2:** 배포하기 전에 `npm run test:cloud`를 실행해서 FAIL을 확인한다.
-- [ ] **Step 3:** 구현하고 `npm run build:server && npx supabase functions deploy api --use-api --project-ref <test-ref>`로 배포한다.
+- [ ] **Step 3:** 구현하고 `npm run build:server`를 실행한 뒤, 별도 터미널에서 `npx supabase functions serve --env-file supabase/functions/.env.local`로 로컬 함수를 띄운다. `supabase/functions/.env.local`(커밋 제외)에는 `ALLOWED_ORIGINS=http://localhost:4173`만 둔다. `SUPABASE_URL`·`SUPABASE_SERVICE_ROLE_KEY`는 로컬 실행 환경이 자동으로 넣는다.
 - [ ] **Step 4:** `npm run test:cloud`가 PASS인지 확인한다.
 - [ ] **Step 5:** 커밋한다: `feat(cloud): deploy api edge function`
 
@@ -386,7 +386,7 @@
   - `trash restore brings work back to my works`
   - `usage line shows tier limits`
 - [ ] **Step 2:** FAIL을 확인한다.
-- [ ] **Step 3:** 구현한다. Task 3 마이그레이션에 `my_usage()` 함수를 추가하는 새 마이그레이션 `20261021000003_my_usage.sql`을 만들고 테스트 프로젝트에 push한다.
+- [ ] **Step 3:** 구현한다. Task 3 마이그레이션에 `my_usage()` 함수를 추가하는 새 마이그레이션 `20261021000003_my_usage.sql`을 만들고 `npx supabase db reset`으로 로컬에 적용한다.
 - [ ] **Step 4:** PASS를 확인한다.
 - [ ] **Step 5:** 커밋한다: `feat(cloud): cloud panel with realtime public list and trash`
 
@@ -472,7 +472,7 @@
   - `diff reports only changed items and unseen blobs`
   - (integration) `private and trashed works never appear`
 - [ ] **Step 2:** FAIL을 확인한다.
-- [ ] **Step 3:** 구현하고 테스트 프로젝트에 배포한다(`--no-verify-jwt`).
+- [ ] **Step 3:** 구현하고 `supabase/config.toml`에 `[functions.export-manifest] verify_jwt = false`를 넣은 뒤 로컬 `functions serve`로 확인한다.
 - [ ] **Step 4:** PASS를 확인한다.
 - [ ] **Step 5:** 커밋한다: `feat(cloud): incremental public manifest for the game`
 
@@ -519,7 +519,7 @@
 
 - [ ] **Step 1:** 테스트를 작성하고 FAIL을 확인한다.
 - [ ] **Step 2:** 구현하고 PASS를 확인한다.
-- [ ] **Step 3:** 테스트 프로젝트로 백업 워크플로를 `workflow_dispatch`로 한 번 실행한다. 덤프와 blob이 백업 저장소에 생겼는지 확인한다. 그 백업을 빈 로컬 Postgres가 없으므로 **테스트 프로젝트를 리셋한 뒤 복원**해서 작업 수와 blob 해시가 같은지 확인하고, 결과를 `docs/cloud-admin.md`에 기록한다.
+- [ ] **Step 3:** 백업 스크립트(`scripts/backup.mjs`, 워크플로가 호출)를 **로컬 Supabase**에 대고 실행한다. 덤프와 blob을 임시 폴더에 받고 → `npx supabase db reset` → 복원 → 작업 수와 blob 해시가 같은지 확인한다. 결과를 `docs/cloud-admin.md`에 기록한다. 운영 워크플로의 첫 실행은 Task 15 Step 3 뒤에 `workflow_dispatch`로 확인한다.
 - [ ] **Step 4:** 커밋한다: `feat(cloud): maintenance, daily backups and admin runbook`
 
 ---
@@ -527,7 +527,7 @@
 ### Task 15: 최종 검증과 운영 반영 준비
 
 - [ ] **Step 1:** `npm run test:unit`, `npm run build`, `npm run test:browser`, `npm run test:cloud`를 모두 실행해서 PASS를 확인하고, 로그를 `artifacts/qa/cloud-*.log`에 보존한다.
-- [ ] **Step 2:** 테스트 프로젝트에서 실제 Edge 두 개(다른 프로필)로 시나리오를 수동 확인한다: 멤버 A 공개 → 멤버 B 목록에 실시간으로 뜸 → 사본 → 준멤버 11장째 거부 → 해제된 계정 즉시 차단. 스크린샷을 남긴다.
+- [ ] **Step 2:** 로컬 Supabase와 `npx http-server dist -p 4173`(또는 같은 역할의 정적 서버)로 실제 Edge 두 개(다른 프로필, 로컬 이메일 계정)를 써서 시나리오를 수동 확인한다: 멤버 A 공개 → 멤버 B 목록에 실시간으로 뜸 → 사본 → 준멤버 11장째 거부 → 해제된 계정 즉시 차단. 스크린샷을 남긴다.
 - [ ] **Step 3:** 운영 프로젝트 반영은 **사용자 확인 후** 진행한다. `db push`, `functions deploy`(api, export-manifest, maintenance), `cloud.json`에 운영 값을 넣고 버전을 1.6.0으로 올린 뒤 Pages를 배포한다. 기존 `release.json`과 `update.json` 절차를 따른다.
 - [ ] **Step 4:** 커밋한다: `chore: cloud sharing verification records`
 
@@ -793,7 +793,7 @@ grant execute on function public.my_usage() to authenticated;
   - JSON 본문 `{"action": "...", "payload": {...}}`, 최대 8.5 MiB(작업 8 MiB + 여유)
   - blob 업로드: `POST /functions/v1/api?action=blob.upload&sha=<hex>`, `Content-Type`은 실제 mime, 본문은 원시 바이트
 - 응답: 성공은 `200 {"ok":true,"result":{...}}`, 실패는 `{"ok":false,"code":"...","message":"한국어 안내"}`와 해당 상태 코드다.
-- CORS: `ALLOWED_ORIGINS` 환경 변수(쉼표 구분, `npx supabase secrets set`)에 있는 출처만 허용한다. 운영은 `https://lolipop000000.github.io`이고, 테스트 프로젝트는 여기에 `http://localhost:4173`을 더한다. `OPTIONS` 요청에 응답한다.
+- CORS: `ALLOWED_ORIGINS` 환경 변수(쉼표 구분, `npx supabase secrets set`)에 있는 출처만 허용한다. 운영은 `https://lolipop000000.github.io`이고, 로컬은 `http://localhost:4173`이다. `OPTIONS` 요청에 응답한다.
 - 시간 기준: 서버 `now()`만 쓴다. 클라이언트 시각은 믿지 않는다.
 - 낙관적 동시성:
   - `work.save`: `update works set …, version = version + 1, updated_at = now() where id = $1 and owner = $uid and version = $base and deleted_at is null returning version`. 0행이면 존재와 소유를 다시 확인해서 `404` 또는 `409 conflict`로 응답한다.
@@ -811,7 +811,7 @@ grant execute on function public.my_usage() to authenticated;
 ## 부록 D. 구현 순서와 원격 의존
 
 - 원격 없이 먼저 할 수 있는 것: Task 1, 2, 4, 6, 7, 그리고 Task 8~11의 가짜 클라이언트 기반 UI
-- 테스트 프로젝트가 필요한 것: Task 3, 5, 12의 통합 테스트, Task 14 백업 확인
+- 로컬 Supabase(Docker)가 필요한 것: Task 3, 5, 12의 통합 테스트, Task 14 백업 확인
 - 운영 프로젝트: Task 15 Step 3에서만, 관리자 확인 후
 
 ## 부록 E. 하지 말 것 (리뷰어가 확인)
