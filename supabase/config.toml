@@ -412,6 +412,9 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 [functions.export-manifest]
 verify_jwt = false
 
+[functions.maintenance]
+verify_jwt = false
+
 [experimental.pgdelta]
 enabled = true
 # Directory under `supabase/` where declarative files are written.
