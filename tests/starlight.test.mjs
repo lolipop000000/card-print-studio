@@ -8,7 +8,7 @@ const api=await import('../src/render/effects/starlight.js').catch(error=>{
 });
 
 // Drawing commands are inspected here for bounds and state ownership; actual
-// curved silhouettes, transparency and time continuity use a browser canvas.
+// light profiles, transparency and time continuity use a browser canvas.
 function context(){
  const commands=[],stack=[];
  const ctx={globalAlpha:.37,fillStyle:'#010203',commands};
@@ -17,6 +17,8 @@ function context(){
  ctx.restore=()=>{Object.assign(ctx,stack.pop());commands.push(['restore']);};
  ctx.createRadialGradient=(...args)=>{const stops=[];commands.push(['gradient',...args,stops]);return {addColorStop:(...stop)=>stops.push(stop)};};
  ctx.getImageData=()=>{throw new Error('starlight must never read pixels');};
+ ctx.canvas={ownerDocument:{createElement:()=>({width:1,height:1,getContext:()=>context()})}};
+ ctx.drawImage=(canvas,...args)=>commands.push(['drawImage',canvas.width,canvas.height,...args]);
  return ctx;
 }
 function draw(ctx,layer={},options={}){
@@ -40,7 +42,7 @@ test('starlight reports finite full-glow bounds and restores the caller alpha',(
  assert.equal(included.length,1);assert.deepEqual(included[0].slice(0,2),[7,11]);
  assert.ok(included[0][2]>=80,'bounds include vertically stretched tips and glow');
  assert.equal(ctx.globalAlpha,.37);assert.equal(ctx.fillStyle,'#010203');
- assert.ok(ctx.commands.filter(([name])=>name==='fill').length>0);
+ assert.ok(ctx.commands.filter(([name])=>name==='drawImage').length>0);
 });
 
 test('starlight caps malformed density and never emits nonfinite drawing coordinates',()=>{

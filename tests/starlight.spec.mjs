@@ -42,12 +42,13 @@ async function scene(){
 }
 const frame=(page,options)=>page.evaluate(options=>window.starlightFrame(options).summary,options);
 
-test('starlight has four long curved cardinal tips and clear space between its diagonal rays',async()=>{
+test('starlight has four long cardinal rays and clear space between them',async t=>{
  const {browser,page,errors}=await scene();try{
   const star=await frame(page),rotated=await frame(page,{params:{rotation:45}});
   assert.ok(star.axes.every(alpha=>alpha>150),'all four long tips are visible: '+star.axes);
   assert.deepEqual(star.diagonals,[0,0,0,0],'no fifth through eighth diagonal tips');
-  assert.ok(rotated.diagonals.every(alpha=>alpha>150),'rotation moves the four tips into the diagonals');
+  t.diagnostic(JSON.stringify({axes:star.axes,rotated:rotated.diagonals,visible:star.visible}));
+  assert.ok(rotated.diagonals.every(alpha=>alpha>100),'rotation moves the four fading rays into the diagonals: '+rotated.diagonals);
   assert.deepEqual(rotated.axes,[0,0,0,0]);
   assert.ok(star.visible>700);assert.equal(star.outside,0);assert.deepEqual(errors,[]);
  }finally{await browser.close();}
@@ -70,6 +71,22 @@ test('starlight retains real alpha and a bright core while geometry and glow con
  }finally{await browser.close();}
 });
 
+test('starlight diffraction rays fade into transparency before their tips instead of ending as an opaque cutout',async t=>{
+ const {browser,page}=await scene();try{
+  const profile=await page.evaluate(()=>{
+   const {data}=window.starlightFrame({params:{glow:0,size:.25,rays:.22,stretch:1}});
+   const alpha=x=>data[(160*320+x)*4+3];
+   return {core:alpha(160),middle:alpha(183),tail:alpha(195),tip:alpha(201),outside:alpha(212)};
+  });
+  t.diagnostic(JSON.stringify(profile));
+  assert.ok(profile.core>235,'the core remains bright: '+JSON.stringify(profile));
+  assert.ok(profile.middle>profile.tail&&profile.tail>profile.tip,'long rays dim continuously towards the tip: '+JSON.stringify(profile));
+  assert.ok(profile.tail<75,'long outer rays remain translucent: '+JSON.stringify(profile));
+  assert.ok(profile.tip<20,'the edge dissolves into transparency: '+JSON.stringify(profile));
+  assert.equal(profile.outside,0);
+ }finally{await browser.close();}
+});
+
 test('starlight frozen frames repeat exactly at late times and twinkle zero holds the same pixels',async()=>{
  const {browser,page}=await scene();try{
   const options={scattered:true,time:19.345,params:{count:16,size:.08,life:2.8,twinkle:1,spin:.1,glow:.65,randomness:1}};
@@ -79,6 +96,27 @@ test('starlight frozen frames repeat exactly at late times and twinkle zero hold
   const still={scattered:true,params:{count:12,size:.08,twinkle:0,spin:0,glow:.65,randomness:1}};
   assert.equal((await frame(page,{...still,time:1.2})).png,(await frame(page,{...still,time:90})).png);
   const empty=await frame(page,{empty:true});assert.equal(empty.alpha,0);assert.deepEqual(empty.included,[]);
+ }finally{await browser.close();}
+});
+
+test('starlight reuses one light stamp across different star sizes and repeated print-scale frames',async()=>{
+ const {browser,page}=await scene();try{
+  const result=await page.evaluate(()=>{
+   const Original=window.OffscreenCanvas,allocations=[];
+   window.OffscreenCanvas=new Proxy(Original,{construct(target,args){const canvas=new target(...args);allocations.push(canvas);return canvas;}});
+   try{
+    const canvas=document.createElement('canvas');canvas.width=canvas.height=320;
+    const ctx=canvas.getContext('2d');ctx.scale(300/25.4,300/25.4);
+    const layer={id:'browser-starlight',params:{count:12,size:.2,twinkle:0,spin:0,stretch:1.45,glow:.65}};
+    const options={height:88,point:()=>({x:12,y:12}),random:(index,salt)=>starlightApi.effectRandom(1,layer.id,index,salt)};
+    starlightApi.drawStarlight(ctx,layer,{...options,time:1.2});const first=allocations.length;
+    for(let i=1;i<=60;i++){ctx.clearRect(0,0,320,320);starlightApi.drawStarlight(ctx,layer,{...options,time:1.2+i/60});}
+    return {first,total:allocations.length,liveBytes:allocations.reduce((sum,canvas)=>sum+canvas.width*canvas.height*4,0)};
+   }finally{window.OffscreenCanvas=Original;}
+  });
+  assert.equal(result.first,1,'all sizes share one light stamp: '+JSON.stringify(result));
+  assert.equal(result.total,1,'subsequent frames allocate no new light stamps: '+JSON.stringify(result));
+  assert.ok(result.liveBytes<=16*1024*1024,'cached backing stores stay inside the budget');
  }finally{await browser.close();}
 });
 
@@ -105,7 +143,7 @@ test('starlight gallery records four-tip geometry soft glow print opacity and ph
  const {browser,page,errors}=await scene();try{
   await page.evaluate(()=>{
    document.body.style.cssText='margin:0;padding:24px;background:#0d1527;color:#e6edff;font:16px sans-serif;display:grid;grid-template-columns:repeat(3,320px);gap:24px';
-   const cases=[['Four curved tips',{params:{glow:.65,stretch:1.45,color:'#9fcfff'}}],['Rotated four tips',{params:{glow:.65,rotation:45,color:'#cfb6ff'}}],['Thin rays',{params:{glow:.65,rays:.05,color:'#9fffe1'}}],['White paper / alpha 0.45',{alpha:.45,params:{glow:1,color:'#6b9ddc'}}],['Twinkle / time 0.25',{time:.25,params:{twinkle:1,life:2.8,glow:.65,stretch:1.45}}],['Seeded starlight field',{scattered:true,time:1.2,params:{count:20,size:.07,twinkle:1,life:2.8,glow:.65,stretch:1.45}}]];
+   const cases=[['Four diffraction rays',{params:{glow:.65,stretch:1.45,color:'#9fcfff'}}],['Rotated four tips',{params:{glow:.65,rotation:45,color:'#cfb6ff'}}],['Thin rays',{params:{glow:.65,rays:.05,color:'#9fffe1'}}],['White paper / alpha 0.45',{alpha:.45,params:{glow:1,color:'#6b9ddc'}}],['Twinkle / time 0.25',{time:.25,params:{twinkle:1,life:2.8,glow:.65,stretch:1.45}}],['Seeded starlight field',{scattered:true,time:1.2,params:{count:20,size:.07,twinkle:1,life:2.8,glow:.65,stretch:1.45}}]];
    for(const [label,options] of cases){const section=document.createElement('section'),title=document.createElement('div'),{canvas}=window.starlightFrame(options);title.textContent=label;title.style.cssText='padding:0 0 10px';canvas.style.cssText='display:block;background:'+(label.startsWith('White')?'#fffdf8':'#080f20')+';border:1px solid #29395a';section.append(title,canvas);document.body.append(section);}
   });
   const output=path.join(root,'artifacts/qa/starlight-gallery.png');await mkdir(path.dirname(output),{recursive:true});await page.screenshot({path:output,fullPage:true});

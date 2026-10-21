@@ -4,38 +4,40 @@ const number=(value,fallback,min,max)=>Number.isFinite(value)?clamp(value,min,ma
 const color=(value,fallback)=>typeof value==='string'&&/^#[0-9a-f]{6}$/i.test(value)?value:fallback;
 const rgba=(hex,alpha)=>'rgba('+[1,3,5].map(at=>parseInt(hex.slice(at,at+2),16)).join(',')+','+alpha+')';
 
-function fourPoints(ctx,notch){
- ctx.moveTo(0,-1);
- ctx.bezierCurveTo(0,-notch,notch,0,1,0);
- ctx.bezierCurveTo(notch,0,0,notch,0,1);
- ctx.bezierCurveTo(0,notch,-notch,0,-1,0);
- ctx.bezierCurveTo(-notch,0,0,-notch,0,-1);
- ctx.closePath();
+const STAMP_BYTES=16*1024*1024,stamps=new Map();
+let stampBytes=0;
+
+function ellipseLight(ctx,rx,ry,stops){
+ ctx.save();ctx.scale(rx,ry);
+ const gradient=ctx.createRadialGradient(0,0,0,0,0,1);
+ for(const [at,tint,alpha] of stops)gradient.addColorStop(at,rgba(tint,alpha));
+ ctx.fillStyle=gradient;ctx.fillRect(-1,-1,2,2);ctx.restore();
 }
 
-// Curves and gradients remain vectors at print resolution. No particle buffer,
-// decoded texture or pixel readback is needed, even when the light changes size.
-function paintLight(ctx,notch,glow,extent,rayColor,coreColor){
- if(glow>0){
-  const halo=ctx.createRadialGradient(0,0,0,0,0,extent);
-  halo.addColorStop(0,rgba(rayColor,glow*.35));
-  halo.addColorStop(.22,rgba(rayColor,glow*.17));
-  halo.addColorStop(.65,rgba(rayColor,glow*.05));
-  halo.addColorStop(1,rgba(rayColor,0));
-  ctx.save();
-  ctx.beginPath();ctx.rect(-extent,-extent,extent*2,extent*2);fourPoints(ctx,notch);
-  // Keep the halo outside the star so inherited opacity is applied once at its
-  // center, instead of accumulating opacity in several overlapping glow passes.
-  ctx.clip('evenodd');ctx.fillStyle=halo;ctx.fillRect(-extent,-extent,extent*2,extent*2);
-  ctx.restore();
- }
- const fill=ctx.createRadialGradient(0,0,0,0,0,1);
- fill.addColorStop(0,coreColor);fill.addColorStop(.12,coreColor);
- fill.addColorStop(.45,rgba(rayColor,.97));fill.addColorStop(1,rgba(rayColor,.68));
- ctx.fillStyle=fill;ctx.beginPath();fourPoints(ctx,notch);ctx.fill();
+function lightStamp(ctx,side,notch,glow,extent,rayColor,coreColor){
+ const key=[side,notch,glow,rayColor,coreColor].join(':');
+ if(stamps.has(key)){const found=stamps.get(key);stamps.delete(key);stamps.set(key,found);return found;}
+ const canvas=typeof OffscreenCanvas==='function'?new OffscreenCanvas(side,side):ctx.canvas?.ownerDocument?.createElement('canvas');
+ if(!canvas)return null;
+ canvas.width=canvas.height=side;
+ const brush=canvas.getContext('2d',{alpha:true});if(!brush)return null;
+ brush.translate(side/2,side/2);brush.scale(side/(extent*2),side/(extent*2));
+ brush.globalCompositeOperation='lighter';
+ if(glow>0)ellipseLight(brush,extent,extent,[[0,rayColor,Math.min(1,glow*.34)],[.1,rayColor,glow*.18],[.35,rayColor,glow*.035],[.7,rayColor,glow*.004],[1,rayColor,0]]);
+ const width=.025+notch*.18;
+ const rays=[[0,coreColor,.85],[.08,coreColor,.8],[.25,rayColor,.62],[.5,rayColor,.3],[.75,rayColor,.07],[1,rayColor,0]];
+ ellipseLight(brush,1,width,rays);ellipseLight(brush,width,1,rays);
+ const needle=.009+notch*.025,hot=[[0,coreColor,.9],[.15,coreColor,.8],[.4,rayColor,.38],[.7,rayColor,.065],[1,rayColor,0]];
+ ellipseLight(brush,1,needle,hot);ellipseLight(brush,needle,1,hot);
+ const core=.055+notch*.2;
+ brush.globalCompositeOperation='source-over';
+ ellipseLight(brush,core,core,[[0,coreColor,1],[.3,coreColor,1],[.6,coreColor,.85],[.85,rayColor,.35],[1,rayColor,0]]);
+ const bytes=side*side*4;
+ while(stamps.size&&stampBytes+bytes>STAMP_BYTES){const [oldKey,old]=stamps.entries().next().value;stamps.delete(oldKey);stampBytes-=old.width*old.height*4;old.width=old.height=1;}
+ stamps.set(key,canvas);stampBytes+=bytes;return canvas;
 }
 
-/** Four concave rays with deterministic lifetime fades and a faster twinkle. */
+/** Four diffraction spikes, a hot core and deterministic lifetime/twinkle fades. */
 export function drawStarlight(ctx,layer,{time=1.2,height=1,point,random,include}){
  const p=layer.params??{},count=Math.floor(number(p.count,12,0,160)),size=number(p.size,.12,0,2);
  if(!count||!size||ctx.globalAlpha<=0)return false;
@@ -44,8 +46,13 @@ export function drawStarlight(ctx,layer,{time=1.2,height=1,point,random,include}
  const life=number(p.life,2.8,.1,30),twinkle=number(p.twinkle,1,0,4),moving=twinkle>0,randomness=number(p.randomness,0,0,1);
  const rayColor=color(p.color,'#b8dfff'),coreColor=color(p.coreColor,'#ffffff'),extent=glow>0?1.15+glow*.5:1;
  const angle=(number(p.rotation,0,-180,180)/360+t*number(p.spin,.1,-3,3))%1*TAU;
+ const matrix=ctx.getTransform?.(),scale=matrix?number(Math.max(Math.hypot(matrix.a,matrix.b),Math.hypot(matrix.c,matrix.d)),1,.01,1000):1;
  const seeded=(index,salt)=>number(random?.(index,'starlight:'+salt),.5,0,1);
- let drawn=false;
+ // One stable resolution covers the largest possible star in this recipe.
+ // Per-star or per-frame buckets would evict each other at high print scales.
+ const footprint=h*size*1.25*Math.max(1,stretch)*extent*scale*2.5;
+ const side=Math.min(2048,2**Math.ceil(Math.log2(Math.max(256,footprint))));
+ let drawn=false,stamp;
  for(let index=0;index<count;index++){
   const age=moving?t/life+seeded(index,'phase'):0,cycle=Math.floor(age),phase=age-cycle;
   const envelope=moving?Math.sin(Math.PI*phase)**2:1;
@@ -62,10 +69,12 @@ export function drawStarlight(ctx,layer,{time=1.2,height=1,point,random,include}
    }
   }
   const radius=h*size*(.75+.5*seeded(index,'size'))*(.5+.5*Math.sqrt(envelope))*(.9+.1*pulse);
+  stamp??=lightStamp(ctx,side,notch,glow,extent,rayColor,coreColor);if(!stamp)continue;
   ctx.save();
   try{
    ctx.globalAlpha*=alpha;ctx.translate(x,y);ctx.rotate(angle);ctx.scale(radius,radius*stretch);
-   paintLight(ctx,notch,glow,extent,rayColor,coreColor);
+   ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+   ctx.drawImage(stamp,-extent,-extent,extent*2,extent*2);
   }finally{ctx.restore();}
   include?.(x,y,radius*Math.max(1,stretch)*extent);drawn=true;
  }

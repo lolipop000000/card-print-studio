@@ -21115,7 +21115,7 @@
     lightning: { name: "\uBC88\uAC1C", placement: "behind", animated: true, generative: true, fields: { color: color("\uC0C9", "#b9e9ff"), width: numeric2("\uB450\uAED8", 0.3, 0.05, 3, 0.05, "mm"), branches: numeric2("\uAC08\uB77C\uC9D0", 3, 0, 8, 1), frequency: numeric2("\uBC1C\uC0DD \uBE48\uB3C4", 2, 0.2, 8, 0.1) } },
     ripple: { name: "\uD30C\uB3D9", hint: "\uB05D \uD06C\uAE30\uAC00 \uC2DC\uC791\uBCF4\uB2E4 \uC791\uC73C\uBA74 \uC548\uC73C\uB85C \uC904\uC5B4\uB4E4\uC5B4\uC694. 0\uC73C\uB85C \uB05D\uB0BC \uC218\uB3C4 \uC788\uC5B4\uC694.", placement: "behind", animated: true, generative: true, fields: { color: color("\uC0C9", "#79d9ff"), width: numeric2("\uB450\uAED8", 0.35, 0.05, 3, 0.05, "mm"), start: numeric2("\uC2DC\uC791 \uD06C\uAE30", 0.05, 0, 1), end: numeric2("\uB05D \uD06C\uAE30", 0.9, 0, 2), frequency: numeric2("\uBC1C\uC0DD \uBE48\uB3C4", 1, 0.2, 8, 0.1), count: { ...count, value: 3 }, life, fade: { ...numeric2("\uB05D \uC0AC\uB77C\uC9D0", 1, 0.2, 4, 0.1), optional: true } } },
     particle: { name: "\uBC18\uC9DD\uC774\uB294 \uC785\uC790", placement: "behind", animated: true, generative: true, fields: { shape: choice2("\uBAA8\uC591", "star", [["star", "\uBCC4"], ["snow", "\uB208"], ["dot", "\uC810"]]), color: color("\uC0C9", "#fff3b6"), count, size: numeric2("\uD06C\uAE30", 0.04, 5e-3, 0.3, 5e-3), spread: numeric2("\uD37C\uC9D0", 0.7, 0, 2), life: { ...life, value: 3.5 }, direction } },
-    starlight: { name: "4\uAC01 \uBCC4\uBE5B", hint: "\uB124 \uBC29\uD5A5\uC73C\uB85C \uAE38\uAC8C \uBED7\uB294 \uBE5B\uB098\uB294 \uBCC4\uC774\uC5D0\uC694. \uBC18\uC9DD\uC784\uC744 0\uC73C\uB85C \uD558\uBA74 \uBC1D\uAE30\uB97C \uACE0\uC815\uD558\uACE0, \uD68C\uC804\uC740 \uB530\uB85C \uC870\uC808\uD574\uC694.", placement: "front", animated: true, generative: true, fields: {
+    starlight: { name: "4\uAC01 \uBCC4\uBE5B", hint: "\uBC1D\uACE0 \uB465\uADFC \uC911\uC2EC\uC5D0\uC11C \uAC00\uB294 \uAD11\uC120\uC774 \uB124 \uBC29\uD5A5\uC73C\uB85C \uBED7\uACE0, \uB05D\uC73C\uB85C \uAC08\uC218\uB85D \uD22C\uBA85\uD574\uC838\uC694. \uBC18\uC9DD\uC784\uC744 0\uC73C\uB85C \uD558\uBA74 \uBC1D\uAE30\uB97C \uACE0\uC815\uD558\uACE0, \uD68C\uC804\uC740 \uB530\uB85C \uC870\uC808\uD574\uC694.", placement: "front", animated: true, generative: true, fields: {
       color: color("\uBE5B \uC0C9", "#b8dfff"),
       coreColor: color("\uC911\uC2EC \uC0C9", "#ffffff"),
       count: numeric2("\uAC1C\uC218", 12, 0, 160, 1),
@@ -24658,39 +24658,55 @@
   var number4 = (value, fallback, min, max) => Number.isFinite(value) ? clamp3(value, min, max) : fallback;
   var color3 = (value, fallback) => typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value) ? value : fallback;
   var rgba2 = (hex, alpha) => "rgba(" + [1, 3, 5].map((at2) => parseInt(hex.slice(at2, at2 + 2), 16)).join(",") + "," + alpha + ")";
-  function fourPoints(ctx, notch) {
-    ctx.moveTo(0, -1);
-    ctx.bezierCurveTo(0, -notch, notch, 0, 1, 0);
-    ctx.bezierCurveTo(notch, 0, 0, notch, 0, 1);
-    ctx.bezierCurveTo(0, notch, -notch, 0, -1, 0);
-    ctx.bezierCurveTo(-notch, 0, 0, -notch, 0, -1);
-    ctx.closePath();
+  var STAMP_BYTES = 16 * 1024 * 1024;
+  var stamps = /* @__PURE__ */ new Map();
+  var stampBytes = 0;
+  function ellipseLight(ctx, rx, ry, stops) {
+    ctx.save();
+    ctx.scale(rx, ry);
+    const gradient2 = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+    for (const [at2, tint2, alpha] of stops) gradient2.addColorStop(at2, rgba2(tint2, alpha));
+    ctx.fillStyle = gradient2;
+    ctx.fillRect(-1, -1, 2, 2);
+    ctx.restore();
   }
-  function paintLight(ctx, notch, glow3, extent, rayColor, coreColor) {
-    if (glow3 > 0) {
-      const halo = ctx.createRadialGradient(0, 0, 0, 0, 0, extent);
-      halo.addColorStop(0, rgba2(rayColor, glow3 * 0.35));
-      halo.addColorStop(0.22, rgba2(rayColor, glow3 * 0.17));
-      halo.addColorStop(0.65, rgba2(rayColor, glow3 * 0.05));
-      halo.addColorStop(1, rgba2(rayColor, 0));
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(-extent, -extent, extent * 2, extent * 2);
-      fourPoints(ctx, notch);
-      ctx.clip("evenodd");
-      ctx.fillStyle = halo;
-      ctx.fillRect(-extent, -extent, extent * 2, extent * 2);
-      ctx.restore();
+  function lightStamp(ctx, side, notch, glow3, extent, rayColor, coreColor) {
+    const key = [side, notch, glow3, rayColor, coreColor].join(":");
+    if (stamps.has(key)) {
+      const found = stamps.get(key);
+      stamps.delete(key);
+      stamps.set(key, found);
+      return found;
     }
-    const fill = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-    fill.addColorStop(0, coreColor);
-    fill.addColorStop(0.12, coreColor);
-    fill.addColorStop(0.45, rgba2(rayColor, 0.97));
-    fill.addColorStop(1, rgba2(rayColor, 0.68));
-    ctx.fillStyle = fill;
-    ctx.beginPath();
-    fourPoints(ctx, notch);
-    ctx.fill();
+    const canvas4 = typeof OffscreenCanvas === "function" ? new OffscreenCanvas(side, side) : ctx.canvas?.ownerDocument?.createElement("canvas");
+    if (!canvas4) return null;
+    canvas4.width = canvas4.height = side;
+    const brush = canvas4.getContext("2d", { alpha: true });
+    if (!brush) return null;
+    brush.translate(side / 2, side / 2);
+    brush.scale(side / (extent * 2), side / (extent * 2));
+    brush.globalCompositeOperation = "lighter";
+    if (glow3 > 0) ellipseLight(brush, extent, extent, [[0, rayColor, Math.min(1, glow3 * 0.34)], [0.1, rayColor, glow3 * 0.18], [0.35, rayColor, glow3 * 0.035], [0.7, rayColor, glow3 * 4e-3], [1, rayColor, 0]]);
+    const width = 0.025 + notch * 0.18;
+    const rays = [[0, coreColor, 0.85], [0.08, coreColor, 0.8], [0.25, rayColor, 0.62], [0.5, rayColor, 0.3], [0.75, rayColor, 0.07], [1, rayColor, 0]];
+    ellipseLight(brush, 1, width, rays);
+    ellipseLight(brush, width, 1, rays);
+    const needle = 9e-3 + notch * 0.025, hot = [[0, coreColor, 0.9], [0.15, coreColor, 0.8], [0.4, rayColor, 0.38], [0.7, rayColor, 0.065], [1, rayColor, 0]];
+    ellipseLight(brush, 1, needle, hot);
+    ellipseLight(brush, needle, 1, hot);
+    const core = 0.055 + notch * 0.2;
+    brush.globalCompositeOperation = "source-over";
+    ellipseLight(brush, core, core, [[0, coreColor, 1], [0.3, coreColor, 1], [0.6, coreColor, 0.85], [0.85, rayColor, 0.35], [1, rayColor, 0]]);
+    const bytes2 = side * side * 4;
+    while (stamps.size && stampBytes + bytes2 > STAMP_BYTES) {
+      const [oldKey, old] = stamps.entries().next().value;
+      stamps.delete(oldKey);
+      stampBytes -= old.width * old.height * 4;
+      old.width = old.height = 1;
+    }
+    stamps.set(key, canvas4);
+    stampBytes += bytes2;
+    return canvas4;
   }
   function drawStarlight(ctx, layer2, { time = 1.2, height = 1, point, random, include }) {
     const p3 = layer2.params ?? {}, count2 = Math.floor(number4(p3.count, 12, 0, 160)), size = number4(p3.size, 0.12, 0, 2);
@@ -24700,8 +24716,11 @@
     const life2 = number4(p3.life, 2.8, 0.1, 30), twinkle = number4(p3.twinkle, 1, 0, 4), moving = twinkle > 0, randomness = number4(p3.randomness, 0, 0, 1);
     const rayColor = color3(p3.color, "#b8dfff"), coreColor = color3(p3.coreColor, "#ffffff"), extent = glow3 > 0 ? 1.15 + glow3 * 0.5 : 1;
     const angle2 = (number4(p3.rotation, 0, -180, 180) / 360 + t3 * number4(p3.spin, 0.1, -3, 3)) % 1 * TAU3;
+    const matrix = ctx.getTransform?.(), scale = matrix ? number4(Math.max(Math.hypot(matrix.a, matrix.b), Math.hypot(matrix.c, matrix.d)), 1, 0.01, 1e3) : 1;
     const seeded = (index2, salt) => number4(random?.(index2, "starlight:" + salt), 0.5, 0, 1);
-    let drawn = false;
+    const footprint = h3 * size * 1.25 * Math.max(1, stretch) * extent * scale * 2.5;
+    const side = Math.min(2048, 2 ** Math.ceil(Math.log2(Math.max(256, footprint))));
+    let drawn = false, stamp;
     for (let index2 = 0; index2 < count2; index2++) {
       const age = moving ? t3 / life2 + seeded(index2, "phase") : 0, cycle = Math.floor(age), phase = age - cycle;
       const envelope = moving ? Math.sin(Math.PI * phase) ** 2 : 1;
@@ -24719,13 +24738,17 @@
         }
       }
       const radius = h3 * size * (0.75 + 0.5 * seeded(index2, "size")) * (0.5 + 0.5 * Math.sqrt(envelope)) * (0.9 + 0.1 * pulse);
+      stamp ??= lightStamp(ctx, side, notch, glow3, extent, rayColor, coreColor);
+      if (!stamp) continue;
       ctx.save();
       try {
         ctx.globalAlpha *= alpha;
         ctx.translate(x3, y3);
         ctx.rotate(angle2);
         ctx.scale(radius, radius * stretch);
-        paintLight(ctx, notch, glow3, extent, rayColor, coreColor);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(stamp, -extent, -extent, extent * 2, extent * 2);
       } finally {
         ctx.restore();
       }
@@ -48071,14 +48094,12 @@ void main(){
   // release.json
   var release_default = {
     format: "card-print-studio-update",
-    version: "1.5.0",
+    version: "1.5.1",
     releasedAt: "2026-10-21",
     notes: [
-      "\uBAA8\uBC14\uC77C\uC5D0\uC11C \uCE74\uB4DC \uBAA9\uB85D\xB7\uD3B8\uC9D1\xB7\uBBF8\uB9AC\uBCF4\uAE30\uB97C \uC804\uD658\uD558\uACE0 \uB450 \uC190\uAC00\uB77D\uC73C\uB85C \uD655\uB300\xB7\uC774\uB3D9\uD574\uC694. \uD3F4\uB354 \uC800\uC7A5\uC744 \uC9C0\uC6D0\uD558\uC9C0 \uC54A\uC73C\uBA74 JSON \uD30C\uC77C\uB85C \uC800\uC7A5\uD574\uC694.",
-      "\uCE74\uB4DC\xB7\uC2A4\uD0AC \uC81C\uBAA9\uC5D0\uB3C4 \uD0A4\uC6CC\uB4DC\uB97C \uB123\uACE0, \uD55C \uAE00\uC790\uB098 \uC120\uD0DD\uD55C \uAD6C\uAC04\uC5D0 \uC0C9\xB7\uAE00\uAF34\xB7\uC774\uD399\uD2B8\uB97C \uB530\uB85C \uC801\uC6A9\uD574\uC694. \uBD88\uD0C0\uBA70 \uC774\uAE00\uAC70\uB9AC\uB294 \uAE00\uC790\uC640 \uB124 \uAF2D\uC9D3\uC810\uC758 4\uAC01 \uBCC4\uBE5B \uD504\uB9AC\uC14B\uC744 \uC81C\uACF5\uD574\uC694.",
-      "\uC0AC\uC9C4\uC5D0\uC11C \uC0AC\uB78C\xB7\uBB3C\uCCB4\uB97C \uC790\uB3D9\uC73C\uB85C \uB0A8\uAE30\uACE0 \uBC30\uACBD\uC744 \uD22C\uBA85\uD558\uAC8C \uB9CC\uB4E4\uC5B4\uC694. \uCC98\uC74C\uC5D0 \uC57D 16MB\uC758 \uCC98\uB9AC \uB3C4\uAD6C\uB97C \uBC1B\uC740 \uB4A4 \uAE30\uAE30\uC5D0\uC11C \uCC98\uB9AC\uD558\uBA70, \uC6D0\uBCF8 \uADF8\uB9BC\uC740 \uBCF4\uC874\uD574\uC694.",
-      "\uC774\uBBF8\uC9C0 \uC785\uC790\uC5D0\uC11C \uBC14\uB85C \uC790\uB974\uAE30\xB7\uBC30\uACBD \uC81C\uAC70\xB7\uC2A4\uD504\uB77C\uC774\uD2B8 \uC2DC\uD2B8 \uD3B8\uC9D1\uC744 \uC5F4\uACE0, \uC18C\uD658\uB9C8\uB2E4 \uB79C\uB364 \uD55C \uCEF7\uC774\uB098 \uB79C\uB364 \uCEF7 \uACC4\uC18D \uC7AC\uC0DD\uC744 \uC870\uC808\uD574\uC694. \uACE0\uB978 \uC7A5\uBA74\uC740 \uC778\uC1C4\uC5D0 \uACE0\uC815\uD574\uC694.",
-      "\uC791\uC740 \uD6A8\uACFC\uC758 \uD53D\uC140 \uC804\uC1A1\uACFC \uC911\uBCF5 \uD569\uC131\uC744 \uC904\uC774\uACE0 \uC7AC\uC0DD \uC911 \uBBF8\uB9AC\uBCF4\uAE30 \uD488\uC9C8\uC744 \uC790\uB3D9 \uC870\uC808\uD574\uC694. \uBA48\uCD94\uBA74 \uD654\uBA74 \uD574\uC0C1\uB3C4\uB97C \uBCF5\uC6D0\uD558\uBA70, \uC778\uC1C4 \uD488\uC9C8\uACFC \uACE0\uC815 \uC7A5\uBA74\uC740 \uC720\uC9C0\uD574\uC694."
+      "\uD5C8\uBE14 \uBCC4\uBE5B \uC0AC\uC9C4\uC744 \uCC38\uACE0\uD574 4\uAC01 \uBCC4\uBE5B\uC744 \uC0C8\uB85C \uADF8\uB838\uC5B4\uC694. \uBC1D\uACE0 \uB465\uADFC \uC911\uC2EC, \uAC00\uB298\uACE0 \uAE34 \uB124 \uBC29\uD5A5 \uAD11\uC120, \uB05D\uC73C\uB85C \uAC08\uC218\uB85D \uD22C\uBA85\uD574\uC9C0\uB294 \uBE5B \uBC88\uC9D0\uC744 \uD45C\uD604\uD574\uC694.",
+      "\uBCC4 \uC0C9\xB7\uC911\uC2EC\uC0C9\xB7\uAD11\uC120 \uD3ED\xB7\uC138\uB85C \uBE44\uC728\xB7\uBE5B \uBC88\uC9D0\xB7\uD68C\uC804\xB7\uBC18\uC9DD\uC784\uC744 \uADF8\uB300\uB85C \uC870\uC808\uD558\uACE0, \uD22C\uBA85\uB3C4\uC640 \uC120\uD0DD\uD55C \uC778\uC1C4 \uC7A5\uBA74\uC744 \uC720\uC9C0\uD574\uC694.",
+      "\uD55C \uC870\uD569\uC758 \uBCC4\uB4E4\uC740 \uBE5B \uC774\uBBF8\uC9C0\uB97C \uC7AC\uC0AC\uC6A9\uD574\uC694. \uBCC4\uB9C8\uB2E4 \uD06C\uAE30\uAC00 \uB2EC\uB77C\uB3C4 \uBC18\uBCF5 \uC7AC\uC0DD \uC911 \uACE0\uD574\uC0C1\uB3C4 \uC774\uBBF8\uC9C0\uB97C \uACC4\uC18D \uB2E4\uC2DC \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694."
     ],
     downloadUrl: "./card-print-studio.html",
     sourceUrl: "https://raw.githubusercontent.com/lolipop000000/card-print-studio/main/dist/update.json"
