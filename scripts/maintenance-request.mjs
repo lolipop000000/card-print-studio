@@ -16,7 +16,7 @@ async function requestMaintenance(env){
  let response;
  try{
   const key=env.SUPABASE_SERVICE_ROLE_KEY;
-  const headers=key.startsWith('sb_secret_')?{apikey:key}:{Authorization:`Bearer ${key}`};
+  const headers=key.startsWith('sb_secret_')?{apikey:key}:{apikey:key,Authorization:`Bearer ${key}`};
   response=await fetch(endpoint,{method:'POST',headers,redirect:'error',signal:AbortSignal.timeout(30000)});
  }catch{return {ok:false,status:0,code:'request-failed'};}
  let body;

@@ -40,6 +40,7 @@ test('successful maintenance reports only HTTP status and verified counters',asy
  const result=await run(t,(request,response)=>{
   assert.equal(request.method,'POST');assert.equal(request.url,'/functions/v1/maintenance');
   assert.equal(request.headers.authorization,`Bearer ${key}`);
+  assert.equal(request.headers.apikey,key,'legacy server calls must identify the project at the API gateway');
   response.end(JSON.stringify({ok:true,result:{trashed:2,blobs:3,audits:4},secret:key}));
  });
  assert.equal(result.exitCode,0);
