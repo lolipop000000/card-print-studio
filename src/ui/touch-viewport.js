@@ -29,10 +29,14 @@ export function createTouchGesture({onStart=()=>{},onChange=()=>{},onEnd=()=>{}}
 
 /** Capture the handoff before a canvas tool receives the second touch. */
 export function mountTouchViewport({viewport,onStart=()=>{},onChange,onEnd=()=>{}}){
- const captures=new Set();let disposed=false;
+ const captures=new Set();let disposed=false,pending=null,frame=0;
+ function flush(){cancelAnimationFrame(frame);frame=0;const change=pending;pending=null;if(change&&!disposed)onChange(change);}
+ // Both contacts in one input frame belong to one transform. Applying each
+ // separately can briefly shrink content and clamp away the intended pan.
+ function change(next){if(pending){pending.factor*=next.factor;pending.to=next.to;}else pending={...next};if(!frame)frame=requestAnimationFrame(flush);}
  const gesture=createTouchGesture({
   onStart(){viewport.dispatchEvent(new Event('touchviewportstart'));viewport.dataset.touchNavigating='true';return onStart();},
-  onChange,
+  onChange:change,
   onEnd(){delete viewport.dataset.touchNavigating;onEnd();}
  });
  const stop=event=>{event.preventDefault();event.stopImmediatePropagation();};
@@ -44,10 +48,11 @@ export function mountTouchViewport({viewport,onStart=()=>{},onChange,onEnd=()=>{
  }
  function move(event){if(gesture.move(event))stop(event);}
  function up(event){
+  if(event.pointerType==='touch'&&contacts.has(event.pointerId))flush();
   if(gesture.up(event))stop(event);contacts.delete(event.pointerId);captures.delete(event.pointerId);
   try{if(viewport.hasPointerCapture(event.pointerId))viewport.releasePointerCapture(event.pointerId);}catch{}
  }
- function cancel(){gesture.cancel();contacts.clear();for(const id of captures){try{if(viewport.hasPointerCapture(id))viewport.releasePointerCapture(id);}catch{}}captures.clear();}
+ function cancel(){cancelAnimationFrame(frame);frame=0;pending=null;gesture.cancel();contacts.clear();for(const id of captures){try{if(viewport.hasPointerCapture(id))viewport.releasePointerCapture(id);}catch{}}captures.clear();}
  const options={capture:true,passive:false};
  viewport.addEventListener('pointerdown',down,options);viewport.addEventListener('pointermove',move,options);viewport.addEventListener('pointerup',up,options);viewport.addEventListener('pointercancel',up,options);window.addEventListener('blur',cancel);
  return {isActive:gesture.isActive,destroy(){if(disposed)return;disposed=true;cancel();viewport.removeEventListener('pointerdown',down,true);viewport.removeEventListener('pointermove',move,true);viewport.removeEventListener('pointerup',up,true);viewport.removeEventListener('pointercancel',up,true);window.removeEventListener('blur',cancel);}};

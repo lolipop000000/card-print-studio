@@ -53,7 +53,9 @@ export async function openPaintingEditor(root,store,cardId){
  const bottom=el('footer',{class:'paint-bottom'},status,el('span',{id:'paint-coords'},'B 브러시 · E 지우개 · M 선택 · Space 이동'),zoomInput,el('span',{},'%'),button('전체 맞춤',fit,{id:'paint-fit'}),button('100%',()=>setZoom(1),{id:'paint-100'}));
  dialog.append(top,el('div',{class:'paint-grid'},toolBar,viewport,panel),message,bottom);document.body.append(dialog);dialog.showModal();
  function renderState(){for(const node of dialog.querySelectorAll('input,select,button'))node.disabled=busy;const confirm=document.getElementById('select-commit'),cancel=document.getElementById('select-cancel');if(confirm)confirm.disabled=busy||!tools.isFloating();if(cancel)cancel.disabled=busy||!tools.isFloating();dialog.dataset.tool=tools.getOptions().tool;dialog.dataset.paintDirty=String(dirty());undoButton.disabled=busy||!session.history.canUndo();redoButton.disabled=busy||!session.history.canRedo();applyButton.disabled=busy;
-  status.replaceChildren(el('strong',{id:'paint-size'},session.width+' × '+session.height+' px'),el('span',{id:'paint-history'},session.history.count()+'단계 · '+(session.history.bytes()/1024/1024).toFixed(2)+' / 128 MiB'));zoomInput.value=(view.scale*100).toFixed(1);
+  status.replaceChildren(el('strong',{id:'paint-size'},session.width+' × '+session.height+' px'),el('span',{id:'paint-history'},session.history.count()+'단계 · '+(session.history.bytes()/1024/1024).toFixed(2)+' / 128 MiB'));
+  // A history redraw can run between input and blur; preserve the pending edit.
+  if(document.activeElement!==zoomInput)zoomInput.value=(view.scale*100).toFixed(1);
   for(const [tool] of TOOLS)document.getElementById('tool-'+tool).classList.toggle('selected',tools.getOptions().tool===tool);
  }
  function compose(white=false){return compositePainting(session,white,{preview:tools.getPreview(),layerId:tools.previewLayerId()});}
@@ -70,7 +72,7 @@ export async function openPaintingEditor(root,store,cardId){
  function requestRender(){if(!frame)frame=requestAnimationFrame(()=>{frame=0;renderViewport();});}
  function renderAll(){renderViewport();renderPanel();}
  function fit(){fitMode=true;view.scale=Math.max(.01,Math.min(1,(viewport.clientWidth-60)/session.width,(viewport.clientHeight-60)/session.height));view.panX=(viewport.clientWidth-session.width*view.scale)/2;view.panY=(viewport.clientHeight-session.height*view.scale)/2;renderViewport();}
- function setZoom(scale){fitMode=false;view=zoomAt(view,{x:viewport.clientWidth/2,y:viewport.clientHeight/2},scale);renderViewport();}
+ function setZoom(scale){fitMode=false;view=zoomAt(view,{x:viewport.clientWidth/2,y:viewport.clientHeight/2},scale);renderViewport();zoomInput.value=(view.scale*100).toFixed(1);}
  function resize(){if(fitMode)fit();else renderViewport();}
  function layerOp(op){return run(async()=>{if(tools.isFloating())throw Error('선택 변형을 먼저 확정하거나 취소하세요.');tools.cancel();await editLayers(session,op);tools.select(null);if(['resizeCanvas','resample'].includes(op.type))fit();});}
  function renderPanel(){

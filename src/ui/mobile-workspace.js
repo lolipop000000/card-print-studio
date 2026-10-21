@@ -18,12 +18,13 @@ function paneTabs(host,entries,{label,initial,attribute,onChange=()=>{}}){
 }
 
 /** Responsive viewing state never enters project JSON or undo history. */
-export function mountMobileWorkspace(root,{onChange=()=>{}}={}){
+export function mountMobileWorkspace(root,{onChange=()=>{},save=()=>{},openLibrary=()=>{}}={}){
  const media=matchMedia('(max-width: 620px)'),top=root.querySelector('.topbar'),grid=root.querySelector('.workspace-grid');
  const library=grid.querySelector('.library'),workspace=grid.querySelector('.workspace'),inspector=grid.querySelector('.inspector');
  library.id||='mobile-library-panel';workspace.id||='mobile-preview-panel';
  const tabs=paneTabs(root,[['cards','카드 목록',library],['editor','편집',inspector],['preview','미리보기',workspace]],{label:'모바일 작업 영역',initial:'preview',attribute:'data-mobile-view',onChange:id=>{closeMenu();onChange(id);}});
  tabs.node.id='mobile-workspace-tabs';top.after(tabs.node);
+ const quick=el('div',{class:'mobile-quick-actions'},button('저장',save,{id:'mobile-save'}),button('보관함',openLibrary,{id:'mobile-library'}));tabs.node.after(quick);
  const actions=top.querySelector('.top-actions');actions.id||='studio-top-actions';
  const menu=button('작업 메뉴',()=>{const open=menu.getAttribute('aria-expanded')!=='true';menu.setAttribute('aria-expanded',String(open));root.dataset.mobileMenu=String(open);},{id:'mobile-menu-toggle',class:'mobile-menu-toggle','aria-expanded':'false','aria-controls':actions.id});
  top.insertBefore(menu,actions);
@@ -46,5 +47,5 @@ export function mountMobileWorkspace(root,{onChange=()=>{}}={}){
  // Browsers that resize the visual viewport for the keyboard keep the focused field reachable.
  const focus=event=>{if(media.matches&&typing(event.target))requestAnimationFrame(()=>{if(event.target===document.activeElement)event.target.scrollIntoView({block:'nearest',inline:'nearest'});});};
  document.addEventListener('focusin',focus);
- return {isPreviewVisible:()=>!media.matches||tabs.current()==='preview',isPhone:()=>media.matches,show:tabs.select,destroy(){observer.disconnect();media.removeEventListener('change',refresh);document.removeEventListener('focusin',focus);tabs.node.remove();menu.remove();for(const [dialog,nav] of dialogMounts){nav.remove();dialog.removeAttribute('data-mobile-section');}delete root.dataset.mobileView;delete root.dataset.mobileMenu;}};
+ return {isPreviewVisible:()=>!media.matches||tabs.current()==='preview',isPhone:()=>media.matches,show:tabs.select,destroy(){observer.disconnect();media.removeEventListener('change',refresh);document.removeEventListener('focusin',focus);tabs.node.remove();quick.remove();menu.remove();for(const [dialog,nav] of dialogMounts){nav.remove();dialog.removeAttribute('data-mobile-section');}delete root.dataset.mobileView;delete root.dataset.mobileMenu;}};
 }
