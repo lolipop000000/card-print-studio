@@ -9,7 +9,7 @@ const ROOT=fileURLToPath(new URL('../',import.meta.url));
 const core=['offline','updates'];
 const profiles={
  quick:core,
- effects:[...core,'effect-video','effect-video-ui','visual-effects-card','visual-effects-history','effect-selected-playback','starlight'],
+ effects:[...core,'preview-settings','mobile-layout','visual-effects-card','visual-effects-history','effect-selected-playback','starlight'],
  print:[...core,'native-print-app','browser-print','visual-effects-print','printing-tolerant','sprite-customization-print'],
  full:null
 };

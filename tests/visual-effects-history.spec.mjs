@@ -1,3 +1,4 @@
+import {openPreviewOptions} from './helpers/flows.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -19,7 +20,7 @@ test('effect history restores layers, parameters and frozen time, branches corre
   await undo(page);assert.equal(await page.locator('#effect-param-height').inputValue(),'0.68');
   await redo(page);assert.equal(await page.locator('#effect-param-height').inputValue(),'0.9');await redo(page);assert.deepEqual(await kinds(page),['flame','smoke']);
   await undo(page);await add(page,'outline');assert.equal(await page.locator('#effect-redo').isDisabled(),true);assert.deepEqual(await kinds(page),['flame','outline']);
-  await page.locator('#effect-time').evaluate(node=>{node.value='2.35';node.dispatchEvent(new Event('input',{bubbles:true}));});await page.locator('#effect-freeze').click();
+  await page.locator('#effect-time').evaluate(node=>{node.value='2.35';node.dispatchEvent(new Event('input',{bubbles:true}));});await openPreviewOptions(page);await page.locator('#effect-freeze').click();
   await undo(page);assert.match(await page.locator('#effect-frame-label').innerText(),/1\.20/);await redo(page);assert.match(await page.locator('#effect-frame-label').innerText(),/2\.35/);
   await page.locator('#effect-apply').click();const applied=await saveProject(page,'effect-history-applied.json');
   assert.deepEqual(applied.cards[0].visualEffects.layers.map(l=>l.kind),['flame','outline']);assert.equal(applied.cards[0].visualEffects.layers[0].params.height,.9);assert.equal(applied.print.effectFrameSec,2.35);

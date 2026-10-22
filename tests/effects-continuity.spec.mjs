@@ -1,25 +1,28 @@
+import {openPreviewOptions} from './helpers/flows.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {openApp,openHarness} from './helpers/browser.mjs';
 import {saveProject} from './helpers/flows.mjs';
 
-test('card and composer clocks continue through six seconds, freeze the visible frame and reopen it',async()=>{
+test('card and composer respect a configured range beyond six seconds, freeze the visible frame and reopen it',async()=>{
  const {browser,page,pageErrors,httpRequests}=await openApp();try{
+  await openPreviewOptions(page,'card');await page.locator('#card-preview-duration').fill('18');await page.locator('#card-preview-duration').press('Tab');await page.locator('#card-preview-loop').uncheck();
   await page.clock.install();await page.locator('#card-effect-time').evaluate(n=>{n.value='5.95';n.dispatchEvent(new Event('input',{bubbles:true}));});
   await page.locator('#card-effect-play').click();await page.clock.runFor(200);
   assert.ok(parseFloat(await page.locator('#card-effect-seconds').innerText())>6,'The card clock must not reset to zero');
-  assert.ok(Number(await page.locator('#card-effect-time').getAttribute('max'))>6);
-  await page.locator('#card-effect-freeze').click();const p=await saveProject(page,'continuous-frame.json');assert.ok(p.print.effectFrameSec>6);
-  await page.locator('#card-frame-effects').click();
+  assert.equal(Number(await page.locator('#card-effect-time').getAttribute('max')),18);
+  await openPreviewOptions(page,'card');await page.locator('#card-effect-freeze').click();const p=await saveProject(page,'continuous-frame.json');assert.ok(p.print.effectFrameSec>6);
+  await page.locator('#card-frame-effects').click();await openPreviewOptions(page);
   assert.match(await page.locator('#effect-frame-label').innerText(),/6\./);
   await page.locator('#effect-time').evaluate(n=>{n.value='11.95';n.dispatchEvent(new Event('input',{bubbles:true}));});
   await page.locator('#effect-play').click();await page.clock.runFor(200);
   assert.ok(parseFloat(await page.locator('#effect-time').inputValue())>12,'Composer playback must continue into the next time window');
-  await page.locator('#effect-freeze').click();const frame=await page.locator('#effect-frame-label').innerText();assert.match(frame,/12\./);
+  await openPreviewOptions(page);await page.locator('#effect-freeze').click();const frame=await page.locator('#effect-frame-label').innerText();assert.match(frame,/12\./);
+  assert.equal(Number(await page.locator('#effect-time').getAttribute('max')),18);
   await page.locator('#effect-undo').click();assert.match(await page.locator('#effect-frame-label').innerText(),/6\./);await page.locator('#effect-redo').click();assert.equal(await page.locator('#effect-frame-label').innerText(),frame);
   await page.locator('#effect-apply').click();const applied=await saveProject(page,'continuous-frame-applied.json');assert.ok(applied.print.effectFrameSec>12);
   await page.locator('#paper-tab').click();assert.equal(await page.locator('#print-effect-frame').inputValue(),String(applied.print.effectFrameSec));
-  await page.locator('#card-tab').click();await page.locator('#card-frame-effects').click();assert.equal(await page.locator('#effect-frame-label').innerText(),frame);
+  await page.locator('#card-tab').click();await page.locator('#card-frame-effects').click();await openPreviewOptions(page);assert.equal(await page.locator('#effect-frame-label').innerText(),frame);
   assert.deepEqual(pageErrors,[]);assert.deepEqual(httpRequests,[]);
  }finally{await browser.close();}
 });

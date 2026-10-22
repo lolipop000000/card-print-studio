@@ -1,3 +1,4 @@
+import {openPreviewOptions} from './helpers/flows.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
@@ -145,7 +146,7 @@ test('dragging pauses playback without selecting a new print frame and transform
   const p=fixture();await openTarget(page,p);await page.locator('#effect-transform-toggle').click();await prepareViewport(page,1);await page.locator('#effect-play').click();
   await page.waitForFunction(()=>Number(document.getElementById('effect-time').value)>1.2);
   const start=await handlePoint(page,'move');await page.mouse.move(start.x,start.y);await page.mouse.down();assert.equal(await page.locator('#effect-play').getAttribute('aria-pressed'),'false');const paused=await page.locator('#effect-time').inputValue();
-  await page.mouse.move(start.x+12,start.y+8,{steps:4});await page.mouse.up();assert.equal(await page.locator('#effect-time').inputValue(),paused);assert.equal(await page.locator('#effect-frame-label').innerText(),'인쇄 1.20초');
+  await page.mouse.move(start.x+12,start.y+8,{steps:4});await page.mouse.up();assert.equal(await page.locator('#effect-time').inputValue(),paused);await openPreviewOptions(page);assert.equal(await page.locator('#effect-frame-label').innerText(),'인쇄 1.20초');
   await page.locator('#effect-transform-toggle').click();assert.equal(await page.locator('#effect-transform-overlay').isVisible(),false);await page.locator('#effect-apply').click();assert.equal((await save(page,'paused-print-frame.json')).print.effectFrameSec,p.print.effectFrameSec);assert.deepEqual(errors,[]);
  }finally{await browser.close();}
 });

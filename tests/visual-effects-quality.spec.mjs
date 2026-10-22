@@ -1,3 +1,4 @@
+import {setPreviewDpi} from './helpers/flows.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -36,7 +37,7 @@ test('named text targets retain separate drafts and apply skill titles and descr
   await target.selectOption(body.id);await page.locator('#effect-start-preset').selectOption('neonText');
   await target.selectOption(title.id);assert.ok(await page.locator('#effect-layer-list [data-kind="flame"]').count());
   assert.equal(await page.locator('#effect-reroll').count(),0);
-  await page.locator('#effect-print-quality').check();await page.waitForFunction(()=>document.getElementById('effect-preview').width===744&&document.getElementById('effect-preview-status').dataset.busy==='false');
+  await setPreviewDpi(page,300);await page.waitForFunction(()=>document.getElementById('effect-preview').width===744&&document.getElementById('effect-preview-status').dataset.busy==='false');
   await page.screenshot({path:path.join(qa,'quality-text-targets.png'),fullPage:true});
   await page.locator('#effect-apply').click();const after=await saveProject(page,'quality-target-after.json');
   assert.ok(after.cards[0].elements.find(e=>e.id===title.id).style.visualEffects.layers.some(l=>l.kind==='flame'));

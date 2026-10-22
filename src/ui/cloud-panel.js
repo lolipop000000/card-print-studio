@@ -1,5 +1,6 @@
 import {el,button,showMessage} from './dom.js';
 import {confirmReplacement} from './files.js';
+import {MOBILE_QUERY} from './mobile-layout.js';
 
 const mb=value=>(Number(value||0)/1048576).toFixed(1).replace(/\.0$/,'');
 const normalized=value=>String(value??'').normalize('NFC').toLocaleLowerCase();
@@ -45,12 +46,12 @@ export function mountLibraryHub(ctx,{dialog,images,header,onClose,initialAccount
  function decorateRows(){
   for(const row of list.querySelectorAll('.cloud-row')){
    const id=row.dataset.cloudItem??row.dataset.cloudAsset,title=row.querySelector('strong');if(!title)continue;
-   title.replaceWith(button(title.textContent,()=>{scrollTop=list.scrollTop;dialogScroll=dialog.scrollTop;selected=id;panel.dataset.detail='true';render();if(matchMedia('(max-width:620px)').matches){dialog.scrollTop=0;back.focus({preventScroll:true});}else focusItem(id);},{'data-library-open':id,class:'library-item-title','aria-label':title.textContent+' 상세 보기'}));row.dataset.selected=String(selected===id);
+   title.replaceWith(button(title.textContent,()=>{scrollTop=list.scrollTop;dialogScroll=dialog.scrollTop;selected=id;panel.dataset.detail='true';render();if(matchMedia(MOBILE_QUERY).matches){dialog.scrollTop=0;back.focus({preventScroll:true});}else focusItem(id);},{'data-library-open':id,class:'library-item-title','aria-label':title.textContent+' 상세 보기'}));row.dataset.selected=String(selected===id);
   }
   if(selected&&!list.querySelector('.cloud-row[data-selected="true"]')){selected=null;panel.dataset.detail='false';}
  }
  function render(){
-  if(!active())return;importer.hidden=!canWrite();importer.disabled=busy;kind.disabled=busy;if(tab==='images')return;
+  if(!active())return;importer.hidden=!canWrite()||tab!=='mine';importer.disabled=busy;kind.disabled=busy;if(tab==='images')return;
   list.replaceChildren();const trash=tab==='trash';
   if(kind.value==='all'||kind.value==='work'){
    const rows=tab==='public'?[...feed.values()].filter(item=>item.kind==='work').sort((a,b)=>String(b.updated_at).localeCompare(String(a.updated_at))):own.filter(item=>trash?!!item.deleted_at:!item.deleted_at);

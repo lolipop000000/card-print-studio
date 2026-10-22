@@ -1,3 +1,4 @@
+import {openMobileSection} from './helpers/flows.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
@@ -46,7 +47,7 @@ for(const [width,height] of [[360,800],[390,844]])test('phone '+width+' switches
   await page.locator('#mobile-preview').tap();assert.equal(await page.locator('#card-canvas').isVisible(),true);assert.equal(await page.locator('#inspector').isVisible(),false);await page.locator('#paper-tab').tap();await page.locator('.paper-sheet').first().waitFor();await noOverflow(page);
   await menu(page);assert.match(await page.locator('#workspace-status').innerText(),/JSON/);const pending=page.waitForEvent('download');await page.getByRole('button',{name:'프로젝트 저장',exact:true}).tap();const downloaded=await pending;assert.equal(JSON.parse(await readFile(await downloaded.path(),'utf8')).cards.at(-1).name,'휴대폰의 카드');
   await page.getByRole('button',{name:'프로젝트 불러오기',exact:true}).tap();assert.equal(await page.locator('#project-import-folder').isDisabled(),true);const picker=page.waitForEvent('filechooser');await page.locator('#project-import-file').tap();await(await picker).setFiles({name:'phone.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(createProject()))});await page.waitForFunction(()=>document.querySelectorAll('.card-row').length===1);
-  await page.locator('#mobile-menu-toggle').tap();await noOverflow(page);const paper=await page.locator('.paper-scroll').boundingBox();assert.ok(paper.height>=160&&paper.y+paper.height<=height,'the A4 preview needs usable space below its scrollable controls: '+JSON.stringify(paper));
+  if(await page.locator('#mobile-menu-toggle').getAttribute('aria-expanded')==='true')await page.locator('#mobile-menu-toggle').tap();await noOverflow(page);const paper=await page.locator('.paper-scroll').boundingBox();assert.ok(paper.height>=160&&paper.y+paper.height<=height,'the A4 preview needs usable space below its scrollable controls: '+JSON.stringify(paper));
   await page.screenshot({path:path.join(qa,'mobile-workspace-'+width+'.png')});await page.locator('#card-tab').tap();await page.locator('#card-zoom-fit').tap();await page.screenshot({path:path.join(qa,'mobile-card-'+width+'.png')});assert.deepEqual(app.pageErrors,[]);
  }finally{await app.browser.close();}
 });
@@ -78,11 +79,11 @@ test('effect and painting dialogs fit the phone and two-finger navigation leaves
  const app=await openPhone(360,800);try{const {page}=app;
   assert.equal(await page.locator('#mobile-editor').count(),1,'phone editor navigation must exist');await page.locator('#mobile-editor').tap();
   const fixture=createProject();fixture.cards[0].template='custom';fixture.cards[0].autoSkillLayout=false;const recipe=createVisualEffects();recipe.layers=[makeVisualEffectLayer('flame',{origin:{x:.2,y:.25,w:.35,h:.3},motion:{enabled:false,speed:1}})];fixture.cards[0].visualEffects=recipe;
-  await page.locator('#project-file').setInputFiles({name:'phone-effect.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(fixture))});await page.locator('#card-frame-effects').tap();await page.locator('#effect-editor').waitFor();
+  await page.locator('#project-file').setInputFiles({name:'phone-effect.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(fixture))});await openMobileSection(page,'시각 이펙트');await page.locator('#card-frame-effects').tap();await page.locator('#effect-editor').waitFor();
   const effectBox=await page.locator('#effect-editor').boundingBox();assert.ok(effectBox.width<=360&&effectBox.x>=0);await page.getByRole('tab',{name:'미리보기',exact:true}).last().tap();
   await page.locator('#effect-transform-toggle').tap();const width=await page.locator('#effect-preview').evaluate(c=>c.getBoundingClientRect().width);await pinch(page,'.effect-preview-scroll');assert.ok(await page.locator('#effect-preview').evaluate((c,w)=>c.getBoundingClientRect().width>w,width));
   assert.equal(await page.locator('#effect-editor').getAttribute('data-effect-dirty'),'false');assert.equal(await page.locator('#effect-undo').isDisabled(),true);await page.locator('#effect-close').tap();
-  await page.locator('#open-painting').tap();await page.locator('#painting-editor').waitFor();const paintBox=await page.locator('#painting-editor').boundingBox();assert.ok(paintBox.width<=360&&paintBox.x>=0);
+  await openMobileSection(page,'사용자 그림');await page.locator('#open-painting').tap();await page.locator('#painting-editor').waitFor();const paintBox=await page.locator('#painting-editor').boundingBox();assert.ok(paintBox.width<=360&&paintBox.x>=0);
   const before=await page.locator('#paint-canvas').evaluate(c=>c.toDataURL()),zoom=Number(await page.locator('#paint-zoom').inputValue());await pinch(page,'#paint-viewport');assert.ok(Number(await page.locator('#paint-zoom').inputValue())>zoom);assert.equal(await page.locator('#paint-canvas').evaluate(c=>c.toDataURL()),before);assert.equal(await page.locator('#painting-editor').getAttribute('data-paint-dirty'),'false');assert.equal(await page.locator('#paint-undo').isDisabled(),true);
   await page.getByRole('tab',{name:'설정 · 레이어',exact:true}).tap();await page.locator('#brush-size').fill('24');await page.locator('#brush-size').press('Tab');await page.getByRole('tab',{name:'그리기',exact:true}).tap();
   await page.screenshot({path:path.join(qa,'mobile-painting-360.png')});const surface=await page.locator('#paint-canvas').boundingBox(),viewport=await page.locator('#paint-viewport').boundingBox(),x=(Math.max(surface.x,viewport.x)+Math.min(surface.x+surface.width,viewport.x+viewport.width))/2,y=(Math.max(surface.y,viewport.y)+Math.min(surface.y+surface.height,viewport.y+viewport.height))/2,touch=await touchSession(page);
@@ -93,7 +94,7 @@ test('effect and painting dialogs fit the phone and two-finger navigation leaves
 
 test('starting a pinch over an existing floating paint selection preserves its earlier uncommitted transform',async()=>{
  const app=await openPhone();try{const {page}=app;
-  await page.locator('#mobile-editor').tap();await page.locator('#open-painting').tap();await page.locator('#painting-editor').waitFor();
+  await page.locator('#mobile-editor').tap();await openMobileSection(page,'사용자 그림');await page.locator('#open-painting').tap();await page.locator('#painting-editor').waitFor();
   await page.getByRole('tab',{name:'설정 · 레이어',exact:true}).tap();await page.locator('#select-all').tap();await page.locator('#select-x').fill('24');await page.locator('#select-x').press('Tab');
   await page.getByRole('tab',{name:'그리기',exact:true}).tap();assert.equal(await page.locator('#paint-selection').evaluate(node=>node.style.left),'24px');
   await pinch(page,'#paint-viewport');assert.equal(await page.locator('#paint-selection').evaluate(node=>node.style.left),'24px','pinch must restore the selection as it was before its first finger');

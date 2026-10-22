@@ -3,7 +3,11 @@ const BASE_WIDTH=315,MIN_ZOOM=.5,MAX_ZOOM=8,MAX_DPI=600,MAX_PIXELS=4_000_000;
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 
 /** Match display pixels while bounding the full-card buffers used by effects. */
-export function effectPreviewDpi({widthMm,heightMm,displayWidth=0,pixelRatio=1,printQuality=false}){
+export function effectPreviewDpi({widthMm,heightMm,displayWidth=0,pixelRatio=1,printQuality=false,dpi=null}){
+ if(Number.isFinite(dpi)&&dpi>0){
+  const budget=Math.floor(Math.min(25.4*Math.sqrt(16_000_000/((widthMm+24)*(heightMm+24))),8192*25.4/(widthMm+24),8192*25.4/(heightMm+24)));
+  return Math.max(1,Math.min(Math.round(dpi),MAX_DPI,budget));
+ }
  const base=printQuality?300:200,ratio=Number.isFinite(pixelRatio)&&pixelRatio>0?pixelRatio:1;
  const needed=Math.max(base,Math.max(0,displayWidth)*ratio*25.4/widthMm);
  // Effects render into a surface extending 12mm beyond each card edge.
@@ -15,9 +19,9 @@ export function effectPreviewDpi({widthMm,heightMm,displayWidth=0,pixelRatio=1,p
 export function createEffectPreviewQuality(){
  let activeDpi=100,fastFrames=0,slowFrames=0;const frameBudget=1000/24;
  return {
-  dpi(options){const full=effectPreviewDpi(options);return options.active?Math.min(full,activeDpi):full;},
-  record(durationMs,dpi,{active=false}={}){
-   if(!active||!Number.isFinite(durationMs)||durationMs<=0||!Number.isFinite(dpi)||dpi<=0)return;
+  dpi(options){const full=effectPreviewDpi(options);return options.active&&!(Number.isFinite(options.dpi)&&options.dpi>0)?Math.min(full,activeDpi):full;},
+  record(durationMs,dpi,{active=false,manual=false}={}){
+   if(manual||!active||!Number.isFinite(durationMs)||durationMs<=0||!Number.isFinite(dpi)||dpi<=0)return;
    if(durationMs>frameBudget*1.2){
     fastFrames=0;
     // Texture allocation and shader compilation can make a single frame slow.
@@ -30,7 +34,7 @@ export function createEffectPreviewQuality(){
 }
 
 /** Viewing state stays outside effect drafts, project history, and print settings. */
-export function mountEffectPreview({canvas,viewport,select,widthMm,heightMm,getPrintQuality,canZoom=()=>true,onChange,onLayout=()=>{}}){
+export function mountEffectPreview({canvas,viewport,select,widthMm,heightMm,getPrintQuality=()=>false,getDpi=()=>null,canZoom=()=>true,onChange,onLayout=()=>{}}){
  let zoom=1,disposed=false,lastWidth=0,lastRatio=window.devicePixelRatio||1,active=false;const quality=createEffectPreviewQuality();
  function synchronize(){
   const value=String(zoom);select.querySelector('[data-custom-zoom]')?.remove();
@@ -80,8 +84,8 @@ export function mountEffectPreview({canvas,viewport,select,widthMm,heightMm,getP
  sizeDisplay();synchronize();lastWidth=canvas.getBoundingClientRect().width;crisp();onChange();
  return {
   setZoom,
-  dpi:({active:nextActive=false}={})=>quality.dpi({widthMm,heightMm,displayWidth:canvas.getBoundingClientRect().width,pixelRatio:window.devicePixelRatio||1,printQuality:getPrintQuality(),active:nextActive}),
-  afterDraw(dpi,{durationMs=0,active:nextActive=false}={}){active=nextActive;quality.record(durationMs,dpi,{active});canvas.dataset.previewDpi=String(dpi);canvas.dataset.previewActive=String(active);crisp();},
+  dpi:({active:nextActive=false}={})=>quality.dpi({widthMm,heightMm,displayWidth:canvas.getBoundingClientRect().width,pixelRatio:window.devicePixelRatio||1,printQuality:getPrintQuality(),dpi:getDpi(),active:nextActive}),
+  afterDraw(dpi,{durationMs=0,active:nextActive=false}={}){active=nextActive;quality.record(durationMs,dpi,{active,manual:getDpi()!==null});canvas.dataset.previewDpi=String(dpi);canvas.dataset.previewActive=String(active);crisp();},
   destroy(){if(disposed)return;disposed=true;touchView.destroy();observer.disconnect();viewport.removeEventListener('wheel',wheel);window.removeEventListener('resize',resized);}
  };
 }

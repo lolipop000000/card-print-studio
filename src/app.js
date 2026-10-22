@@ -207,11 +207,12 @@ export function mountEditor(root,store,{cloudClient=createCloudClient()}={}){
   el('div',{id:'card-warnings',class:'card-warnings'}),
   el('div',{class:'card-effect-transport'},
    button('재생',()=>{},{id:'card-effect-play','aria-pressed':false}),
-   button('고화질 6초 보기',()=>{},{id:'card-effect-prerender'}),
    el('input',{id:'card-effect-time',type:'range',min:0,max:6,step:.01,value:1.2,'aria-label':'카드 미리보기 시간 (초)'}),
    el('output',{id:'card-effect-seconds',htmlFor:'card-effect-time'},'1.20초'),
-   button('현재 장면을 인쇄 프레임으로',()=>{},{id:'card-effect-freeze'}),
-   button('인쇄 장면 보기',()=>{},{id:'card-effect-print-frame'})),
+   el('details',{id:'card-preview-options',class:'preview-options'},el('summary',{},'설정'),el('div',{class:'preview-options-body'},
+    el('div',{id:'card-preview-settings'}),
+    button('현재 장면을 인쇄 프레임으로',()=>{},{id:'card-effect-freeze'}),
+    button('인쇄 장면 보기',()=>{},{id:'card-effect-print-frame'})))),
   el('footer',{class:'canvas-footer'},el('span',{id:'canvas-size'}),el('span',{},'Ctrl+휠 확대·축소 · 빈 곳 드래그 / Shift+클릭 다중 선택'),zoomControls));
  const paperRoot=el('div',{id:'paper-view',hidden:true,class:'paper-view'},el('p',{class:'empty-note'},'용지 미리보기를 준비하고 있어요.'));
  const center=el('main',{class:'workspace'},el('nav',{class:'workspace-tabs'},el('div',{class:'tab-group'},cardTab,paperTab),el('div',{class:'tab-group'},frontTab,backTab)),cardArea,paperRoot);
