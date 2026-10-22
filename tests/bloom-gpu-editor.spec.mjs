@@ -1,3 +1,4 @@
+import {addVisualLayer} from './helpers/effects.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {openApp} from './helpers/browser.mjs';
@@ -9,7 +10,7 @@ test('offline effect editor shows CPU fallback honestly when GPU is unavailable'
    const get=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,...args){return type==='webgl2'?null:get.call(this,type,...args);};
   });
   await page.locator('#card-frame-effects').click();
-  for(const kind of ['flame','bloom']){await page.locator('#effect-layer-kind').selectOption(kind);await page.locator('#effect-layer-add').click();}
+  for(const kind of ['flame','bloom']){await addVisualLayer(page,kind);}
   await page.locator('#effect-param-threshold').fill('0');await page.locator('#effect-param-threshold').press('Tab');
   await page.waitForFunction(()=>document.getElementById('effect-preview-status')?.dataset.busy==='false'&&document.getElementById('effect-preview-status')?.dataset.bloomBackend==='cpu');
   assert.match(await page.locator('#effect-preview-status').innerText(),/블룸 CPU/);

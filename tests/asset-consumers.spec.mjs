@@ -1,3 +1,4 @@
+import {addVisualLayer} from './helpers/effects.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
@@ -95,7 +96,7 @@ test('new standalone effects use the full region while saved faces and attached 
   await page.locator('[data-effect-preset="saved-emission"]').click();assert.equal(await page.locator('#effect-face').inputValue(),'inside');
   await page.locator('[data-builtin-effect="flame"]').click();assert.equal(await page.locator('#effect-face').inputValue(),'area');
   await page.locator('#effect-combine-preset').selectOption('smoke');await page.locator('#effect-merge-preset').click();await page.locator('#effect-layer-list [data-kind="smoke"] .effect-layer-select').click();assert.equal(await page.locator('#effect-face').inputValue(),'area');
-  await page.locator('#effect-start-preset').selectOption('empty');await page.locator('#effect-layer-kind').selectOption('sprite');await page.locator('#effect-layer-add').click();assert.equal(await page.locator('#effect-face').inputValue(),'area');
+  await page.locator('#effect-start-preset').selectOption('empty');await addVisualLayer(page,'sprite');assert.equal(await page.locator('#effect-face').inputValue(),'area');
   await page.locator('#effect-target').selectOption('text-a');await page.locator('#effect-start-preset').selectOption('flame');assert.equal(await page.locator('#effect-face').inputValue(),'up');assert.equal(await page.locator('label[for="effect-face"]>span').innerText(),'모양에서 피어나는 면');assert.equal(await page.locator('#effect-face option[value="area"]').innerText(),'직접 정한 영역');
   await page.locator('#effect-target').selectOption('image-a');await page.locator('#effect-start-preset').selectOption('flame');assert.equal(await page.locator('#effect-face').inputValue(),'up');await page.evaluate(()=>window.closeEffect({force:true}));assert.deepEqual(e.errors,[]);
  }finally{await e.browser.close();}

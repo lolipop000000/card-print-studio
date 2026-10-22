@@ -1,3 +1,4 @@
+import {addVisualLayer} from './helpers/effects.mjs';
 import {setPreviewDpi} from './helpers/flows.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -5,7 +6,7 @@ import path from 'node:path';
 import {openApp,qa} from './helpers/browser.mjs';
 import {saveProject} from './helpers/flows.mjs';
 const fill=async(page,id,value)=>{await page.locator(id).fill(String(value));await page.locator(id).press('Tab');};
-const add=async(page,kind)=>{await page.locator('#effect-layer-kind').selectOption(kind);await page.locator('#effect-layer-add').click();};
+const add=async(page,kind)=>{await addVisualLayer(page,kind);};
 async function image(page){return {name:'나만의 룬.png',mimeType:'image/png',buffer:Buffer.from(await page.evaluate(()=>{const c=document.createElement('canvas');c.width=64;c.height=32;const g=c.getContext('2d');g.strokeStyle='#90cfff';g.lineWidth=3;g.strokeRect(12,4,40,24);g.clearRect(25,10,14,12);return [...Uint8Array.from(atob(c.toDataURL().split(',')[1]),c=>c.charCodeAt(0))];}))};}
 async function upload(page,file){
  assert.equal(await page.locator('#effect-sprite-file').count(),1,'Image import is isolated from card-art import');

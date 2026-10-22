@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createWorkspaceStorage} from '../src/storage/workspace.js';
 import {createProject} from '../src/model/project.js';
+import {createParticleLibraryStorage} from '../src/storage/particle-library.js';
+import {createParticleLibrary,createParticleEntry,parseParticleLibrary} from '../src/model/particle-library.js';
+import {createVisualEffects} from '../src/model/visual-effects.js';
 
 let model,storageModule;try{model=await import('../src/model/asset-library.js');storageModule=await import('../src/storage/asset-library.js');}catch(error){if(error.code!=='ERR_MODULE_NOT_FOUND')throw error;}
 const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5EE2cAAAAASUVORK5CYII=';
@@ -28,6 +31,19 @@ class Dir{
 }
 const workspace=(picker)=>createWorkspaceStorage({picker,persistence:memory()});
 const create=(options)=>storageModule.createAssetLibraryStorage(options);
+
+test('particle recipes use their own file, retain image data, and reject external overwrites',async()=>{
+ const root=new Dir('작업실 데이터'),ws=workspace(async()=>root);await ws.connect();
+ const images=create({workspace:ws,persistence:memory()}),particles=createParticleLibraryStorage({workspace:ws,persistence:memory()});
+ await images.load();await images.save(library('그림 유지'));await particles.load();
+ const collection={...createParticleLibrary(),entries:[createParticleEntry('연기',createVisualEffects('smoke'),{})]};await particles.save(collection);
+ const folder=await root.getDirectoryHandle('에셋'),file=await folder.getFileHandle('particle-library.json');
+ assert.deepEqual(parseParticleLibrary(file.text),collection);assert.equal((await images.load()).entries[0].name,'그림 유지');
+ assert.match(particles.getState().location,/particle-library.json$/);
+ const outside={...collection,entries:[{...collection.entries[0],name:'다른 창'}]};file.text=JSON.stringify(outside);
+ await assert.rejects(particles.save(collection),{code:'conflict'});assert.equal(parseParticleLibrary(file.text).entries[0].name,'다른 창');
+ images.destroy();particles.destroy();
+});
 
 test('shared library storage API is available',()=>assert.equal(typeof storageModule?.createAssetLibraryStorage,'function'));
 test('offline browser cache reloads across sessions and never claims a disk save',async()=>{

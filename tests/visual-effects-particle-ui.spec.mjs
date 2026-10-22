@@ -1,3 +1,4 @@
+import {addVisualLayer} from './helpers/effects.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {openApp} from './helpers/browser.mjs';
@@ -20,9 +21,9 @@ test('particle category exposes twelve rendered choices and petal controls survi
 
 test('ripple end fading remains editable alongside an alpha-following outline',async()=>{
  const {browser,page,pageErrors}=await openApp();try{
-  await page.locator('#card-text-effects').click();await page.locator('#effect-layer-kind').selectOption('ripple');await page.locator('#effect-layer-add').click();
+  await page.locator('#card-text-effects').click();await addVisualLayer(page,'ripple');
   assert.equal(await page.locator('#effect-param-fade').count(),1,'ripple offers its fade curve');await fill(page,'#effect-param-fade','2.5');
-  await page.locator('#effect-layer-kind').selectOption('outline');await page.locator('#effect-layer-add').click();assert.ok((await page.locator('#effect-layer-hint').textContent()).includes('투명도'));
+  await addVisualLayer(page,'outline');assert.ok((await page.locator('#effect-layer-hint').textContent()).includes('투명도'));
   await fill(page,'#effect-param-width','0.2');await page.locator('#effect-apply').click();const saved=await saveProject(page,'ripple-outline-ui.json'),layers=saved.cards[0].elements.find(e=>e.binding?.field==='name').style.visualEffects.layers;
   assert.equal(layers.find(l=>l.kind==='ripple').params.fade,2.5);assert.equal(layers.at(-1).kind,'outline');assert.equal(layers.at(-1).params.width,.2);assert.deepEqual(pageErrors,[]);
  }finally{await browser.close();}

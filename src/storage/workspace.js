@@ -1,12 +1,14 @@
 import {parseProject,serializeProject} from '../model/project.js';
 import {parseCardFile,cardNameKey} from '../model/card-file.js';
 import {createAssetLibrary,parseAssetLibrary,serializeAssetLibrary} from '../model/asset-library.js';
+import {createParticleLibrary,parseParticleLibrary,serializeParticleLibrary} from '../model/particle-library.js';
 
 const DATA_FOLDER='작업실 데이터',PROJECTS_FOLDER='프로젝트',CARDS_FOLDER='카드',EXTENSION='.card-project.json',CARD_EXTENSION='.card.json';
 const projectFiles={folderName:PROJECTS_FOLDER,extension:EXTENSION,parse:parseProject,invalid:'invalid-project',label:'프로젝트'};
 const cardFiles={folderName:CARDS_FOLDER,extension:CARD_EXTENSION,parse:parseCardFile,invalid:'invalid-card',label:'카드 파일'};
 const permissionOptions={mode:'readwrite'};
 const ASSETS_FOLDER='에셋',ASSET_FILE='asset-library.json';
+const librarySpec=kind=>kind==='particle'?{file:'particle-library.json',baseline:'particleLibraryText',create:createParticleLibrary,parse:parseParticleLibrary,serialize:serializeParticleLibrary}:{file:ASSET_FILE,baseline:'assetLibraryText',create:createAssetLibrary,parse:parseAssetLibrary,serialize:serializeAssetLibrary};
 const reserved=/^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i;
 
 export class WorkspaceStorageError extends Error {
@@ -86,7 +88,7 @@ export function createWorkspaceStorage({
   return 'direct';
  }
  async function targetFor(root){return {root,layout:await classify(root),projects:null,cards:null,assets:null};}
- function assetLocation(target){const base=target.root.name;return ['projects','cards'].includes(target.layout)?null:base+'/'+(target.layout==='parent'?DATA_FOLDER+'/'+ASSETS_FOLDER+'/':target.layout==='data'?ASSETS_FOLDER+'/':'')+ASSET_FILE;}
+ function assetLocation(target,file=ASSET_FILE){const base=target.root.name;return ['projects','cards'].includes(target.layout)?null:base+'/'+(target.layout==='parent'?DATA_FOLDER+'/'+ASSETS_FOLDER+'/':target.layout==='data'?ASSETS_FOLDER+'/':'')+file;}
  function paths(target){const base=target.root.name;return {projectsPath:target.layout==='cards'?null:target.layout==='parent'?base+'/'+DATA_FOLDER+'/'+PROJECTS_FOLDER:target.layout==='data'?base+'/'+PROJECTS_FOLDER:base,cardsPath:target.layout==='projects'?null:target.layout==='parent'?base+'/'+DATA_FOLDER+'/'+CARDS_FOLDER:target.layout==='data'?base+'/'+CARDS_FOLDER:base,assetsPath:assetLocation(target)};}
  function assertAssetTarget(target,attempt){if(connection!==target||selection!==attempt)throw problem('stale-binding','에셋 보관함을 읽거나 저장하는 동안 연결한 폴더가 바뀌었어요. 보관함을 다시 불러오세요.');}
  function checkAssetFolder(target){if(['projects','cards'].includes(target.layout))throw problem('wrong-folder','에셋 보관함은 프로젝트/카드 전용 폴더에 저장할 수 없어요. 상위 작업실 데이터 폴더를 연결하세요.');}
@@ -235,29 +237,31 @@ export function createWorkspaceStorage({
   read:entry=>readFile(entry,projectFiles),
   listCards:()=>listFiles(cardFiles),
   readCard:entry=>readFile(entry,cardFiles),
-  async readAssetLibrary(){
+  async readAssetLibrary({kind='image'}={}){
+   const spec=librarySpec(kind);
    const target=requireConnection(),attempt=selection,check=()=>assertAssetTarget(target,attempt);
    return enqueue(async()=>{
     try{
      check();checkAssetFolder(target);await permission(target.root);check();const folder=await assetDirectory(target,false,check);check();let text=null;
-     if(folder)try{const handle=await folder.getFileHandle(ASSET_FILE);check();text=(await readText(handle)).text;check();}catch(error){if(error?.name!=='NotFoundError')throw error;}
-     let library;try{library=text===null?createAssetLibrary():parseAssetLibrary(text);}catch(error){throw problem('invalid-asset-library','폴더의 에셋 보관함 내용이 올바르지 않아요: '+error.message,error);}
-     check();target.assetLibraryText=text;return {library,text,location:assetLocation(target)};
+     if(folder)try{const handle=await folder.getFileHandle(spec.file);check();text=(await readText(handle)).text;check();}catch(error){if(error?.name!=='NotFoundError')throw error;}
+     let library;try{library=text===null?spec.create():spec.parse(text);}catch(error){throw problem('invalid-asset-library','폴더의 에셋 보관함 내용이 올바르지 않아요: '+error.message,error);}
+     check();target[spec.baseline]=text;return {library,text,location:assetLocation(target,spec.file)};
     }catch(error){const next=normalizeError(error,'read-failed','에셋 보관함을 읽지 못했어요. 폴더 권한과 파일 상태를 확인하세요.');if(connection===target&&selection===attempt)publish({error:errorInfo(next),...(next.code==='permission-denied'?{permission:'denied'}:{})});throw next;}
    });
   },
   async writeAssetLibrary(library,options={}){
-   let text;try{text=serializeAssetLibrary(library);}catch(error){throw problem('invalid-asset-library',error.message,error);}
+   const spec=librarySpec(options.kind);
+   let text;try{text=spec.serialize(library);}catch(error){throw problem('invalid-asset-library',error.message,error);}
    const target=requireConnection(),attempt=selection,check=()=>assertAssetTarget(target,attempt);checkAssetFolder(target);
-   const expected=Object.hasOwn(options,'expectedText')?options.expectedText:target.assetLibraryText;
-   if(target.assetLibraryText===undefined||(expected!==null&&typeof expected!=='string'))throw problem('library-not-loaded','저장하기 전에 현재 폴더의 에셋 보관함을 다시 불러오세요.');
+   const expected=Object.hasOwn(options,'expectedText')?options.expectedText:target[spec.baseline];
+   if(target[spec.baseline]===undefined||(expected!==null&&typeof expected!=='string'))throw problem('library-not-loaded','저장하기 전에 현재 폴더의 에셋 보관함을 다시 불러오세요.');
    const permissionResult=permission(target.root,true).then(value=>({value}),error=>({error}));
    return enqueue(async()=>{
     try{
      check();const result=await permissionResult;if(result.error)throw result.error;check();const folder=await assetDirectory(target,true,check);check();let handle;
-     try{handle=await folder.getFileHandle(ASSET_FILE);check();if(expected===null)throw problem('conflict','에셋 보관함을 읽은 뒤 같은 위치에 파일이 생겼어요. 보관함을 다시 불러오세요.');}catch(error){if(error?.name!=='NotFoundError')throw error;if(expected!==null)throw problem('conflict','에셋 보관함 파일이 이동되거나 삭제됐어요. 보관함을 다시 불러오세요.',error);check();handle=await freshHandle(folder,ASSET_FILE,check);check();}
+     try{handle=await folder.getFileHandle(spec.file);check();if(expected===null)throw problem('conflict','에셋 보관함을 읽은 뒤 같은 위치에 파일이 생겼어요. 보관함을 다시 불러오세요.');}catch(error){if(error?.name!=='NotFoundError')throw error;if(expected!==null)throw problem('conflict','에셋 보관함 파일이 이동되거나 삭제됐어요. 보관함을 다시 불러오세요.',error);check();handle=await freshHandle(folder,spec.file,check);check();}
      const actual=(await readText(handle)).text;check();if(actual!==(expected??''))throw problem('conflict','다른 곳에서 에셋 보관함 파일이 바뀌었어요. 보관함을 다시 불러온 뒤 저장하세요.');
-     await writeChecked(handle,text,expected??'',check);check();target.assetLibraryText=text;publish({permission:'granted',error:null});return {library:parseAssetLibrary(text),text,location:assetLocation(target)};
+     await writeChecked(handle,text,expected??'',check);check();target[spec.baseline]=text;publish({permission:'granted',error:null});return {library:spec.parse(text),text,location:assetLocation(target,spec.file)};
     }catch(error){if(connection!==target||selection!==attempt)throw normalizeError(error,'stale-binding','연결한 폴더가 바뀌었어요. 에셋 보관함을 다시 불러오세요.');throw saveFailure(error,target);}
    });
   },

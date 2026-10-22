@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createProject,createCard} from '../src/model/project.js';
-import {createVisualEffects} from '../src/model/visual-effects.js';
+import {createVisualEffects,makeVisualEffectLayer} from '../src/model/visual-effects.js';
 
 const model=await import('../supabase/functions/_shared/model.bundle.js');
 const a='a'.repeat(64),b='b'.repeat(64),ref=hash=>'blob:sha256:'+hash;
@@ -11,6 +11,13 @@ const invalid=fn=>assert.throws(fn,error=>error.code==='invalid-work');
 
 test('bundle imports without DOM globals',()=>{assert.equal(typeof globalThis.document,'undefined');assert.equal(typeof globalThis.window,'undefined');assert.equal(typeof model.validateCloudWork,'function');});
 test('validateCloudWork counts cards and refs',()=>{assert.deepEqual(model.validateCloudWork(work()),{cardCount:3,blobRefs:[a,b]});});
+test('the checked-in server bundle accepts and validates the same particle movement fields as the editor',()=>{
+ const recipe={...createVisualEffects(),layers:[makeVisualEffectLayer('smoke',{params:{motionPattern:'spiral',pathDistance:.5,pathTurns:2,pathAmplitude:.1}})]};
+ const p=work();p.cards[0].visualEffects=recipe;
+ assert.equal(model.validateCloudWork(p).cardCount,3);
+ assert.deepEqual(model.validateCloudAsset('effect_template',{kind:'effect_template',item:{id:'moving-particle',name:'나선 연기',recipe},blobs:[]}),{blobRefs:[]});
+ recipe.layers[0].params.pathDistance=4;invalid(()=>model.validateCloudWork(p));
+});
 test('rejects prototype keys and depth 65',()=>{
  for(const key of ['__proto__','constructor','prototype']){const p=work();p.extra=JSON.parse('{"'+key+'":{}}');invalid(()=>model.validateCloudWork(p));}
  const p=work();let cursor=p;for(let i=0;i<65;i++){cursor.extra={};cursor=cursor.extra;}invalid(()=>model.validateCloudWork(p));

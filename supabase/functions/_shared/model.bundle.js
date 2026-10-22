@@ -182,6 +182,16 @@ function validateSpriteControls(params = {}) {
   return problems2;
 }
 
+// src/model/particle-motion.js
+var PARTICLE_PATHS = [["natural", "\uAE30\uC874 \uC6C0\uC9C1\uC784"], ["straight", "\uC9C1\uC120"], ["fan", "\uBD80\uCC44\uAF34 \uD37C\uC9D0"], ["spiral", "\uBC14\uAE65\uC73C\uB85C \uB098\uC120"], ["vortex", "\uC548\uCABD\uC73C\uB85C \uC18C\uC6A9\uB3CC\uC774"], ["wave", "\uBB3C\uACB0 \uD754\uB4E4\uB9BC"], ["orbit", "\uC6D0 \uADA4\uB3C4"]];
+var number = (label, value, min, max, step) => ({ type: "number", label, value, min, max, step, optional: true, group: "\uC774\uB3D9 \uD328\uD134" });
+var PARTICLE_MOTION_FIELDS = {
+  motionPattern: { type: "select", label: "\uCD94\uAC00 \uC774\uB3D9 \uD328\uD134", value: "natural", options: PARTICLE_PATHS, optional: true, group: "\uC774\uB3D9 \uD328\uD134" },
+  pathDistance: number("\uD328\uD134 \uC774\uB3D9 \uAC70\uB9AC", 0.5, 0, 3, 0.05),
+  pathTurns: number("\uD328\uD134 \uD68C\uC804 \uC218", 1, -8, 8, 0.1),
+  pathAmplitude: number("\uBB3C\uACB0 \uC9C4\uD3ED", 0.15, 0, 2, 0.05)
+};
+
 // src/model/visual-effects.js
 var numeric2 = (label, value, min, max, step = 0.05, unit = "") => ({ type: "number", label, value, min, max, step, unit });
 var color = (label, value) => ({ type: "color", label, value });
@@ -286,6 +296,7 @@ var VISUAL_EFFECT_CATALOG = {
   vortex: { name: "\uC18C\uC6A9\uB3CC\uC774 \uC785\uC790", hint: "\uC785\uC790\uB4E4\uC774 \uB098\uC120 \uADA4\uC801\uC744 \uB530\uB77C \uD37C\uC9C0\uBA70 \uC0AC\uB77C\uC838\uC694.", placement: "behind", animated: true, generative: true, fields: particleFields({ "color": "#5466bb", "color2": "#b7a1dd", "count": 28, "size": 0.025, "travel": 0.4, "spread": 0.65, "life": 3.5, "direction": -90, "fade": 1.1, "spin": 0.65 }) },
   textWarp: { name: "\uAE00\uC790 \uD615\uD0DC \uC65C\uACE1", placement: "source", animated: false, textOnly: true, fields: { arc: numeric2("\uC544\uCE58", 0, -1, 1), wave: numeric2("\uBB3C\uACB0 \uB192\uC774", 0, 0, 1), wavelength: numeric2("\uBB3C\uACB0 \uAC04\uACA9", 0.5, 0.1, 2), skewDeg: numeric2("\uAE30\uC6B8\uC784", 0, -45, 45, 1, "\xB0"), scaleX: numeric2("\uAC00\uB85C \uBC30\uC728", 1, 0.25, 3), scaleY: numeric2("\uC138\uB85C \uBC30\uC728", 1, 0.25, 3) } }
 };
+for (const definition of Object.values(VISUAL_EFFECT_CATALOG)) if (definition.generative) Object.assign(definition.fields, PARTICLE_MOTION_FIELDS);
 var VISUAL_EFFECT_PRESETS = {
   fourPointStarlight: { name: "4\uAC01 \uBCC4\uBE5B \uBC18\uC9DD\uC784", category: "\uBE5B\xB7\uC6C0\uC9C1\uC784", layers: [{ kind: "starlight", placement: "front", emit: { face: "area", openOnly: false }, params: { color: "#86c9ff", coreColor: "#ffffff", count: 12, size: 0.1, stretch: 1.5, glow: 0.85, twinkle: 1, spin: 0.04, randomness: 0 } }] },
   radiantBloom: { name: "\uB208\uBD80\uC2E0 \uBE5B", category: "\uBE5B\xB7\uC6C0\uC9C1\uC784", layers: [{ kind: "gradient", scope: "inside", params: { color: "#fffbea", color2: "#ffbb68" } }, { kind: "outline", scope: "outside", opacity: 0.9, params: { color: "#79502b", width: 0.14 } }, { kind: "bloom", params: { threshold: 0.35, knee: 0.5, radius: 1.5, strength: 1.7, color: "#ffe6b0" } }] },
@@ -923,7 +934,7 @@ function createCard(kind, p) {
   return card;
 }
 var object5 = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
-var number = (v, min = -Infinity) => typeof v === "number" && Number.isFinite(v) && v >= min;
+var number2 = (v, min = -Infinity) => typeof v === "number" && Number.isFinite(v) && v >= min;
 var id4 = (v) => typeof v === "string" && v.length > 0 && v.length < 200 && !["__proto__", "constructor", "prototype"].includes(v);
 var dataUrl2 = (v, mime) => typeof v === "string" && v.startsWith("data:" + mime + ";base64,") && /^[A-Za-z0-9+/]+=*$/.test(v.slice(v.indexOf(",") + 1));
 function validateProject(p) {
@@ -947,7 +958,7 @@ function validateProject(p) {
     return errors;
   }
   for (const [key, label, unit] of [["cardWidthMm", "\uCE74\uB4DC \uD3ED", "mm"], ["cardHeightMm", "\uCE74\uB4DC \uB192\uC774", "mm"], ["maxWidthMm", "\uCD5C\uB300 \uCE74\uB4DC \uD3ED", "mm"], ["maxHeightMm", "\uCD5C\uB300 \uCE74\uB4DC \uB192\uC774", "mm"], ["minFontPt", "\uCD5C\uC18C \uAE00\uC790 \uD06C\uAE30", "pt"]])
-    if (!number(s[key], 0.01)) invalid("dimension", "", label, s[key], "0.01 " + unit + " \uC774\uC0C1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4");
+    if (!number2(s[key], 0.01)) invalid("dimension", "", label, s[key], "0.01 " + unit + " \uC774\uC0C1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4");
   if (s.cardWidthMm > s.maxWidthMm) invalid("max-size", "", "\uCE74\uB4DC \uD3ED", s.cardWidthMm, "\uC124\uC815\uD55C \uCD5C\uB300 \uD3ED " + valueLabel(s.maxWidthMm) + " mm \uC774\uD558\uC5EC\uC57C \uD569\uB2C8\uB2E4");
   if (s.cardHeightMm > s.maxHeightMm) invalid("max-size", "", "\uCE74\uB4DC \uB192\uC774", s.cardHeightMm, "\uC124\uC815\uD55C \uCD5C\uB300 \uB192\uC774 " + valueLabel(s.maxHeightMm) + " mm \uC774\uD558\uC5EC\uC57C \uD569\uB2C8\uB2E4");
   for (const rank of RANKS) {
@@ -956,8 +967,8 @@ function validateProject(p) {
       invalid("rank-rule", context, "\uCCB4\uB825 \uAE30\uC900", rule, "\uAE30\uBCF8 HP\uC640 HP \uC0C1\uD55C\uC774 \uC788\uB294 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4");
       continue;
     }
-    if (!number(rule.baseHp, 0)) invalid("rank-rule", context, "\uAE30\uBCF8 HP", rule.baseHp, "0 \uC774\uC0C1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4");
-    if (!(rule.hpCap === null || number(rule.hpCap, 0))) invalid("rank-rule", context, "HP \uC0C1\uD55C", rule.hpCap, "\uC81C\uD55C \uC5C6\uC74C\uC740 null, \uC0C1\uD55C\uC740 0 \uC774\uC0C1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4");
+    if (!number2(rule.baseHp, 0)) invalid("rank-rule", context, "\uAE30\uBCF8 HP", rule.baseHp, "0 \uC774\uC0C1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4");
+    if (!(rule.hpCap === null || number2(rule.hpCap, 0))) invalid("rank-rule", context, "HP \uC0C1\uD55C", rule.hpCap, "\uC81C\uD55C \uC5C6\uC74C\uC740 null, \uC0C1\uD55C\uC740 0 \uC774\uC0C1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4");
   }
   const print = p.print;
   if (!object5(print)) invalid("print-settings", "", "\uC778\uC1C4 \uC124\uC815", print, "\uC778\uC1C4 \uC124\uC815 \uAC1D\uCCB4\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4");
@@ -967,11 +978,11 @@ function validateProject(p) {
     for (const [key, label] of [["duplex", "\uC591\uBA74 \uC778\uC1C4"], ["cropMarks", "\uC7AC\uB2E8\uC120 \uD45C\uC2DC"]])
       if (typeof print[key] !== "boolean") invalid("print-settings", "\uC778\uC1C4", label, print[key], "true \uB610\uB294 false\uC5EC\uC57C \uD569\uB2C8\uB2E4");
     for (const [key, label] of [["marginMm", "\uC5EC\uBC31"], ["gapMm", "\uCE74\uB4DC \uAC04\uACA9"]])
-      if (!number(print[key], 0)) invalid("print-settings", "\uC778\uC1C4", label, print[key], "0 mm \uC774\uC0C1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4");
+      if (!number2(print[key], 0)) invalid("print-settings", "\uC778\uC1C4", label, print[key], "0 mm \uC774\uC0C1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4");
     for (const [key, label] of [["backOffsetXmm", "\uB4B7\uBA74 \uAC00\uB85C \uBCF4\uC815"], ["backOffsetYmm", "\uB4B7\uBA74 \uC138\uB85C \uBCF4\uC815"]])
-      if (!number(print[key])) invalid("print-settings", "\uC778\uC1C4", label, print[key], "mm \uB2E8\uC704\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4");
+      if (!number2(print[key])) invalid("print-settings", "\uC778\uC1C4", label, print[key], "mm \uB2E8\uC704\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4");
   }
-  if (print?.effectFrameSec !== void 0 && !number(print.effectFrameSec, 0)) invalid("effect-frame", "", "\uC778\uC1C4 \uC774\uD399\uD2B8 \uC7A5\uBA74 \uC2DC\uAC04", print.effectFrameSec, "0\uCD08 \uC774\uC0C1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4");
+  if (print?.effectFrameSec !== void 0 && !number2(print.effectFrameSec, 0)) invalid("effect-frame", "", "\uC778\uC1C4 \uC774\uD399\uD2B8 \uC7A5\uBA74 \uC2DC\uAC04", print.effectFrameSec, "0\uCD08 \uC774\uC0C1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4");
   let structureInvalid = false;
   for (const [valid, label, value, rule] of [[Array.isArray(p.cards), "\uCE74\uB4DC \uBAA9\uB85D", p.cards, "\uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4"], [object5(p.back), "\uACF5\uD1B5 \uB4B7\uBA74", p.back, "\uC694\uC18C \uBAA9\uB85D\uC744 \uAC00\uC9C4 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4"], [object5(p.back) && Array.isArray(p.back.elements), "\uACF5\uD1B5 \uB4B7\uBA74 \uC694\uC18C \uBAA9\uB85D", p.back?.elements, "\uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4"], [object5(p.assets), "\uADF8\uB9BC \uC790\uB8CC", p.assets, "\uADF8\uB9BC ID\uB97C \uD0A4\uB85C \uD558\uB294 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4"], [object5(p.paintings), "\uADF8\uB9BC \uC6D0\uBCF8", p.paintings, "\uC6D0\uBCF8 ID\uB97C \uD0A4\uB85C \uD558\uB294 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4"]])
     if (!valid) {
@@ -1128,7 +1139,7 @@ function validateProject(p) {
       if (e.locked !== void 0 && typeof e.locked !== "boolean") invalid("element-lock", context, "\uD3EC\uC778\uD130 \uC7A0\uAE08", e.locked, "true \uB610\uB294 false\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
       if (!object5(e.rect)) invalid("element", context, "\uC704\uCE58\xB7\uD06C\uAE30", e.rect, "x, y, w, h\uAC00 \uC788\uB294 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
       else for (const [key, label, min] of [["x", "\uAC00\uB85C \uC704\uCE58", -Infinity], ["y", "\uC138\uB85C \uC704\uCE58", -Infinity], ["w", "\uD3ED", 0.01], ["h", "\uB192\uC774", 0.01]])
-        if (!number(e.rect[key], min)) invalid("element", context, label, e.rect[key], min === -Infinity ? "mm \uB2E8\uC704\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4" : "0.01 mm \uC774\uC0C1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
+        if (!number2(e.rect[key], min)) invalid("element", context, label, e.rect[key], min === -Infinity ? "mm \uB2E8\uC704\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4" : "0.01 mm \uC774\uC0C1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
       if (!object5(e.style)) invalid("element", context, "\uC2A4\uD0C0\uC77C", e.style, "\uC2A4\uD0C0\uC77C \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
       if (e.style?.visualEffects !== void 0) {
         if (!["text", "image", "effect"].includes(e.type)) invalid("visual-effect-target", context, "\uC774\uD399\uD2B8 \uB300\uC0C1 \uC885\uB958", e.type, "text, image, effect \uC694\uC18C\uC5D0\uB9CC \uC774\uD399\uD2B8\uB97C \uC801\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4", extra);
@@ -1184,8 +1195,8 @@ function validateProject(p) {
     }
     if (card.kind === "monster") {
       if (!RANKS.includes(card.rank)) invalid("monster-info", context, "\uB4F1\uAE09", card.rank, RANKS.join(", ") + " \uC911 \uD558\uB098\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
-      if (!number(card.baseHp, 0)) invalid("monster-info", context, "\uAE30\uBCF8 HP", card.baseHp, "0 \uC774\uC0C1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
-      if (!number(card.hpReduction, 0)) invalid("monster-info", context, "HP \uCC28\uAC10\uB7C9", card.hpReduction, "0 \uC774\uC0C1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
+      if (!number2(card.baseHp, 0)) invalid("monster-info", context, "\uAE30\uBCF8 HP", card.baseHp, "0 \uC774\uC0C1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
+      if (!number2(card.hpReduction, 0)) invalid("monster-info", context, "HP \uCC28\uAC10\uB7C9", card.hpReduction, "0 \uC774\uC0C1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
       if (card.hpReduction > card.baseHp) invalid("monster-info", context, "HP \uCC28\uAC10\uB7C9", card.hpReduction, "\uAE30\uBCF8 HP " + valueLabel(card.baseHp) + " \uC774\uD558\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
       for (const [field, kind] of [["passives", "\uD328\uC2DC\uBE0C"], ["actives", "\uC561\uD2F0\uBE0C"]]) {
         const skills = card[field];
@@ -1270,7 +1281,7 @@ function validateProject(p) {
       if (typeof layer.name !== "string") invalid("layer", location, "\uC774\uB984", layer.name, "\uBB38\uC790\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4", detail);
       if (typeof layer.visible !== "boolean") invalid("layer", location, "\uD45C\uC2DC \uC124\uC815", layer.visible, "true \uB610\uB294 false\uC5EC\uC57C \uD569\uB2C8\uB2E4", detail);
       if (typeof layer.locked !== "boolean") invalid("layer", location, "\uC7A0\uAE08 \uC124\uC815", layer.locked, "true \uB610\uB294 false\uC5EC\uC57C \uD569\uB2C8\uB2E4", detail);
-      if (!number(layer.opacity, 0) || layer.opacity > 1) invalid("layer", location, "\uBD88\uD22C\uBA85\uB3C4", layer.opacity, "0~1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4", detail);
+      if (!number2(layer.opacity, 0) || layer.opacity > 1) invalid("layer", location, "\uBD88\uD22C\uBA85\uB3C4", layer.opacity, "0~1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4", detail);
       if (layer.blendMode !== void 0 && !isBlendMode(layer.blendMode)) invalid("layer", location, "\uD63C\uD569 \uBAA8\uB4DC", layer.blendMode, "\uC9C0\uC6D0\uD558\uB294 26\uAC1C \uB808\uC774\uC5B4 \uD63C\uD569 \uBAA8\uB4DC \uC911 \uD558\uB098\uC5EC\uC57C \uD569\uB2C8\uB2E4. \uC774\uC804 \uD30C\uC77C\uC740 \uC0DD\uB7B5\uD558\uBA74 \uC77C\uBC18(source-over)\uC73C\uB85C \uD45C\uC2DC\uD569\uB2C8\uB2E4", detail);
       if (!dataUrl2(layer.png, "image/png")) invalid("layer", location, "\uD53D\uC140 \uB370\uC774\uD130", layer.png, "image/png \uD615\uC2DD\uC758 base64 \uB370\uC774\uD130 URL\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4", detail);
       layerIds.add(layer.id);
