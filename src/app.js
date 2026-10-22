@@ -39,6 +39,7 @@ import {createBlobStore} from './cloud/blobs.js';
 import {createCloudSession} from './cloud/session.js';
 import {createCloudAccountControls} from './ui/cloud-account.js';
 import {createCloudAssetControls} from './ui/cloud-assets.js';
+import {createCloudCardUpload} from './ui/cloud-card-upload.js';
 import {openCloudImport} from './ui/cloud-import.js';
 
 export function mountEditor(root,store,{cloudClient=createCloudClient()}={}){
@@ -131,6 +132,7 @@ export function mountEditor(root,store,{cloudClient=createCloudClient()}={}){
  const cloudAccount=createCloudAccountControls(ctx,{client:cloudClient,session:cloudSession});
  Object.assign(ctx,{cloudSession,cloudAccount,cloudBlobs,workspaceFiles,assetLibrary});
  const cloudAssetControls=createCloudAssetControls(ctx,{client:cloudClient,blobs:cloudBlobs,account:cloudAccount,assetLibrary});
+ const cloudCardUpload=createCloudCardUpload(ctx,{client:cloudClient,blobs:cloudBlobs,account:cloudAccount});
  ctx.openCloudImport=()=>{ctx.closeCloudPanel?.();return openCloudImport(ctx,{client:cloudClient,blobs:cloudBlobs,workspace:ctx.workspaceFiles.storage,assetLibrary:ctx.assetLibrary});};
  ctx.canExport=()=>!viewingPublic||cloudAccount.canWrite();
  ctx.canApplyLibraryAsset=()=>!viewingPublic;
@@ -190,6 +192,7 @@ export function mountEditor(root,store,{cloudClient=createCloudClient()}={}){
    state.activeCardId=c.id;state.back=false;setElementSelection(state,[]);ctx.edit('카드 복제',d=>d.cards.push(c));
   },{id:'duplicate-card'}),button('카드 삭제',()=>{const id=state.activeCardId;ctx.edit('카드 삭제',d=>{d.cards=d.cards.filter(c=>c.id!==id);});setElementSelection(state,[]);refresh();},{id:'delete-card',class:'danger'})),
   el('div',{class:'library-bottom'},button('카드만 저장',()=>cardFiles.save(),{id:'save-card','data-cloud-export':true}),button('카드 불러오기',()=>cardFiles.open(),{id:'load-card'})),
+  el('div',{class:'library-bottom'},cloudCardUpload.selected,cloudCardUpload.json),
   el('div',{class:'library-note'},'그림 원본과 레이어까지\n프로젝트 파일 하나에 담아요.'));
  const cardTab=button('카드 편집',()=>{state.mode='card';refresh();},{id:'card-tab'});
  const paperTab=button('A4 용지 보기',()=>{state.mode='paper';refresh();},{id:'paper-tab'});
@@ -218,7 +221,7 @@ export function mountEditor(root,store,{cloudClient=createCloudClient()}={}){
  const center=el('main',{class:'workspace'},el('nav',{class:'workspace-tabs'},el('div',{class:'tab-group'},cardTab,paperTab),el('div',{class:'tab-group'},frontTab,backTab)),cardArea,paperRoot);
  const inspector=el('aside',{id:'inspector',class:'inspector'});
  const message=el('div',{id:'message',hidden:true,role:'alert',class:'message'},el('span',{}),button('×',()=>message.hidden=true,{'aria-label':'메시지 닫기'}));
- root.append(top,el('div',{id:'library-account-home',hidden:true},cloudAccount.node),recovery.notice,el('div',{class:'workspace-grid'},sidebar,center,inspector),message,projectFile,artFile,cardFiles.input);
+ root.append(top,el('div',{id:'library-account-home',hidden:true},cloudAccount.node),recovery.notice,el('div',{class:'workspace-grid'},sidebar,center,inspector),message,projectFile,artFile,cardFiles.input,cloudCardUpload.input);
  const cardCanvas=mountCardCanvas(canvasHost,ctx);ctx.cardCanvas=cardCanvas;ctx.paperRoot=paperRoot;
  const paperView=mountPaperView(paperRoot,store);ctx.onPaper=()=>{if(state.mode==='paper')paperView.refresh();};
  let phoneFitted=false;
@@ -268,7 +271,7 @@ export function mountEditor(root,store,{cloudClient=createCloudClient()}={}){
  const unload=event=>{if(store.isDirty()||document.querySelector('[data-paint-dirty="true"],[data-effect-dirty="true"]')){event.preventDefault();event.returnValue='';}};
  window.addEventListener('keydown',key);window.addEventListener('beforeunload',unload);
  refresh();root.dataset.ready='true';updates.checkAtStartup();
- return Object.assign(ctx,{getActiveCardId:()=>state.activeCardId,destroy(){ctx.closeCloudImport?.();ctx.closeCloudPanel?.();cloudAssetControls.destroy();stopCloudView();root.removeEventListener('click',readonlyClick,true);Object.assign(store,originalMutations);cloudAccount.destroy();cloudSession.dispose();cancelAnimationFrame(phoneFitFrame);mobileWorkspace.destroy();assetLibrary.destroy();recovery.destroy();cardTemplates.destroy();cardLibrary.destroy();updates.destroy();fileDrop.destroy();cardFiles.destroy();workspaceFiles.destroy();ctx.closeVisualEffects?.({force:true});ctx.closeKeywords?.();unsubscribe();window.removeEventListener('keydown',key);window.removeEventListener('beforeunload',unload);cardCanvas.destroy();paperView.destroy();root.replaceChildren();}});
+ return Object.assign(ctx,{getActiveCardId:()=>state.activeCardId,destroy(){ctx.closeCloudImport?.();ctx.closeCloudPanel?.();cloudCardUpload.destroy();cloudAssetControls.destroy();stopCloudView();root.removeEventListener('click',readonlyClick,true);Object.assign(store,originalMutations);cloudAccount.destroy();cloudSession.dispose();cancelAnimationFrame(phoneFitFrame);mobileWorkspace.destroy();assetLibrary.destroy();recovery.destroy();cardTemplates.destroy();cardLibrary.destroy();updates.destroy();fileDrop.destroy();cardFiles.destroy();workspaceFiles.destroy();ctx.closeVisualEffects?.({force:true});ctx.closeKeywords?.();unsubscribe();window.removeEventListener('keydown',key);window.removeEventListener('beforeunload',unload);cardCanvas.destroy();paperView.destroy();root.replaceChildren();}});
 }
 async function boot(){const root=document.getElementById('app');if(!root)return;try{await ensureFont();const p=createProject();p.cards[0]=applyTemplate(p.cards[0],p.settings,'monster-standard');mountEditor(root,createStore(p,{prepare:d=>{d.cards=d.cards.map(c=>c.variant&&c.autoSkillLayout?syncSkillElements(c,d.settings,d.keywords||[]):c);}}));}catch(e){root.textContent='작업실을 열지 못했어요: '+e.message;}}
 boot();

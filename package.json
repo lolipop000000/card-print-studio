@@ -1,6 +1,6 @@
 {
   "name": "card-print-studio",
-  "version": "1.6.4",
+  "version": "1.6.5",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,6 +12,7 @@
     "build": "node scripts/build.mjs",
     "build:server": "node scripts/build-server-model.mjs",
     "verify": "node scripts/verify.mjs",
+    "verify:cloud": "node scripts/verify.mjs --profile cloud",
     "verify:effects": "node scripts/verify.mjs --profile effects",
     "verify:print": "node scripts/verify.mjs --profile print",
     "verify:full": "node scripts/verify.mjs --profile full"

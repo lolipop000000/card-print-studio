@@ -9,13 +9,14 @@ const ROOT=fileURLToPath(new URL('../',import.meta.url));
 const core=['offline','updates'];
 const profiles={
  quick:core,
+ cloud:[...core,'cloud-card-upload','cloud-account','cloud-panel','cloud-import','library-hub','shared-assets','mobile-layout'],
  effects:[...core,'preview-settings','mobile-layout','visual-effects-card','visual-effects-history','effect-selected-playback','effect-playback-cache','effects-gpu','starlight','particle-emission-render','particle-emission-ui','particle-emitter-ui','painting-usability','visual-effects-print'],
  print:[...core,'native-print-app','browser-print','visual-effects-print','printing-tolerant','sprite-customization-print'],
  full:null
 };
 
 export function selectTests(files,profile){
- if(!Object.hasOwn(profiles,profile))throw Error('알 수 없는 검사 종류: '+profile+' (quick / effects / print / full)');
+ if(!Object.hasOwn(profiles,profile))throw Error('알 수 없는 검사 종류: '+profile+' (quick / cloud / effects / print / full)');
  const units=files.filter(f=>f.endsWith('.test.mjs'));
  const browser=profiles[profile]?.map(name=>'tests/'+name+'.spec.mjs')??files.filter(f=>f.endsWith('.spec.mjs'));
  for(const file of browser)if(!files.includes(file))throw Error('필수 검사 파일이 없습니다: '+file);
@@ -159,7 +160,7 @@ export async function runVerification({root=ROOT,profile='quick',timeoutMs=profi
 
 async function main(){
  const args=process.argv.slice(2);
- if(args.includes('--help')){console.log('node scripts/verify.mjs [--profile quick|effects|print|full] [--list]\n빌드 → 버전 일치 → 순차 검사 → 요약/상세 로그 저장. 배포와 개인 파일 수정은 하지 않습니다.');return;}
+ if(args.includes('--help')){console.log('node scripts/verify.mjs [--profile quick|cloud|effects|print|full] [--list]\n빌드 → 버전 일치 → 순차 검사 → 요약/상세 로그 저장. 배포와 개인 파일 수정은 하지 않습니다.');return;}
  let profile='quick';
  for(let i=0;i<args.length;i++){
   if(args[i]==='--profile'&&args[i+1])profile=args[++i];else if(args[i]!=='--list')throw Error('알 수 없는 인수: '+args[i]);

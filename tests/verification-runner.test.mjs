@@ -42,6 +42,12 @@ test('effects profile covers the replacement duration and DPI controls using exi
  for(const name of ['painting-usability','effects-gpu','effect-playback-cache','visual-effects-print'])assert.ok(selected.includes('tests/'+name+'.spec.mjs'));
 });
 
+test('cloud profile repeats upload, account, library and local-save checks without unrelated effect rendering',async()=>{
+ const {selectTests}=await api(),files=(await readdir(new URL('.',import.meta.url))).map(name=>'tests/'+name),selected=selectTests(files,'cloud');
+ for(const name of ['offline','updates','cloud-card-upload','cloud-account','cloud-panel','cloud-import','library-hub','shared-assets','mobile-layout'])assert.ok(selected.includes('tests/'+name+'.spec.mjs'));
+ assert.ok(selected.includes('tests/card-file.test.mjs'));assert.ok(!selected.includes('tests/visual-effects-print.spec.mjs'));assert.equal(new Set(selected).size,selected.length);
+});
+
 test('a green report requires completed tests with no failures, skips, cancellations or todo',async()=>{
  const {summarizeTests}=await api();
  const tap='# tests 2\n# pass 2\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n';
