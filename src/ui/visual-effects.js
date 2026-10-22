@@ -168,6 +168,8 @@ export function openVisualEffectsEditor(ctx,initialTarget,{onApply,applyLabel='�
   // A destination may disappear independently while the library dialog is open.
   try{readTargetEffects(ctx.store.getProject(),draft.target);}catch{return message('그림을 고르는 동안 대상이 삭제되어 이미지를 붙이지 않았어요. 사용할 대상에서 다시 선택하세요.');}
   if(image.naturalWidth!==asset.width||image.naturalHeight!==asset.height)throw new Error('선택한 그림의 크기가 맞지 않습니다. 보관함에 원본을 다시 가져오세요.');
+  // Share identical image bytes across layers and repeated library imports.
+  asset=[...Object.values(ctx.store.getProject().assets),...stagedAssets.values()].find(existing=>existing.mime===asset.mime&&existing.width===asset.width&&existing.height===asset.height&&existing.dataUrl===asset.dataUrl)??asset;
   stagedAssets.set(asset.id,asset);stagedImages.set(asset.id,image);assetNames.set(asset.id,name);
   editDraft(()=>{
    const next=clone(draftRecipe),layer=next.layers.find(l=>l.id===destination.layerId);Object.assign(layer.params,spritePatch,{assetId:asset.id,shape:'image'});

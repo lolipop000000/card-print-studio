@@ -119,7 +119,7 @@ function lifetime(time,life,index,count,randomness,random){
 }
 
 /** Draw independent sprite lifetimes or one decoration in millimetre coordinates. */
-export function drawSpriteEmitter(ctx,layer,{time=1.2,height,point,random,include,image,center}){
+export function drawSpriteEmitter(ctx,layer,{time=1.2,height,point,random,include,image,center,lifetimes=null}){
  if(layer.kind!=='sprite')return false;
  const p=layer.params??{},shape=shapes.has(p.shape)?p.shape:'star',h=Math.max(.01,Number.isFinite(height)?height:.01),single=p.renderMode==='single';
  const width=image&&(image.naturalWidth||image.width),imageHeight=image&&(image.naturalHeight||image.height);
@@ -134,17 +134,18 @@ export function drawSpriteEmitter(ctx,layer,{time=1.2,height,point,random,includ
  if(single){
   const origin=Number.isFinite(center?.x)&&Number.isFinite(center?.y)?center:point?.(0,0,'sprite-even');
   if(origin&&alphaStart>.00001&&startSize>0)particles.push({...decorationSprite(layer,h,t,origin),fill:fixedColor});
- }else for(let index=0;index<count;index++){
-  const lifeState=lifetime(t,life,index,count,randomness,random),{cycle,age,phase}=lifeState;
-  const alpha=mix(alphaStart,alphaEnd,phase)*(fadeIn?smooth(phase/fadeIn):1)*(fadeOut?smooth((1-phase)/fadeOut):1),radius=mix(startSize,endSize,phase);
+ }else for(const state of lifetimes??Array.from({length:count},(_,index)=>({index,...lifetime(t,life,index,count,randomness,random),sizeScale:1}))){
+  const {index,cycle,age,phase}=state;
+  const alpha=state.alpha??mix(alphaStart,alphaEnd,phase)*(fadeIn?smooth(phase/fadeIn):1)*(fadeOut?smooth((1-phase)/fadeOut):1),radius=mix(startSize,endSize,phase)*state.sizeScale;
   if(alpha<=.00001||radius<=0)continue;
-  const origin=point(index,randomness?cycle:0,randomness?'emit':'sprite-even');if(!origin)continue;
+  const origin=point(index,lifetimes?cycle:randomness?cycle:0,randomness?'emit':'sprite-even');if(!origin)continue;
   const salt=cycle+':sprite:',variation=name=>(random(index,salt+name)-.5)*randomness;
-  const heading=direction+mix(count>1?index/(count-1)-.5:0,random(index,salt+'heading')-.5,randomness)*spread*Math.PI,dx=Math.cos(heading),dy=Math.sin(heading);
+  const slot=state.slot??index,total=state.count??count;
+  const heading=direction+mix(total>1?slot/(total-1)-.5:0,random(index,salt+'heading')-.5,randomness)*spread*Math.PI,dx=Math.cos(heading),dy=Math.sin(heading);
   const distance=travel*phase*(1+variation('travel')*.5),sway=drift*.2*Math.sin(phase*TAU+variation('drift')*TAU)*Math.sin(phase*Math.PI);
   particles.push({index,cycle,phase,age,alpha,radius,x:origin.x+dx*distance-dy*sway,y:origin.y+dy*distance+dx*sway+gravity*age*age*.5,angle:rotation+variation('rotation')*TAU+spin*TAU*age,fill:lifetimeColor(first,last,phase)});
  }
- particles.sort((a,b)=>b.phase-a.phase);
+ if(!lifetimes)particles.sort((a,b)=>b.phase-a.phase);
  ctx.save();
  try{
   ctx.lineCap='round';ctx.lineJoin='round';ctx.setLineDash([]);ctx.lineDashOffset=0;ctx.shadowBlur=0;ctx.shadowOffsetX=0;ctx.shadowOffsetY=0;ctx.filter='none';

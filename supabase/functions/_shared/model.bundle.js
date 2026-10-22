@@ -192,6 +192,68 @@ var PARTICLE_MOTION_FIELDS = {
   pathAmplitude: number("\uBB3C\uACB0 \uC9C4\uD3ED", 0.15, 0, 2, 0.05)
 };
 
+// src/model/particle-emission.js
+var finite = (value, min, max) => Number.isFinite(value) && value >= min && value <= max;
+var object2 = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+var EPS = 1e-8;
+function validateParticleEmission(value) {
+  const errors = [];
+  const shape = (item, allowed, label) => {
+    if (!object2(item)) {
+      errors.push(label + "\uC740 \uC124\uC815\uC744 \uB2F4\uC740 \uAC1D\uCCB4\uC5EC\uC57C \uD574\uC694.");
+      return false;
+    }
+    for (const key of Object.keys(item)) if (!allowed.includes(key)) errors.push(label + "\uC5D0 \uC9C0\uC6D0\uD558\uC9C0 \uC54A\uB294 \uD56D\uBAA9 \u201C" + key + "\u201D\uC774 \uC788\uC5B4\uC694.");
+    return true;
+  };
+  const num = (item, key, label, min, max, integer = false) => {
+    if (!finite(item[key], min, max) || integer && !Number.isInteger(item[key])) errors.push(label + " \uAC12 " + String(item[key]) + "\uC740 " + min + "~" + max + (integer ? " \uC0AC\uC774\uC758 \uC815\uC218" : " \uC0AC\uC774\uC758 \uC218") + "\uC5EC\uC57C \uD574\uC694.");
+  };
+  if (!shape(value, ["delay", "duration", "loops", "loopDelay", "prewarm", "rate", "rateCurve", "lifeMin", "lifeMax", "maxAlive", "bursts", "sizeCurve", "alphaCurve", "drawOrder"], "\uC785\uC790 \uC0DD\uC131 \uC124\uC815")) return errors;
+  if (value.drawOrder !== void 0 && !["newerFront", "olderFront"].includes(value.drawOrder)) errors.push("\uC785\uC790 \uACB9\uCE68 \uC21C\uC11C\uB294 \uC0C8 \uC785\uC790 \uC704 \uB610\uB294 \uC624\uB798\uB41C \uC785\uC790 \uC704\uB85C \uC124\uC815\uD558\uC138\uC694.");
+  for (const [key, label, min, max, integer] of [["delay", "\uC2DC\uC791 \uC9C0\uC5F0", 0, 60], ["duration", "\uC0DD\uC131 \uC9C0\uC18D \uC2DC\uAC04", 0.05, 60], ["loops", "\uC804\uCCB4 \uBC18\uBCF5 \uD69F\uC218", 0, 1e3, true], ["loopDelay", "\uBC18\uBCF5 \uC0AC\uC774 \uD734\uC2DD", 0, 60], ["prewarm", "\uBBF8\uB9AC \uCC44\uC6B0\uAE30 \uC2DC\uAC04", 0, 30], ["rate", "\uCD08\uB2F9 \uC0DD\uC131\uB7C9", 0, 500], ["lifeMin", "\uCD5C\uC18C \uC785\uC790 \uC218\uBA85", 0.05, 30], ["lifeMax", "\uCD5C\uB300 \uC785\uC790 \uC218\uBA85", 0.05, 30], ["maxAlive", "\uB3D9\uC2DC \uD45C\uC2DC \uD55C\uB3C4", 1, 1024, true]]) num(value, key, label, min, max, integer);
+  if (value.lifeMin > value.lifeMax) errors.push("\uCD5C\uC18C \uC785\uC790 \uC218\uBA85\uC740 \uCD5C\uB300 \uC785\uC790 \uC218\uBA85\uBCF4\uB2E4 \uD074 \uC218 \uC5C6\uC5B4\uC694.");
+  for (const [key, label, max] of [["sizeCurve", "\uC218\uBA85\uBCC4 \uD06C\uAE30 \uACE1\uC120", 8], ["alphaCurve", "\uC218\uBA85\uBCC4 \uBD88\uD22C\uBA85\uB3C4 \uACE1\uC120", 1]]) {
+    if (value[key] === void 0) continue;
+    const curve = value[key];
+    if (!Array.isArray(curve) || curve.length < 2 || curve.length > 16) {
+      errors.push(label + "\uC740 2~16\uAC1C\uC758 \uC810\uC73C\uB85C \uC124\uC815\uD558\uC138\uC694.");
+      continue;
+    }
+    let previous = -1;
+    for (const point of curve) {
+      if (!shape(point, ["at", "value"], label)) continue;
+      num(point, "at", label + " \uC2DC\uC810", 0, 1);
+      num(point, "value", label + " \uAC12", 0, max);
+      if (point.at <= previous) errors.push(label + "\uC758 \uC2DC\uC810\uC740 \uC911\uBCF5 \uC5C6\uC774 \uC55E\uC5D0\uC11C \uB4A4 \uC21C\uC11C\uC5EC\uC57C \uD574\uC694.");
+      previous = point.at;
+    }
+    if (curve[0]?.at !== 0 || curve.at(-1)?.at !== 1) errors.push(label + "\uC5D0\uB294 \uC2DC\uC791(0)\uACFC \uB05D(1) \uC9C0\uC810\uC774 \uD544\uC694\uD574\uC694.");
+  }
+  if (!Array.isArray(value.rateCurve) || value.rateCurve.length > 16 || value.rateCurve.length === 1) errors.push("\uC0DD\uC131\uB960 \uACE1\uC120\uC740 \uBE44\uC6B0\uAC70\uB098 2~16\uAC1C\uC758 \uC810\uC73C\uB85C \uC124\uC815\uD558\uC138\uC694.");
+  else if (value.rateCurve.length) {
+    let previous = -1;
+    for (const point of value.rateCurve) {
+      if (!shape(point, ["at", "rate"], "\uC0DD\uC131\uB960 \uACE1\uC120 \uC810")) continue;
+      num(point, "at", "\uACE1\uC120 \uC2DC\uC810", 0, 1);
+      num(point, "rate", "\uACE1\uC120 \uCD08\uB2F9 \uC0DD\uC131\uB7C9", 0, 500);
+      if (point.at <= previous) errors.push("\uC0DD\uC131\uB960 \uACE1\uC120\uC758 \uC2DC\uC810\uC740 \uC911\uBCF5 \uC5C6\uC774 \uC55E\uC5D0\uC11C \uB4A4 \uC21C\uC11C\uC5EC\uC57C \uD574\uC694.");
+      previous = point.at;
+    }
+    if (value.rateCurve[0]?.at !== 0 || value.rateCurve.at(-1)?.at !== 1) errors.push("\uC0DD\uC131\uB960 \uACE1\uC120\uC5D0\uB294 \uC2DC\uC791(0)\uACFC \uB05D(1) \uC9C0\uC810\uC774 \uD544\uC694\uD574\uC694.");
+  }
+  if (!Array.isArray(value.bursts) || value.bursts.length > 32) errors.push("Burst \uC2DC\uAC04\uD45C\uB294 \uCD5C\uB300 32\uAC1C\uAE4C\uC9C0 \uCD94\uAC00\uD560 \uC218 \uC788\uC5B4\uC694.");
+  else for (const [index, burst] of value.bursts.entries()) {
+    const label = "Burst " + (index + 1) + " \xB7 ";
+    if (!shape(burst, ["time", "countMin", "countMax", "cycles", "interval", "probability"], label)) continue;
+    for (const [key, name, min, max, integer] of [["time", "\uBC1C\uC0DD \uC2DC\uC810", 0, value.duration], ["countMin", "\uCD5C\uC18C \uC0DD\uC131\uB7C9", 1, 1024, true], ["countMax", "\uCD5C\uB300 \uC0DD\uC131\uB7C9", 1, 1024, true], ["cycles", "\uBC18\uBCF5 \uD69F\uC218", 1, 1e3, true], ["interval", "\uBC18\uBCF5 \uAC04\uACA9", 0, 60], ["probability", "\uBC1C\uC0DD \uD655\uB960", 0, 1]]) num(burst, key, label + name, min, max, integer);
+    if (burst.countMin > burst.countMax) errors.push(label + "\uCD5C\uC18C \uC0DD\uC131\uB7C9\uC740 \uCD5C\uB300 \uC0DD\uC131\uB7C9\uBCF4\uB2E4 \uD074 \uC218 \uC5C6\uC5B4\uC694.");
+    if (burst.cycles > 1 && burst.interval <= 0) errors.push(label + "\uC5EC\uB7EC \uBC88 \uBC18\uBCF5\uD560 \uB54C\uB294 \uBC18\uBCF5 \uAC04\uACA9\uC744 0\uCD08\uBCF4\uB2E4 \uD06C\uAC8C \uC124\uC815\uD558\uC138\uC694.");
+    if (burst.time + (burst.cycles - 1) * burst.interval > value.duration + EPS) errors.push(label + "\uB9C8\uC9C0\uB9C9 \uBC18\uBCF5 \uC2DC\uC810\uC774 \uC0DD\uC131 \uC9C0\uC18D \uC2DC\uAC04 " + value.duration + "\uCD08\uB97C \uB118\uC5B4\uC694.");
+  }
+  return errors;
+}
+
 // src/model/visual-effects.js
 var numeric2 = (label, value, min, max, step = 0.05, unit = "") => ({ type: "number", label, value, min, max, step, unit });
 var color = (label, value) => ({ type: "color", label, value });
@@ -449,7 +511,7 @@ var VISUAL_EFFECT_PRESETS = {
     { kind: "glow", scope: "outside", params: { color: "#d2afec", radius: 0.75, strength: 0.2 }, motion: { enabled: false } }
   ] }
 };
-var object2 = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+var object3 = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 var safe = (k) => !["__proto__", "constructor", "prototype"].includes(k);
 var validId = (v) => typeof v === "string" && v.length > 0 && v.length < 200 && safe(v);
 var bounded = (v, min, max) => typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
@@ -480,14 +542,14 @@ function validateRecipe(value, target, legacy) {
     if (typeof v !== "boolean") bad(label + " \uAC12 " + valueLabel(v) + "\uC740 \uCF1C\uC9D0/\uAEBC\uC9D0 \uAC12\uC774 \uC544\uB2D9\uB2C8\uB2E4.");
   };
   const shapeKeys = (v, allowed, label) => {
-    if (!object2(v)) {
+    if (!object3(v)) {
       bad(label + "\uC774 \uD56D\uBAA9\uC744 \uB2F4\uC740 \uAC1D\uCCB4\uAC00 \uC544\uB2D9\uB2C8\uB2E4. \uD604\uC7AC \uAC12: " + valueLabel(v) + ".");
       return false;
     }
     for (const key of Object.keys(v)) if (!allowed.includes(key)) bad(label + "\uC5D0 \uC9C0\uC6D0\uD558\uC9C0 \uC54A\uB294 \uD56D\uBAA9 " + valueLabel(key) + "\uC774 \uC788\uC2B5\uB2C8\uB2E4.");
     return true;
   };
-  if (!object2(value)) {
+  if (!object3(value)) {
     bad("\uC774\uD399\uD2B8 \uC870\uD569\uC774 \uAC1D\uCCB4\uAC00 \uC544\uB2D9\uB2C8\uB2E4. \uD604\uC7AC \uAC12: " + valueLabel(value) + ".");
     return problems2;
   }
@@ -528,7 +590,7 @@ function validateRecipe(value, target, legacy) {
   const ids = /* @__PURE__ */ new Set();
   let warps = 0;
   for (const [index, layer] of value.layers.entries()) {
-    const definition = object2(layer) && definitionFor(layer.kind);
+    const definition = object3(layer) && definitionFor(layer.kind);
     context = index + 1 + "\uBC88 \uB808\uC774\uC5B4" + (definition ? " \xB7 " + definition.name : "") + ": ";
     if (!definition || legacy && !legacyKinds.has(layer.kind)) {
       bad("\uC9C0\uC6D0\uD558\uC9C0 \uC54A\uB294 \uD6A8\uACFC \uC885\uB958 " + valueLabel(layer?.kind) + "\uC785\uB2C8\uB2E4.");
@@ -538,8 +600,9 @@ function validateRecipe(value, target, legacy) {
     else if (ids.has(layer.id)) bad("\uB808\uC774\uC5B4 ID " + valueLabel(layer.id) + "\uC774 \uC55E\uC120 \uB808\uC774\uC5B4\uC640 \uC911\uBCF5\uB429\uB2C8\uB2E4.");
     ids.add(layer.id);
     const common = ["id", "kind", "enabled", "opacity", "params", "motion", "blendMode"];
-    const specific = legacy ? ["placement", "emitter", "rotationDeg", "origin"] : ["protectText", ...definition.generative ? ["placement", "emit", "rotationDeg", "origin"] : definition.textOnly ? ["placement"] : ["scope"]];
+    const specific = legacy ? ["placement", "emitter", "rotationDeg", "origin"] : ["protectText", ...definition.generative ? ["placement", "emit", "rotationDeg", "origin", "emission"] : definition.textOnly ? ["placement"] : ["scope"]];
     shapeKeys(layer, [...common, ...specific], "\uB808\uC774\uC5B4");
+    if (!legacy && definition.generative && layer.emission !== void 0) for (const message of validateParticleEmission(layer.emission)) bad(message);
     boolValue("\uB808\uC774\uC5B4 \uC0AC\uC6A9", layer.enabled);
     numericValue("\uBD88\uD22C\uBA85\uB3C4", layer.opacity, 0, 1);
     if (Object.hasOwn(layer, "blendMode")) {
@@ -567,7 +630,7 @@ function validateRecipe(value, target, legacy) {
     } else if (legacy) choiceValue("\uC55E\uB4A4 \uBC30\uCE58", layer.placement, ["behind", "surface", "front"]);
     else if (definition.generative) choiceValue("\uC55E\uB4A4 \uBC30\uCE58", layer.placement, ["behind", "front"]);
     else choiceValue("\uD544\uD130 \uC801\uC6A9 \uBC94\uC704", layer.scope, ["all", "inside", "outside"]);
-    if (!object2(layer.params)) {
+    if (!object3(layer.params)) {
       bad("\uC870\uC808 \uD56D\uBAA9\uC774 \uAC1D\uCCB4\uAC00 \uC544\uB2D9\uB2C8\uB2E4. \uD604\uC7AC \uAC12: " + valueLabel(layer.params) + ".");
       continue;
     }
@@ -588,30 +651,30 @@ function validateRecipe(value, target, legacy) {
   return problems2;
 }
 function validateVisualEffects(value, target = "any") {
-  return validateRecipe(value, target, object2(value) && !Object.hasOwn(value, "version"));
+  return validateRecipe(value, target, object3(value) && !Object.hasOwn(value, "version"));
 }
 
 // src/model/variants.js
 var VARIANT_FIELDS = ["name", "attribute", "attributes", "rank", "baseHp", "hpReduction", "artAssetId", "passives", "actives", "effect", "keywords", "nameKeywords", "textRanges", "template", "autoSkillLayout", "elements", "visualEffects"];
-var object3 = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+var object4 = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 var safe2 = (k) => !["__proto__", "constructor", "prototype"].includes(k);
 var id2 = (k) => typeof k === "string" && k.length > 0 && k.length < 200 && safe2(k);
-var keyed = (a) => Array.isArray(a) && a.every((v) => object3(v) && id2(v.id));
+var keyed = (a) => Array.isArray(a) && a.every((v) => object4(v) && id2(v.id));
 function validJson(value, depth = 0) {
   if (depth > 40) return false;
   if (value === null || ["string", "boolean"].includes(typeof value)) return true;
   if (typeof value === "number") return Number.isFinite(value);
   if (Array.isArray(value)) return value.every((v) => validJson(v, depth + 1));
-  return object3(value) && Object.entries(value).every(([k, v]) => safe2(k) && validJson(v, depth + 1));
+  return object4(value) && Object.entries(value).every(([k, v]) => safe2(k) && validJson(v, depth + 1));
 }
 function validPatch(patch, depth = 0) {
-  if (!object3(patch) || depth > 40) return false;
-  if (patch.legacyEffect) return Object.keys(patch).length === 1 && object3(patch.legacyEffect.fields) && validPatch(patch.legacyEffect, depth + 1);
+  if (!object4(patch) || depth > 40) return false;
+  if (patch.legacyEffect) return Object.keys(patch).length === 1 && object4(patch.legacyEffect.fields) && validPatch(patch.legacyEffect, depth + 1);
   if (Object.hasOwn(patch, "value")) return Object.keys(patch).length === 1 && validJson(patch.value);
   if (patch.remove === true) return Object.keys(patch).length === 1;
-  if (object3(patch.fields)) return Object.keys(patch).length === 1 && Object.entries(patch.fields).every(([k, v]) => safe2(k) && validPatch(v, depth + 1));
+  if (object4(patch.fields)) return Object.keys(patch).length === 1 && Object.entries(patch.fields).every(([k, v]) => safe2(k) && validPatch(v, depth + 1));
   const l = patch.list;
-  return Object.keys(patch).length === 1 && object3(l) && Object.keys(l).every((k) => ["edits", "removed", "added", "order"].includes(k)) && object3(l.edits) && Object.entries(l.edits).every(([k, v]) => id2(k) && validPatch(v, depth + 1)) && Array.isArray(l.removed) && l.removed.every(id2) && keyed(l.added) && validJson(l.added) && (l.order === null || Array.isArray(l.order) && l.order.every(id2));
+  return Object.keys(patch).length === 1 && object4(l) && Object.keys(l).every((k) => ["edits", "removed", "added", "order"].includes(k)) && object4(l.edits) && Object.entries(l.edits).every(([k, v]) => id2(k) && validPatch(v, depth + 1)) && Array.isArray(l.removed) && l.removed.every(id2) && keyed(l.added) && validJson(l.added) && (l.order === null || Array.isArray(l.order) && l.order.every(id2));
 }
 var diagnostic = (path, value, rule) => path + " \uAC12 " + valueLabel(value) + ". " + rule + ".";
 var idRule = "ID\uB294 1~199\uC790\uC758 \uBB38\uC790\uC5F4\uC774\uC5B4\uC57C \uD558\uBA70 \uC608\uC57D ID __proto__, constructor, prototype\uC740 \uC0AC\uC6A9\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4";
@@ -626,7 +689,7 @@ function jsonDiagnostic(value, path, depth = 0) {
     }
     return null;
   }
-  if (object3(value)) {
+  if (object4(value)) {
     for (const [key, item] of Object.entries(value)) {
       if (!safe2(key)) return diagnostic(path + " \uAC1D\uCCB4 \uD0A4", key, "\uC608\uC57D \uD0A4 __proto__, constructor, prototype\uC740 \uC0AC\uC6A9\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4");
       const detail = jsonDiagnostic(item, path + "." + valueLabel(key), depth + 1);
@@ -637,17 +700,17 @@ function jsonDiagnostic(value, path, depth = 0) {
   return diagnostic(path, value, "null, \uBB38\uC790\uC5F4, true/false, \uC720\uD55C\uD55C \uC22B\uC790, \uBC30\uC5F4 \uB610\uB294 \uAC1D\uCCB4\uC778 JSON \uAC12\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4");
 }
 function patchDiagnostic(patch, path, depth = 0) {
-  if (!object3(patch)) return diagnostic(path, patch, "\uBCC0\uACBD \uB0B4\uC6A9\uC744 \uB098\uD0C0\uB0B4\uB294 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4");
+  if (!object4(patch)) return diagnostic(path, patch, "\uBCC0\uACBD \uB0B4\uC6A9\uC744 \uB098\uD0C0\uB0B4\uB294 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4");
   if (depth > 40) return diagnostic(path + " \uC911\uCCA9 \uAE4A\uC774", depth, "40 \uC774\uD558\uC5EC\uC57C \uD569\uB2C8\uB2E4");
   const keys = Object.keys(patch);
   if (keys.length !== 1) return diagnostic(path + " \uBCC0\uACBD \uD615\uD0DC \uC218 (" + keys.map(valueLabel).join(", ") + ")", keys.length, "value, remove, fields, list, legacyEffect \uC911 \uD558\uB098\uC758 \uD615\uD0DC\uB9CC \uC788\uC5B4\uC57C \uD569\uB2C8\uB2E4 (\uD544\uB4DC 1\uAC1C)");
   if (patch.legacyEffect) {
-    if (!object3(patch.legacyEffect.fields)) return diagnostic(path + ".legacyEffect.fields", patch.legacyEffect.fields, "\uC774\uC804 \uC774\uD399\uD2B8\uC758 \uD544\uB4DC \uBCC0\uACBD \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4");
+    if (!object4(patch.legacyEffect.fields)) return diagnostic(path + ".legacyEffect.fields", patch.legacyEffect.fields, "\uC774\uC804 \uC774\uD399\uD2B8\uC758 \uD544\uB4DC \uBCC0\uACBD \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4");
     return patchDiagnostic(patch.legacyEffect, path + ".legacyEffect", depth + 1);
   }
   if (Object.hasOwn(patch, "value")) return jsonDiagnostic(patch.value, path + ".value");
   if (patch.remove === true) return null;
-  if (object3(patch.fields)) {
+  if (object4(patch.fields)) {
     for (const [key, change] of Object.entries(patch.fields)) {
       if (!safe2(key)) return diagnostic(path + ".fields \uBCC0\uACBD \uD0A4", key, "\uC608\uC57D \uD0A4 __proto__, constructor, prototype\uC740 \uC0AC\uC6A9\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4");
       const detail = patchDiagnostic(change, path + ".fields." + valueLabel(key), depth + 1);
@@ -659,9 +722,9 @@ function patchDiagnostic(patch, path, depth = 0) {
   if (Object.hasOwn(patch, "fields")) return diagnostic(path + ".fields", patch.fields, "\uD544\uB4DC\uBCC4 \uBCC0\uACBD \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4");
   if (!Object.hasOwn(patch, "list")) return diagnostic(path + " \uBCC0\uACBD \uD615\uD0DC", keys[0], "value, remove, fields, list, legacyEffect \uC911 \uD558\uB098\uC5EC\uC57C \uD569\uB2C8\uB2E4");
   const list2 = patch.list, location = path + ".list";
-  if (!object3(list2)) return diagnostic(location, list2, "edits, removed, added, order\uAC00 \uC788\uB294 \uBAA9\uB85D \uBCC0\uACBD \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4");
+  if (!object4(list2)) return diagnostic(location, list2, "edits, removed, added, order\uAC00 \uC788\uB294 \uBAA9\uB85D \uBCC0\uACBD \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4");
   for (const key of Object.keys(list2)) if (!["edits", "removed", "added", "order"].includes(key)) return diagnostic(location + " \uD544\uB4DC", key, "edits, removed, added, order\uB9CC \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4");
-  if (!object3(list2.edits)) return diagnostic(location + ".edits", list2.edits, "\uC218\uC815\uD560 \uD56D\uBAA9 ID\uB97C \uD0A4\uB85C \uD558\uB294 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4");
+  if (!object4(list2.edits)) return diagnostic(location + ".edits", list2.edits, "\uC218\uC815\uD560 \uD56D\uBAA9 ID\uB97C \uD0A4\uB85C \uD558\uB294 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4");
   for (const [index, [key, change]] of Object.entries(list2.edits).entries()) {
     const item = location + ".edits " + (index + 1) + "\uBC88 (ID " + valueLabel(key) + ")";
     if (!id2(key)) return diagnostic(item + " \uC218\uC815 \uD56D\uBAA9 ID", key, idRule);
@@ -673,7 +736,7 @@ function patchDiagnostic(patch, path, depth = 0) {
   if (!Array.isArray(list2.added)) return diagnostic(location + ".added", list2.added, "\uCD94\uAC00\uD560 \uD56D\uBAA9 \uAC1D\uCCB4\uC758 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4");
   for (let index = 0; index < list2.added.length; index++) if (index in list2.added) {
     const item = list2.added[index], itemPath = location + ".added " + (index + 1) + "\uBC88 (ID " + valueLabel(item?.id) + ")";
-    if (!object3(item)) return diagnostic(itemPath, item, "\uC720\uD6A8\uD55C ID\uAC00 \uC788\uB294 \uCD94\uAC00 \uD56D\uBAA9 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4");
+    if (!object4(item)) return diagnostic(itemPath, item, "\uC720\uD6A8\uD55C ID\uAC00 \uC788\uB294 \uCD94\uAC00 \uD56D\uBAA9 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4");
     if (!id2(item.id)) return diagnostic(itemPath + " \uCD94\uAC00 \uD56D\uBAA9 ID", item.id, idRule);
   }
   const jsonProblem = jsonDiagnostic(list2.added, location + ".added");
@@ -686,19 +749,19 @@ function patchDiagnostic(patch, path, depth = 0) {
 }
 function variantDiagnostic(card, cards) {
   const variant = card.variant;
-  if (!object3(variant)) return diagnostic("Variant \uC815\uBCF4", variant, "\uC6D0\uBCF8 ID, \uB77C\uBCA8, ID \uB300\uC751\uD45C, \uBCC0\uACBD \uB0B4\uC6A9\uC744 \uAC00\uC9C4 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4");
+  if (!object4(variant)) return diagnostic("Variant \uC815\uBCF4", variant, "\uC6D0\uBCF8 ID, \uB77C\uBCA8, ID \uB300\uC751\uD45C, \uBCC0\uACBD \uB0B4\uC6A9\uC744 \uAC00\uC9C4 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4");
   if (!id2(variant.parentId)) return diagnostic("\uC6D0\uBCF8 \uCE74\uB4DC ID", variant.parentId, idRule);
   if (!cards.has(variant.parentId)) return diagnostic("\uC6D0\uBCF8 \uCE74\uB4DC ID", variant.parentId, "\uC774 \uD504\uB85C\uC81D\uD2B8\uC5D0 \uC874\uC7AC\uD558\uB294 \uCE74\uB4DC ID\uC5EC\uC57C \uD569\uB2C8\uB2E4");
   if (cards.get(variant.parentId).kind !== card.kind) return diagnostic("\uCE74\uB4DC \uC885\uB958", card.kind, "\uC6D0\uBCF8 \uCE74\uB4DC ID " + valueLabel(variant.parentId) + "\uC758 \uC885\uB958 " + valueLabel(cards.get(variant.parentId).kind) + "\uC640 \uAC19\uC544\uC57C \uD569\uB2C8\uB2E4");
   if (typeof variant.label !== "string") return diagnostic("Variant \uB77C\uBCA8", variant.label, "\uBB38\uC790\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4");
   if (variant.label.length > 120) return diagnostic("Variant \uB77C\uBCA8 \uAE38\uC774", variant.label.length, "120\uC790 \uC774\uD558\uC5EC\uC57C \uD569\uB2C8\uB2E4");
-  if (!object3(variant.ids)) return diagnostic("ID \uB300\uC751\uD45C", variant.ids, "\uC6D0\uBCF8 ID\uB97C \uD0A4\uB85C \uD558\uACE0 \uC0C8 ID\uB97C \uAC12\uC73C\uB85C \uD558\uB294 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4");
+  if (!object4(variant.ids)) return diagnostic("ID \uB300\uC751\uD45C", variant.ids, "\uC6D0\uBCF8 ID\uB97C \uD0A4\uB85C \uD558\uACE0 \uC0C8 ID\uB97C \uAC12\uC73C\uB85C \uD558\uB294 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4");
   for (const [index, [key, value]] of Object.entries(variant.ids).entries()) {
     const location = "ID \uB300\uC751 " + (index + 1) + "\uBC88 (\uC6D0\uBCF8 ID " + valueLabel(key) + ")";
     if (!id2(key)) return diagnostic(location + " \uC6D0\uBCF8 ID", key, idRule);
     if (!id2(value)) return diagnostic(location + " \uC0C8 ID", value, idRule);
   }
-  if (!object3(variant.overrides)) return diagnostic("\uBCC0\uACBD \uB0B4\uC6A9", variant.overrides, "\uBCC0\uACBD\uD560 \uCE74\uB4DC \uD56D\uBAA9\uC744 \uD0A4\uB85C \uD558\uB294 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4");
+  if (!object4(variant.overrides)) return diagnostic("\uBCC0\uACBD \uB0B4\uC6A9", variant.overrides, "\uBCC0\uACBD\uD560 \uCE74\uB4DC \uD56D\uBAA9\uC744 \uD0A4\uB85C \uD558\uB294 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4");
   for (const [index, [key, patch]] of Object.entries(variant.overrides).entries()) {
     const path = "\uBCC0\uACBD \uB0B4\uC6A9 " + (index + 1) + "\uBC88 " + valueLabel(key);
     if (!VARIANT_FIELDS.includes(key)) return diagnostic(path + " \uBCC0\uACBD \uD56D\uBAA9", key, VARIANT_FIELDS.join(", ") + " \uC911 \uD558\uB098\uC5EC\uC57C \uD569\uB2C8\uB2E4");
@@ -707,12 +770,12 @@ function variantDiagnostic(card, cards) {
   return null;
 }
 function validateVariants(project) {
-  const problems2 = [], cards = new Map(project.cards.filter(object3).map((c) => [c.id, c]));
+  const problems2 = [], cards = new Map(project.cards.filter(object4).map((c) => [c.id, c]));
   const bad = (card, detail) => problems2.push({ code: "variant", message: cardProblemLabel(card) + " (\uCE74\uB4DC " + (project.cards.indexOf(card) + 1) + "\uBC88, ID " + valueLabel(card.id) + ") \xB7 Variant: " + detail, cardId: card.id });
   for (const card of cards.values()) {
     const v = card.variant;
     if (v === void 0) continue;
-    if (!object3(v) || !id2(v.parentId) || !cards.has(v.parentId) || cards.get(v.parentId).kind !== card.kind || typeof v.label !== "string" || v.label.length > 120 || !object3(v.ids) || !Object.entries(v.ids).every(([k, value]) => id2(k) && id2(value)) || !object3(v.overrides) || !Object.entries(v.overrides).every(([k, patch]) => VARIANT_FIELDS.includes(k) && validPatch(patch))) {
+    if (!object4(v) || !id2(v.parentId) || !cards.has(v.parentId) || cards.get(v.parentId).kind !== card.kind || typeof v.label !== "string" || v.label.length > 120 || !object4(v.ids) || !Object.entries(v.ids).every(([k, value]) => id2(k) && id2(value)) || !object4(v.overrides) || !Object.entries(v.overrides).every(([k, patch]) => VARIANT_FIELDS.includes(k) && validPatch(patch))) {
       bad(card, variantDiagnostic(card, cards));
       continue;
     }
@@ -737,15 +800,15 @@ var TEXT_STYLE_DEFAULTS = Object.freeze({ fontPt: 9, fontWeight: 400, fontStyle:
 var TEXT_STYLE_KEYS = Object.freeze(Object.keys(TEXT_STYLE_DEFAULTS));
 function textStyleProblems(style) {
   if (!style || typeof style !== "object" || Array.isArray(style)) return [];
-  const problems2 = [], finite2 = (value, min, max) => typeof value === "number" && Number.isFinite(value) && value >= min && value <= max;
+  const problems2 = [], finite3 = (value, min, max) => typeof value === "number" && Number.isFinite(value) && value >= min && value <= max;
   const check = (key, label, valid, rule) => {
     if (style[key] !== void 0 && !valid(style[key])) problems2.push({ key, label, value: style[key], rule });
   };
-  check("fontPt", "\uAE00\uC790 \uD06C\uAE30", (v) => finite2(v, 0.01, Infinity), "0.01 pt \uC774\uC0C1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4");
-  check("fontWeight", "\uAE00\uC790 \uAD75\uAE30", (v) => finite2(v, 100, 1e3), "100~1000\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4");
+  check("fontPt", "\uAE00\uC790 \uD06C\uAE30", (v) => finite3(v, 0.01, Infinity), "0.01 pt \uC774\uC0C1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4");
+  check("fontWeight", "\uAE00\uC790 \uAD75\uAE30", (v) => finite3(v, 100, 1e3), "100~1000\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4");
   check("fontStyle", "\uAE30\uC6B8\uC784", (v) => ["normal", "italic"].includes(v), "normal \uB610\uB294 italic\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4");
-  check("letterSpacingMm", "\uC790\uAC04", (v) => finite2(v, -1, 5), "-1~5 mm\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4");
-  check("lineHeight", "\uC904 \uAC04\uACA9", (v) => finite2(v, 0.8, 4), "0.8~4\uBC30\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4");
+  check("letterSpacingMm", "\uC790\uAC04", (v) => finite3(v, -1, 5), "-1~5 mm\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4");
+  check("lineHeight", "\uC904 \uAC04\uACA9", (v) => finite3(v, 0.8, 4), "0.8~4\uBC30\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4");
   check("align", "\uAE00\uC790 \uC815\uB82C", (v) => ["left", "center", "right"].includes(v), "left, center, right \uC911 \uD558\uB098\uC5EC\uC57C \uD569\uB2C8\uB2E4");
   check("underline", "\uBC11\uC904", (v) => typeof v === "boolean", "true \uB610\uB294 false\uC5EC\uC57C \uD569\uB2C8\uB2E4");
   return problems2;
@@ -756,11 +819,11 @@ var PT_MM = 25.4 / 72;
 var segmenter2 = new Intl.Segmenter("ko", { granularity: "grapheme" });
 
 // src/model/card-templates.js
-var object4 = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+var object5 = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 var safe3 = (k) => !["__proto__", "constructor", "prototype"].includes(k);
 var id3 = (v) => typeof v === "string" && v.length > 0 && v.length < 200 && safe3(v);
-var finite = (v, min = -Infinity, max = Infinity) => typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
-var own = (value, key) => object4(value) && Object.hasOwn(value, key);
+var finite2 = (v, min = -Infinity, max = Infinity) => typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
+var own = (value, key) => object5(value) && Object.hasOwn(value, key);
 var pick = (value, keys) => Object.fromEntries(keys.filter((key) => own(value, key)).map((key) => [key, clone(value[key])]));
 var STYLE_KEYS = [...TEXT_STYLE_KEYS, "color", "fill", "strokeWidthMm", "fit", "cropX", "cropY", "visualEffects"];
 var NAME_STYLE_KEYS = [...TEXT_STYLE_KEYS, "color", "visualEffects"];
@@ -771,7 +834,7 @@ function validateCardTemplates(list2) {
   if (list2 === void 0) return [];
   const problems2 = [], bad = (path, message) => problems2.push({ code: "card-template", message: path + ": " + message });
   const shape = (value, keys, path) => {
-    if (!object4(value)) {
+    if (!object5(value)) {
       bad(path, "\uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4.");
       return false;
     }
@@ -792,11 +855,11 @@ function validateCardTemplates(list2) {
     if (!["monster", "item"].includes(saved.kind)) bad(path, "\uCE74\uB4DC \uC885\uB958\uB294 monster \uB610\uB294 item\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.");
     const recipe = saved.recipe;
     if (!shape(recipe, ["widthMm", "heightMm", "autoSkillLayout", "elements", "skillStyles", "visualEffects"], path + " \uB514\uC790\uC778")) continue;
-    for (const field of ["widthMm", "heightMm"]) if (!finite(recipe[field], 0.01)) bad(path, "\uCE74\uB4DC \uD06C\uAE30\uB294 0.01 mm \uC774\uC0C1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4.");
+    for (const field of ["widthMm", "heightMm"]) if (!finite2(recipe[field], 0.01)) bad(path, "\uCE74\uB4DC \uD06C\uAE30\uB294 0.01 mm \uC774\uC0C1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4.");
     if (typeof recipe.autoSkillLayout !== "boolean") bad(path, "\uAE30\uC220 \uC790\uB3D9 \uB9DE\uCDA4\uC740 true \uB610\uB294 false\uC5EC\uC57C \uD569\uB2C8\uB2E4.");
-    const assets = object4(saved.assets) ? saved.assets : {}, paintings = object4(saved.paintings) ? saved.paintings : {};
-    if (!object4(saved.assets)) bad(path, "\uADF8\uB9BC \uC790\uB8CC\uB294 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4.");
-    if (!object4(saved.paintings)) bad(path, "\uADF8\uB9BC \uC6D0\uBCF8\uC740 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4.");
+    const assets = object5(saved.assets) ? saved.assets : {}, paintings = object5(saved.paintings) ? saved.paintings : {};
+    if (!object5(saved.assets)) bad(path, "\uADF8\uB9BC \uC790\uB8CC\uB294 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4.");
+    if (!object5(saved.paintings)) bad(path, "\uADF8\uB9BC \uC6D0\uBCF8\uC740 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4.");
     const referenced = /* @__PURE__ */ new Set(), effect = (value, target, location) => {
       for (const problem of validateVisualEffects(value, target)) bad(location, problem.message);
       for (const layer of Array.isArray(value?.layers) ? value.layers : []) if (layer?.params?.assetId !== null && layer?.params?.assetId !== void 0) {
@@ -810,9 +873,9 @@ function validateCardTemplates(list2) {
       for (const problem of textStyleProblems(value)) bad(location, problem.label + " " + problem.rule + ".");
       for (const key of ["color", "fill"]) if (value[key] !== void 0 && (typeof value[key] !== "string" || value[key].length > 120)) bad(location, "\uC0C9\uC740 120\uC790 \uC774\uB0B4 \uBB38\uC790\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.");
       if (name && value.color !== void 0 && !/^#[0-9a-f]{6}$/i.test(value.color)) bad(location, "\uC774\uB984 \uC0C9\uC740 #RRGGBB \uD615\uC2DD\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.");
-      if (value.strokeWidthMm !== void 0 && !finite(value.strokeWidthMm, 0)) bad(location, "\uC120 \uAD75\uAE30\uB294 0 \uC774\uC0C1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4.");
+      if (value.strokeWidthMm !== void 0 && !finite2(value.strokeWidthMm, 0)) bad(location, "\uC120 \uAD75\uAE30\uB294 0 \uC774\uC0C1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4.");
       if (value.fit !== void 0 && !["contain", "cover"].includes(value.fit)) bad(location, "\uADF8\uB9BC \uB9DE\uCDA4\uC740 contain \uB610\uB294 cover\uC5EC\uC57C \uD569\uB2C8\uB2E4.");
-      for (const key of ["cropX", "cropY"]) if (value[key] !== void 0 && !finite(value[key], 0, 1)) bad(location, "\uADF8\uB9BC \uC790\uB974\uAE30 \uC704\uCE58\uB294 0~1\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.");
+      for (const key of ["cropX", "cropY"]) if (value[key] !== void 0 && !finite2(value[key], 0, 1)) bad(location, "\uADF8\uB9BC \uC790\uB974\uAE30 \uC704\uCE58\uB294 0~1\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.");
       if (value.visualEffects !== void 0) {
         if (!["text", "image", "effect"].includes(target)) bad(location, "\uC774 \uC694\uC18C\uC5D0\uB294 \uC774\uD399\uD2B8\uB97C \uC801\uC6A9\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
         else effect(value.visualEffects, target, location + " \uC774\uD399\uD2B8");
@@ -829,7 +892,7 @@ function validateCardTemplates(list2) {
       if (!shape(e, ["type", "rect", "style", "binding", "content", "assetId", "dice"], location)) continue;
       if (!ELEMENT_TYPES.includes(e.type)) bad(location, "\uC9C0\uC6D0\uD558\uB294 \uC694\uC18C \uC885\uB958\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4.");
       if (shape(e.rect, ["x", "y", "w", "h"], location + " \uC704\uCE58\xB7\uD06C\uAE30")) {
-        for (const key of ["x", "y", "w", "h"]) if (!finite(e.rect[key], ["w", "h"].includes(key) ? 0.01 : -Infinity)) bad(location, "\uC704\uCE58\uC640 \uD06C\uAE30\uB294 \uC720\uD55C\uD55C mm \uAC12\uC774\uBA70 \uD3ED\uACFC \uB192\uC774\uB294 0.01 \uC774\uC0C1\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.");
+        for (const key of ["x", "y", "w", "h"]) if (!finite2(e.rect[key], ["w", "h"].includes(key) ? 0.01 : -Infinity)) bad(location, "\uC704\uCE58\uC640 \uD06C\uAE30\uB294 \uC720\uD55C\uD55C mm \uAC12\uC774\uBA70 \uD3ED\uACFC \uB192\uC774\uB294 0.01 \uC774\uC0C1\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.");
       }
       style(e.style, location + " \uC2A4\uD0C0\uC77C", e.type);
       if (e.binding !== null) {
@@ -899,7 +962,7 @@ function validateCardTemplates(list2) {
         if (!shape(layer, ["id", "name", "visible", "locked", "opacity", "blendMode", "png"], location + " \uB808\uC774\uC5B4")) continue;
         if (!id3(layer.id) || layers.has(layer.id)) bad(location, "\uB808\uC774\uC5B4 ID\uB294 \uC720\uD6A8\uD558\uACE0 \uC11C\uB85C \uB2EC\uB77C\uC57C \uD569\uB2C8\uB2E4.");
         layers.add(layer.id);
-        if (typeof layer.name !== "string" || typeof layer.visible !== "boolean" || typeof layer.locked !== "boolean" || !finite(layer.opacity, 0, 1) || layer.blendMode !== void 0 && !isBlendMode(layer.blendMode) || !dataUrl(layer.png, "image/png")) bad(location, "\uADF8\uB9BC \uB808\uC774\uC5B4\uC758 \uC774\uB984\xB7\uD45C\uC2DC\xB7\uC7A0\uAE08\xB7\uBD88\uD22C\uBA85\uB3C4\xB7\uD63C\uD569 \uBAA8\uB4DC\xB7PNG\uB97C \uD655\uC778\uD558\uC138\uC694.");
+        if (typeof layer.name !== "string" || typeof layer.visible !== "boolean" || typeof layer.locked !== "boolean" || !finite2(layer.opacity, 0, 1) || layer.blendMode !== void 0 && !isBlendMode(layer.blendMode) || !dataUrl(layer.png, "image/png")) bad(location, "\uADF8\uB9BC \uB808\uC774\uC5B4\uC758 \uC774\uB984\xB7\uD45C\uC2DC\xB7\uC7A0\uAE08\xB7\uBD88\uD22C\uBA85\uB3C4\xB7\uD63C\uD569 \uBAA8\uB4DC\xB7PNG\uB97C \uD655\uC778\uD558\uC138\uC694.");
       }
       if (!layers.has(d.activeLayerId)) bad(location, "\uC120\uD0DD \uB808\uC774\uC5B4\uAC00 \uADF8\uB9BC \uC6D0\uBCF8\uC5D0 \uC5C6\uC2B5\uB2C8\uB2E4.");
     }
@@ -933,7 +996,7 @@ function createCard(kind, p) {
   else throw new Error("\uCE74\uB4DC \uC885\uB958\uB97C \uD655\uC778\uD558\uC138\uC694.");
   return card;
 }
-var object5 = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+var object6 = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 var number2 = (v, min = -Infinity) => typeof v === "number" && Number.isFinite(v) && v >= min;
 var id4 = (v) => typeof v === "string" && v.length > 0 && v.length < 200 && !["__proto__", "constructor", "prototype"].includes(v);
 var dataUrl2 = (v, mime) => typeof v === "string" && v.startsWith("data:" + mime + ";base64,") && /^[A-Za-z0-9+/]+=*$/.test(v.slice(v.indexOf(",") + 1));
@@ -942,7 +1005,7 @@ function validateProject(p) {
   const bad = (code, message, extra = {}) => errors.push({ code, message, ...extra });
   const invalid = (code, context, field, value, rule, extra = {}) => bad(code, (context ? context + ": " : "") + field + " \uAC12 " + valueLabel(value) + ". " + rule + ".", extra);
   const idRule2 = "ID\uB294 1~199\uC790\uC758 \uBB38\uC790\uC5F4\uC774\uC5B4\uC57C \uD558\uBA70 __proto__, constructor, prototype\uC740 \uC0AC\uC6A9\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4";
-  if (!object5(p)) {
+  if (!object6(p)) {
     invalid("file-version", "", "\uD504\uB85C\uC81D\uD2B8 \uD30C\uC77C", p, "\uCE74\uB4DC \uD504\uB85C\uC81D\uD2B8 \uAC1D\uCCB4(format: card-print-studio, version: 1)\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4");
     return errors;
   }
@@ -953,7 +1016,7 @@ function validateProject(p) {
   }
   if (typeof p.name !== "string") invalid("deck-name", "", "\uB371 \uC774\uB984", p.name, "\uBB38\uC790\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4");
   const s = p.settings;
-  if (!object5(s)) {
+  if (!object6(s)) {
     invalid("settings", "", "\uD504\uB85C\uC81D\uD2B8 \uC124\uC815", s, "\uC124\uC815 \uAC1D\uCCB4\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4");
     return errors;
   }
@@ -963,7 +1026,7 @@ function validateProject(p) {
   if (s.cardHeightMm > s.maxHeightMm) invalid("max-size", "", "\uCE74\uB4DC \uB192\uC774", s.cardHeightMm, "\uC124\uC815\uD55C \uCD5C\uB300 \uB192\uC774 " + valueLabel(s.maxHeightMm) + " mm \uC774\uD558\uC5EC\uC57C \uD569\uB2C8\uB2E4");
   for (const rank of RANKS) {
     const rule = s.rankRules?.[rank], context = "\uB4F1\uAE09 " + rank;
-    if (!object5(rule)) {
+    if (!object6(rule)) {
       invalid("rank-rule", context, "\uCCB4\uB825 \uAE30\uC900", rule, "\uAE30\uBCF8 HP\uC640 HP \uC0C1\uD55C\uC774 \uC788\uB294 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4");
       continue;
     }
@@ -971,7 +1034,7 @@ function validateProject(p) {
     if (!(rule.hpCap === null || number2(rule.hpCap, 0))) invalid("rank-rule", context, "HP \uC0C1\uD55C", rule.hpCap, "\uC81C\uD55C \uC5C6\uC74C\uC740 null, \uC0C1\uD55C\uC740 0 \uC774\uC0C1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4");
   }
   const print = p.print;
-  if (!object5(print)) invalid("print-settings", "", "\uC778\uC1C4 \uC124\uC815", print, "\uC778\uC1C4 \uC124\uC815 \uAC1D\uCCB4\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4");
+  if (!object6(print)) invalid("print-settings", "", "\uC778\uC1C4 \uC124\uC815", print, "\uC778\uC1C4 \uC124\uC815 \uAC1D\uCCB4\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4");
   else {
     for (const [key, label, choices] of [["paper", "\uC6A9\uC9C0", ["A4", "Letter"]], ["orientation", "\uC6A9\uC9C0 \uBC29\uD5A5", ["portrait", "landscape"]], ["flip", "\uC591\uBA74 \uB4A4\uC9D1\uAE30", ["long", "short"]]])
       if (!choices.includes(print[key])) invalid("print-settings", "\uC778\uC1C4", label, print[key], choices.join(" \uB610\uB294 ") + "\uC5EC\uC57C \uD569\uB2C8\uB2E4");
@@ -984,7 +1047,7 @@ function validateProject(p) {
   }
   if (print?.effectFrameSec !== void 0 && !number2(print.effectFrameSec, 0)) invalid("effect-frame", "", "\uC778\uC1C4 \uC774\uD399\uD2B8 \uC7A5\uBA74 \uC2DC\uAC04", print.effectFrameSec, "0\uCD08 \uC774\uC0C1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4");
   let structureInvalid = false;
-  for (const [valid, label, value, rule] of [[Array.isArray(p.cards), "\uCE74\uB4DC \uBAA9\uB85D", p.cards, "\uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4"], [object5(p.back), "\uACF5\uD1B5 \uB4B7\uBA74", p.back, "\uC694\uC18C \uBAA9\uB85D\uC744 \uAC00\uC9C4 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4"], [object5(p.back) && Array.isArray(p.back.elements), "\uACF5\uD1B5 \uB4B7\uBA74 \uC694\uC18C \uBAA9\uB85D", p.back?.elements, "\uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4"], [object5(p.assets), "\uADF8\uB9BC \uC790\uB8CC", p.assets, "\uADF8\uB9BC ID\uB97C \uD0A4\uB85C \uD558\uB294 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4"], [object5(p.paintings), "\uADF8\uB9BC \uC6D0\uBCF8", p.paintings, "\uC6D0\uBCF8 ID\uB97C \uD0A4\uB85C \uD558\uB294 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4"]])
+  for (const [valid, label, value, rule] of [[Array.isArray(p.cards), "\uCE74\uB4DC \uBAA9\uB85D", p.cards, "\uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4"], [object6(p.back), "\uACF5\uD1B5 \uB4B7\uBA74", p.back, "\uC694\uC18C \uBAA9\uB85D\uC744 \uAC00\uC9C4 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4"], [object6(p.back) && Array.isArray(p.back.elements), "\uACF5\uD1B5 \uB4B7\uBA74 \uC694\uC18C \uBAA9\uB85D", p.back?.elements, "\uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4"], [object6(p.assets), "\uADF8\uB9BC \uC790\uB8CC", p.assets, "\uADF8\uB9BC ID\uB97C \uD0A4\uB85C \uD558\uB294 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4"], [object6(p.paintings), "\uADF8\uB9BC \uC6D0\uBCF8", p.paintings, "\uC6D0\uBCF8 ID\uB97C \uD0A4\uB85C \uD558\uB294 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4"]])
     if (!valid) {
       invalid("file-structure", "", label, value, rule);
       structureInvalid = true;
@@ -1008,7 +1071,7 @@ function validateProject(p) {
   };
   const textRanges = (owner, fields, extra, context) => {
     if (owner.textRanges === void 0) return;
-    if (!object5(owner.textRanges)) {
+    if (!object6(owner.textRanges)) {
       invalid("text-range", context, "\uAE00\uC790 \uAD6C\uAC04 \uBAA9\uB85D", owner.textRanges, "\uD14D\uC2A4\uD2B8 \uD544\uB4DC\uBCC4 \uBC30\uC5F4\uC744 \uAC00\uC9C4 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
       return;
     }
@@ -1026,7 +1089,7 @@ function validateProject(p) {
       let end = 0;
       for (const [index, r] of ranges.entries()) {
         const label = location + " " + (index + 1) + "\uBC88";
-        if (!object5(r)) {
+        if (!object6(r)) {
           invalid("text-range", label, "\uAD6C\uAC04", r, "ID, \uC2DC\uC791\xB7\uB05D \uC704\uCE58, \uC2A4\uD0C0\uC77C\uC744 \uAC00\uC9C4 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
           continue;
         }
@@ -1034,7 +1097,7 @@ function validateProject(p) {
         if (!Number.isInteger(r.start) || !Number.isInteger(r.end) || r.start < end || r.end <= r.start || r.end > text2.length || !boundaries.has(r.start) || !boundaries.has(r.end))
           invalid("text-range", label, "\uC2DC\uC791\xB7\uB05D \uC704\uCE58", [r.start, r.end], "0~" + text2.length + " \uBC94\uC704\uC758 \uBB38\uC790 \uACBD\uACC4\uC5EC\uC57C \uD558\uBA70 \uC704\uCE58 \uC21C\uC11C\uB300\uB85C \uACB9\uCE58\uC9C0 \uC54A\uC544\uC57C \uD569\uB2C8\uB2E4", extra);
         if (Number.isInteger(r.end)) end = r.end;
-        if (!object5(r.style)) {
+        if (!object6(r.style)) {
           invalid("text-range", label, "\uAE00\uC790 \uC2A4\uD0C0\uC77C", r.style, "\uC2A4\uD0C0\uC77C \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
           continue;
         }
@@ -1047,7 +1110,7 @@ function validateProject(p) {
   if (p.visualEffectPresets !== void 0 && !Array.isArray(p.visualEffectPresets)) invalid("visual-effect-presets", "", "\uB0B4 \uC774\uD399\uD2B8 \uBAA9\uB85D", p.visualEffectPresets, "\uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4");
   for (const [index, preset] of (Array.isArray(p.visualEffectPresets) ? p.visualEffectPresets : []).entries()) {
     const context = "\uB0B4 \uC774\uD399\uD2B8 " + (index + 1) + "\uBC88" + (typeof preset?.name === "string" ? " " + valueLabel(preset.name) : "");
-    if (!object5(preset)) {
+    if (!object6(preset)) {
       invalid("visual-effect-preset", context, "\uC800\uC7A5 \uC815\uBCF4", preset, "\uC774\uB984\uACFC \uB808\uC2DC\uD53C\uAC00 \uC788\uB294 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4");
       continue;
     }
@@ -1062,10 +1125,10 @@ function validateProject(p) {
     effectRecipe(preset.recipe, void 0, {}, context);
   }
   errors.push(...validateCardTemplates(p.cardTemplates));
-  for (const [index, saved] of (Array.isArray(p.cardTemplates) ? p.cardTemplates : []).entries()) if (object5(saved)) checkId(saved.id, "\uB0B4 \uCE74\uB4DC \uC11C\uC2DD " + (index + 1) + "\uBC88");
+  for (const [index, saved] of (Array.isArray(p.cardTemplates) ? p.cardTemplates : []).entries()) if (object6(saved)) checkId(saved.id, "\uB0B4 \uCE74\uB4DC \uC11C\uC2DD " + (index + 1) + "\uBC88");
   const dice = (value, extra, context) => {
     if (value === null || value === void 0) return;
-    if (!object5(value)) {
+    if (!object6(value)) {
       invalid("dice", context, "\uC8FC\uC0AC\uC704 \uC870\uAC74", value, "\uB208 \uBAA9\uB85D, \uBB38\uAD6C, \uC0C9\uC744 \uAC00\uC9C4 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
       return;
     }
@@ -1085,7 +1148,7 @@ function validateProject(p) {
   if (p.keywords !== void 0 && !Array.isArray(p.keywords)) invalid("keywords", "", "\uD0A4\uC6CC\uB4DC \uBAA9\uB85D", p.keywords, "\uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4");
   for (const [index, kw] of (Array.isArray(p.keywords) ? p.keywords : []).entries()) {
     const context = "\uD0A4\uC6CC\uB4DC " + (index + 1) + "\uBC88" + (typeof kw?.name === "string" ? " " + valueLabel(kw.name) : "");
-    if (!object5(kw)) {
+    if (!object6(kw)) {
       invalid("keyword", context, "\uC800\uC7A5 \uC815\uBCF4", kw, "\uD0A4\uC6CC\uB4DC \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4");
       continue;
     }
@@ -1113,7 +1176,7 @@ function validateProject(p) {
     const ids = /* @__PURE__ */ new Set();
     for (const [index, ref] of refs.entries()) {
       const location = context + " \xB7 \uD0A4\uC6CC\uB4DC \uC5F0\uACB0 " + (index + 1) + "\uBC88";
-      if (!object5(ref)) invalid("keyword-reference", location, "\uC5F0\uACB0 \uC815\uBCF4", ref, "keywordId\uC640 \uD45C\uC2DC \uBC29\uC2DD\uC774 \uC788\uB294 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
+      if (!object6(ref)) invalid("keyword-reference", location, "\uC5F0\uACB0 \uC815\uBCF4", ref, "keywordId\uC640 \uD45C\uC2DC \uBC29\uC2DD\uC774 \uC788\uB294 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
       else {
         if (!keywordIds.has(ref.keywordId)) invalid("keyword-reference", location, "\uD0A4\uC6CC\uB4DC ID", ref.keywordId, "\uD504\uB85C\uC81D\uD2B8 \uD0A4\uC6CC\uB4DC \uBAA9\uB85D\uC5D0 \uC874\uC7AC\uD558\uB294 ID\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
         if (ids.has(ref.keywordId)) invalid("keyword-reference", location, "\uC911\uBCF5 \uD0A4\uC6CC\uB4DC ID", ref.keywordId, "\uD55C \uB300\uC0C1\uC5D0 \uAC19\uC740 \uD0A4\uC6CC\uB4DC\uB97C \uB450 \uBC88 \uC5F0\uACB0\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4", extra);
@@ -1129,7 +1192,7 @@ function validateProject(p) {
       return;
     }
     for (const [index, e] of list2.entries()) {
-      if (!object5(e)) {
+      if (!object6(e)) {
         invalid("element", owner + " \xB7 \uC694\uC18C " + (index + 1) + "\uBC88", "\uC800\uC7A5 \uC815\uBCF4", e, "\uC694\uC18C \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4", { cardId: card?.id });
         continue;
       }
@@ -1137,10 +1200,10 @@ function validateProject(p) {
       checkId(e.id, context, extra);
       if (!ELEMENT_TYPES.includes(e.type)) invalid("element", context, "\uC694\uC18C \uC885\uB958", e.type, ELEMENT_TYPES.join(", ") + " \uC911 \uD558\uB098\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
       if (e.locked !== void 0 && typeof e.locked !== "boolean") invalid("element-lock", context, "\uD3EC\uC778\uD130 \uC7A0\uAE08", e.locked, "true \uB610\uB294 false\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
-      if (!object5(e.rect)) invalid("element", context, "\uC704\uCE58\xB7\uD06C\uAE30", e.rect, "x, y, w, h\uAC00 \uC788\uB294 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
+      if (!object6(e.rect)) invalid("element", context, "\uC704\uCE58\xB7\uD06C\uAE30", e.rect, "x, y, w, h\uAC00 \uC788\uB294 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
       else for (const [key, label, min] of [["x", "\uAC00\uB85C \uC704\uCE58", -Infinity], ["y", "\uC138\uB85C \uC704\uCE58", -Infinity], ["w", "\uD3ED", 0.01], ["h", "\uB192\uC774", 0.01]])
         if (!number2(e.rect[key], min)) invalid("element", context, label, e.rect[key], min === -Infinity ? "mm \uB2E8\uC704\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4" : "0.01 mm \uC774\uC0C1\uC758 \uC720\uD55C\uD55C \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
-      if (!object5(e.style)) invalid("element", context, "\uC2A4\uD0C0\uC77C", e.style, "\uC2A4\uD0C0\uC77C \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
+      if (!object6(e.style)) invalid("element", context, "\uC2A4\uD0C0\uC77C", e.style, "\uC2A4\uD0C0\uC77C \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
       if (e.style?.visualEffects !== void 0) {
         if (!["text", "image", "effect"].includes(e.type)) invalid("visual-effect-target", context, "\uC774\uD399\uD2B8 \uB300\uC0C1 \uC885\uB958", e.type, "text, image, effect \uC694\uC18C\uC5D0\uB9CC \uC774\uD399\uD2B8\uB97C \uC801\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4", extra);
         else effectRecipe(e.style.visualEffects, e.type, extra, context);
@@ -1151,7 +1214,7 @@ function validateProject(p) {
       textRanges(e, ["content"], extra, context);
       if (e.binding !== null && e.binding !== void 0) {
         const binding = e.binding, fields = ["name", "hp", "art", "item.effect", "skill.name", "skill.effect", "skill.dice", "skill.keywords", "item.keywords"];
-        if (!object5(binding)) invalid("binding", context, "\uCE74\uB4DC \uC815\uBCF4 \uC5F0\uACB0", binding, "field\uAC00 \uC788\uB294 \uC5F0\uACB0 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
+        if (!object6(binding)) invalid("binding", context, "\uCE74\uB4DC \uC815\uBCF4 \uC5F0\uACB0", binding, "field\uAC00 \uC788\uB294 \uC5F0\uACB0 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
         else if (!fields.includes(binding.field)) invalid("binding", context, "\uC5F0\uACB0 \uD544\uB4DC", binding.field, fields.join(", ") + " \uC911 \uD558\uB098\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
         else if (!card) invalid("binding", context, "\uCE74\uB4DC \uC815\uBCF4 \uC5F0\uACB0", binding.field, "\uACF5\uD1B5 \uB4B7\uBA74\uC5D0\uB294 \uCE74\uB4DC \uC815\uBCF4 \uC5F0\uACB0\uC744 \uC0AC\uC6A9\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4", extra);
         else if (binding.field.startsWith("skill.") && ![...Array.isArray(card.passives) ? card.passives : [], ...Array.isArray(card.actives) ? card.actives : []].some((sk) => sk?.id === binding.skillId))
@@ -1161,7 +1224,7 @@ function validateProject(p) {
     }
   };
   for (const [index, card] of p.cards.entries()) {
-    if (!object5(card)) {
+    if (!object6(card)) {
       invalid("card", "\uCE74\uB4DC " + (index + 1) + "\uBC88", "\uC800\uC7A5 \uC815\uBCF4", card, "\uCE74\uB4DC \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4");
       continue;
     }
@@ -1206,7 +1269,7 @@ function validateProject(p) {
         }
         for (const [skillIndex, sk] of skills.entries()) {
           const location = context + " \xB7 " + kind + " \uC2A4\uD0AC " + (typeof sk?.name === "string" && sk.name ? valueLabel(sk.name) : skillIndex + 1 + "\uBC88");
-          if (!object5(sk)) {
+          if (!object6(sk)) {
             invalid("skill", location, "\uC800\uC7A5 \uC815\uBCF4", sk, "\uC2A4\uD0AC \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
             continue;
           }
@@ -1219,7 +1282,7 @@ function validateProject(p) {
           keywordRefs(sk.nameKeywords, detail, location + " \xB7 \uC81C\uBAA9");
           textRanges(sk, ["name", "effect"], detail, location);
           if (sk.nameStyle !== void 0) {
-            if (!object5(sk.nameStyle)) invalid("skill-name-style", location, "\uC774\uB984 \uC2A4\uD0C0\uC77C", sk.nameStyle, "\uC2A4\uD0C0\uC77C \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4", detail);
+            if (!object6(sk.nameStyle)) invalid("skill-name-style", location, "\uC774\uB984 \uC2A4\uD0C0\uC77C", sk.nameStyle, "\uC2A4\uD0C0\uC77C \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4", detail);
             else {
               if (sk.nameStyle.color !== void 0 && (typeof sk.nameStyle.color !== "string" || !/^#[0-9a-f]{6}$/i.test(sk.nameStyle.color))) invalid("skill-name-style", location, "\uC774\uB984 \uAE00\uC790 \uC0C9", sk.nameStyle.color, "#RRGGBB \uD615\uC2DD\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4 (\uC608: #427963)", detail);
               for (const problem of textStyleProblems(sk.nameStyle)) invalid("skill-name-style", location, "\uC774\uB984 " + problem.label, problem.value, problem.rule, detail);
@@ -1238,7 +1301,7 @@ function validateProject(p) {
   elements(p.back.elements, null);
   for (const [key, asset] of Object.entries(p.assets)) {
     const context = "\uADF8\uB9BC \uC790\uB8CC " + valueLabel(key), extra = { assetId: key };
-    if (!object5(asset)) {
+    if (!object6(asset)) {
       invalid("asset", context, "\uC800\uC7A5 \uC815\uBCF4", asset, "\uADF8\uB9BC \uC790\uB8CC \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
       continue;
     }
@@ -1252,7 +1315,7 @@ function validateProject(p) {
   }
   for (const [key, drawing] of Object.entries(p.paintings)) {
     const context = "\uADF8\uB9BC \uC6D0\uBCF8 " + valueLabel(key), extra = { paintingId: key };
-    if (!object5(drawing)) {
+    if (!object6(drawing)) {
       invalid("painting", context, "\uC800\uC7A5 \uC815\uBCF4", drawing, "\uADF8\uB9BC \uC6D0\uBCF8 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
       continue;
     }
@@ -1270,7 +1333,7 @@ function validateProject(p) {
     const layerIds = /* @__PURE__ */ new Set();
     for (const [index, layer] of drawing.layers.entries()) {
       const location = context + " \xB7 \uB808\uC774\uC5B4 " + (index + 1) + "\uBC88" + (typeof layer?.name === "string" ? " " + valueLabel(layer.name) : "");
-      if (!object5(layer)) {
+      if (!object6(layer)) {
         invalid("layer", location, "\uC800\uC7A5 \uC815\uBCF4", layer, "\uB808\uC774\uC5B4 \uAC1D\uCCB4\uC5EC\uC57C \uD569\uB2C8\uB2E4", extra);
         layerIds.add(layer?.id);
         continue;
@@ -1372,12 +1435,12 @@ function collectBlobRefs(value) {
 }
 function cloudProjectForValidation(value) {
   const data = structuredClone(value);
-  for (const [object7, key, mime] of slots(data)) if (typeof object7[key] === "string" && refPattern.test(object7[key])) object7[key] = "data:" + mime + ";base64,AAAA";
+  for (const [object8, key, mime] of slots(data)) if (typeof object8[key] === "string" && refPattern.test(object8[key])) object8[key] = "data:" + mime + ";base64,AAAA";
   return data;
 }
 
 // src/cloud/server-model.js
-var object6 = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+var object7 = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 var identifier = (v) => typeof v === "string" && v.length > 0 && v.length < 200;
 var reject = (message) => {
   throw Object.assign(new Error(message), { code: "invalid-work" });
@@ -1399,10 +1462,10 @@ function boundedJson(data) {
   if (new TextEncoder().encode(JSON.stringify(data)).length > 8 * 1024 * 1024) reject("\uC791\uC5C5 JSON\uC740 \uCD5C\uB300 8 MB\uAE4C\uC9C0 \uC800\uC7A5\uD560 \uC218 \uC788\uC5B4\uC694.");
 }
 function checkImages(assets = {}, paintings = {}) {
-  if (!object6(assets) || !object6(paintings)) reject("\uADF8\uB9BC \uC790\uB8CC\uC640 \uC6D0\uBCF8\uC740 \uAC1D\uCCB4\uC5EC\uC57C \uD574\uC694.");
+  if (!object7(assets) || !object7(paintings)) reject("\uADF8\uB9BC \uC790\uB8CC\uC640 \uC6D0\uBCF8\uC740 \uAC1D\uCCB4\uC5EC\uC57C \uD574\uC694.");
   for (const asset of Object.values(assets)) if (!/^blob:sha256:[0-9a-f]{64}$/.test(asset?.dataUrl)) reject("\uADF8\uB9BC\uC740 \uC5C5\uB85C\uB4DC\uB41C \uC774\uBBF8\uC9C0 \uCC38\uC870\uC5EC\uC57C \uD574\uC694.");
   for (const drawing of Object.values(paintings)) {
-    if (!object6(drawing) || !Array.isArray(drawing.layers)) reject("\uADF8\uB9BC \uC6D0\uBCF8\uC758 \uB808\uC774\uC5B4\uB294 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD574\uC694.");
+    if (!object7(drawing) || !Array.isArray(drawing.layers)) reject("\uADF8\uB9BC \uC6D0\uBCF8\uC758 \uB808\uC774\uC5B4\uB294 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD574\uC694.");
     for (const layer of drawing.layers) if (!/^blob:sha256:[0-9a-f]{64}$/.test(layer?.png)) reject("\uB808\uC774\uC5B4\uB294 \uC5C5\uB85C\uB4DC\uB41C \uC774\uBBF8\uC9C0 \uCC38\uC870\uC5EC\uC57C \uD574\uC694.");
   }
 }
@@ -1420,7 +1483,7 @@ function validateCloudWork(data) {
 }
 function validateCloudAsset(kind, data) {
   boundedJson(data);
-  if (!object6(data) || data.kind !== kind || !object6(data.item) || !["effect_template", "image", "card_template", "keyword"].includes(kind)) reject("\uACF5\uC720 \uC5D0\uC14B\uC758 \uC885\uB958\uC640 \uB0B4\uC6A9\uC774 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC544\uC694.");
+  if (!object7(data) || data.kind !== kind || !object7(data.item) || !["effect_template", "image", "card_template", "keyword"].includes(kind)) reject("\uACF5\uC720 \uC5D0\uC14B\uC758 \uC885\uB958\uC640 \uB0B4\uC6A9\uC774 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC544\uC694.");
   if (Object.keys(data).some((key) => !["kind", "item", "blobs", "assets", "paintings"].includes(key))) reject("\uACF5\uC720 \uC5D0\uC14B\uC5D0 \uC9C0\uC6D0\uD558\uC9C0 \uC54A\uB294 \uD56D\uBAA9\uC774 \uC788\uC5B4\uC694.");
   const refs = collectBlobRefs({ ...data, blobs: [] });
   if (!Array.isArray(data.blobs) || JSON.stringify(data.blobs) !== JSON.stringify(refs)) reject("\uACF5\uC720 \uC5D0\uC14B\uC758 \uC774\uBBF8\uC9C0 \uCC38\uC870 \uBAA9\uB85D\uC774 \uC77C\uCE58\uD558\uC9C0 \uC54A\uC544\uC694.");

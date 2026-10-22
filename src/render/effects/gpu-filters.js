@@ -134,12 +134,11 @@ export function applyGpuFilter(surface,layer,{rect=surface.work,timeSec=1.2,seed
  const output=makeSurface({...surface.work},surface.dpi),pixels=output.ctx.createImageData(region.width,region.height);pixels.data.set(result);output.ctx.putImageData(pixels,region.x,region.y);return output;
 }
 
-const contourShader=`void main(){ivec2 p=ivec2(gl_FragCoord.xy);float distance=texelFetch(auxiliary,p,0).r,alpha=0.;if(distance>=0.&&!isinf(distance)){for(int i=0;i<int(u0.z);i++){vec4 pair=i<2?u2:i<4?u3:i<6?u4:i<8?u5:i<10?u6:u7;vec2 ring=i%2==0?pair.xy:pair.zw;float coverage=clamp((u0.x*.5+u0.y*.5-abs(distance-ring.x))/u0.y,0.,1.)*ring.y;alpha=1.-(1.-alpha)*(1.-coverage);}}result=bytes(vec4(u1.rgb,floor(alpha*255.+.5)));}`;
+const contourShader=`void main(){ivec2 p=ivec2(gl_FragCoord.xy);float alpha=0.;for(int i=0;i<int(u0.z);i++){vec4 ring=texelFetch(auxiliary,ivec2(i%size.x,size.y+i/size.x),0);ivec2 q=ivec2(floor(vec2(p)-ring.zw+vec2(.5)));if(any(lessThan(q,ivec2(0)))||any(greaterThanEqual(q,size)))continue;float distance=texelFetch(auxiliary,q,0).r;if(distance<0.||isinf(distance))continue;float coverage=clamp((u0.x*.5+u0.y*.5-abs(distance-ring.x))/u0.y,0.,1.)*ring.y;alpha=1.-(1.-alpha)*(1.-coverage);}result=bytes(vec4(u1.rgb,floor(alpha*255.+.5)));}`;
 export function gpuContour(shape,rings,primary,width){
- if(rings.length>12)return null;
- const aux=auxData(shape.width,shape.height);for(let i=0;i<shape.distance.length;i++)aux.data[i*4]=shape.distance[i];
+ const aux=auxData(shape.width,shape.height+Math.ceil(rings.length/shape.width));for(let i=0;i<shape.distance.length;i++)aux.data[i*4]=shape.distance[i];
  const values={u0:[width,1/shape.scale,rings.length,0],u1:[...color(primary,'#79d9ff'),0]};
- for(let i=0;i<rings.length;i++){const key='u'+(2+Math.floor(i/2));values[key]||=[0,0,0,0];values[key][i%2*2]=rings[i].radius;values[key][i%2*2+1]=rings[i].alpha;}
+ rings.forEach((ring,i)=>aux.data.set([ring.radius,ring.alpha,(ring.x??0)*shape.scale,(ring.y??0)*shape.scale],(shape.distance.length+i)*4));
  return runGpuEffect({kind:'ripple',width:shape.width,height:shape.height,data:new Uint8ClampedArray(shape.width*shape.height*4),aux,passes:[pass('contour',contourShader,values)]});
 }
 

@@ -4,6 +4,7 @@ import {BLEND_MODES,DEFAULT_BLEND_MODE} from './blend-modes.js';
 import {SPRITE_CONTROL_FIELDS,spriteControlDefaults,validateSpriteControls} from './sprite-controls.js';
 import {textRangeTarget,textRangeOwners} from './text-ranges.js';
 import {PARTICLE_MOTION_FIELDS} from './particle-motion.js';
+import {validateParticleEmission} from './particle-emission.js';
 
 const numeric=(label,value,min,max,step=.05,unit='')=>({type:'number',label,value,min,max,step,unit});
 const color=(label,value)=>({type:'color',label,value});
@@ -313,8 +314,9 @@ function validateRecipe(value,target,legacy){
   else if(ids.has(layer.id))bad('레이어 ID '+valueLabel(layer.id)+'이 앞선 레이어와 중복됩니다.');
   ids.add(layer.id);
   const common=['id','kind','enabled','opacity','params','motion','blendMode'];
-  const specific=legacy?['placement','emitter','rotationDeg','origin']:['protectText',...(definition.generative?['placement','emit','rotationDeg','origin']:definition.textOnly?['placement']:['scope'])];
+  const specific=legacy?['placement','emitter','rotationDeg','origin']:['protectText',...(definition.generative?['placement','emit','rotationDeg','origin','emission']:definition.textOnly?['placement']:['scope'])];
   shapeKeys(layer,[...common,...specific],'레이어');
+  if(!legacy&&definition.generative&&layer.emission!==undefined)for(const message of validateParticleEmission(layer.emission))bad(message);
   boolValue('레이어 사용',layer.enabled);numericValue('불투명도',layer.opacity,0,1);
   if(Object.hasOwn(layer,'blendMode')){
    choiceValue('혼합 모드',layer.blendMode,BLEND_MODES.map(([mode])=>mode));

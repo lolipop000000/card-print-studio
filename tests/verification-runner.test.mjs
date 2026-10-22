@@ -38,6 +38,8 @@ test('verification profiles select existing checks once and reject missing or un
 test('effects profile covers the replacement duration and DPI controls using existing test files',async()=>{
  const {selectTests}=await api(),files=(await readdir(new URL('.',import.meta.url))).map(name=>'tests/'+name),selected=selectTests(files,'effects');
  assert.ok(selected.includes('tests/preview-settings.spec.mjs'));assert.ok(selected.includes('tests/mobile-layout.spec.mjs'));assert.ok(!selected.includes('tests/effect-video-ui.spec.mjs'));
+ assert.ok(selected.includes('tests/particle-emission-render.spec.mjs'));assert.ok(selected.includes('tests/particle-emission-ui.spec.mjs'));assert.ok(selected.includes('tests/particle-emitter-ui.spec.mjs'));
+ for(const name of ['painting-usability','effects-gpu','effect-playback-cache','visual-effects-print'])assert.ok(selected.includes('tests/'+name+'.spec.mjs'));
 });
 
 test('a green report requires completed tests with no failures, skips, cancellations or todo',async()=>{

@@ -5,11 +5,14 @@ import {makeVisualEffectLayerForTarget} from '../model/effect-emission.js';
 import {BLEND_MODES,DEFAULT_BLEND_MODE} from '../model/blend-modes.js';
 import {isSpriteFieldVisible,SPRITE_CONTROL_HINT,SPRITE_SHEET_HINT} from '../model/sprite-controls.js';
 import {PARTICLE_IMAGES,particleImageData} from '../render/particle-images.js';
+import {createParticleEmission} from '../model/particle-emission.js';
+import {renderParticleEmission} from './particle-emission.js';
 const placements=[['behind','대상 뒤'],['front','대상 앞']];
 const scopes=[['all','지금까지 쌓은 전체'],['inside','원본 모양 안쪽'],['outside','원본 모양 바깥']];
 export function renderVisualEffectFields(host,{recipe,selectedLayerId,targetType,onChange,onSelect,assetOptions=[],onImportImage,onLibraryImage,onBuiltinImage,importing=false}){
  const layer=recipe.layers.find(l=>l.id===selectedLayerId),index=recipe.layers.indexOf(layer),definition=layer&&VISUAL_EFFECT_CATALOG[layer.kind];
  const advancedOpen=host.querySelector('#effect-advanced')?.open||false;
+ const emissionOpen=host.querySelector('#effect-emission-section')?.open??true;
  const spriteGroupState=new Map([...host.querySelectorAll('[data-sprite-group]')].map(group=>[group.dataset.spriteGroup,group.open]));
  const emitterValue=host.querySelector('#effect-emitter-preset')?.value??'sprite';
  const kinds=Object.entries(VISUAL_EFFECT_CATALOG).filter(([,d])=>!d.generative&&(!d.textOnly||targetType==='text'));
@@ -33,7 +36,7 @@ export function renderVisualEffectFields(host,{recipe,selectedLayerId,targetType
   const frame=recipe.frame||{scope:'border',bandMm:4},change=fn=>onChange(r=>{r.frame??={scope:'border',bandMm:4};fn(r.frame);});
   header.push(field('프레임 효과 범위','effect-frame-scope',frame.scope,v=>change(f=>f.scope=v),{options:[['border','테두리'],['borderBleed','테두리 + 안쪽 번짐'],['full','배경 전체']]}),field('테두리 띠 두께 (mm)','effect-frame-band',frame.bandMm,v=>change(f=>f.bandMm=v),{type:'number',min:2,max:10,step:.5}));
  }
- host.replaceChildren(...header,el('div',{class:'effect-add-row particle-add-row'},emitter,button('✦ 파티클 추가',()=>onChange(r=>{const next=makeVisualEffectLayerForTarget(emitter.value,targetType);r.layers.push(next);return next.id;}),{id:'effect-particle-add',disabled:recipe.layers.length>=12})),el('div',{class:'effect-add-row'},picker,button('+ 효과 추가',add,{id:'effect-layer-add',disabled:recipe.layers.length>=12})),list);
+ host.replaceChildren(...header,el('div',{class:'effect-add-row particle-add-row'},emitter,button('✦ 파티클 추가',()=>onChange(r=>{const next=makeVisualEffectLayerForTarget(emitter.value,targetType);next.emission=createParticleEmission(next.params);r.layers.push(next);return next.id;}),{id:'effect-particle-add',disabled:recipe.layers.length>=12})),el('div',{class:'effect-add-row'},picker,button('+ 효과 추가',add,{id:'effect-layer-add',disabled:recipe.layers.length>=12})),list);
  if(!layer){host.append(el('p',{id:'effect-empty',class:'empty-note'},'효과를 추가하거나 왼쪽 프리셋으로 시작하세요.'));return;}
  const mutate=change=>onChange(r=>change(r.layers.find(l=>l.id===layer.id)));
  const canMove=delta=>layer.kind!=='textWarp'&&index+delta>=0&&index+delta<recipe.layers.length&&recipe.layers[index+delta].kind!=='textWarp';
@@ -52,10 +55,15 @@ export function renderVisualEffectFields(host,{recipe,selectedLayerId,targetType
   el('p',{id:'effect-blend-hint',class:'hint'},definition.generative?'대상 뒤: 이펙트 → 지금까지의 결과, 대상 앞: 지금까지의 결과 → 이펙트 순으로 혼합해요. 메뉴의 ‘현재 레이어’는 두 번째로 겹치는 쪽이에요.':'일반은 필터 결과로 바꾸고, 다른 모드는 지금까지의 결과 위에 필터 결과를 혼합해요. 불투명도와 적용 범위는 그다음 조절해요.'));
  if(definition.hint)panel.append(el('p',{id:'effect-layer-hint',class:'hint'},definition.hint));
  if(layer.kind==='sprite')panel.append(el('p',{id:'effect-sprite-controls-hint',class:'hint'},SPRITE_CONTROL_HINT),el('div',{class:'particle-image-gallery','aria-label':'기본 입자 이미지'},...PARTICLE_IMAGES.map(([key,name])=>button([el('img',{src:particleImageData(key),alt:'',width:40,height:40}),el('span',{},name)],()=>onBuiltinImage?.(layer.id,key),{'data-particle-image':key,disabled:importing||!onBuiltinImage,title:name}))));
- if(layer.kind!=='textWarp')panel.append(el('label',{class:'check'},el('input',{id:'effect-over-text',type:'checkbox',checked:layer.protectText===false,onchange:event=>mutate(l=>l.protectText=!event.target.checked)}),'글자 위에도 그리기'));
+ if(layer.kind!=='textWarp')panel.append(el('label',{class:'check'},el('input',{id:'effect-over-text',type:'checkbox',checked:layer.protectText===false,onchange:event=>mutate(l=>{l.protectText=!event.target.checked;if(event.target.checked&&definition.generative)l.placement='front';})}),'글자 위에도 그리기'));
+ const timed=definition.generative&&!(layer.kind==='sprite'&&layer.params.renderMode==='single');
+ if(timed)panel.append(renderParticleEmission(layer,mutate,{open:emissionOpen}));
  const groups=new Map(),groupIds={'이미지 자르기':'crop','크기·회전 중심':'transform','여러 컷 재생':'sheet','이동 패턴':'path'};
  const entries=Object.entries(definition.fields);if(layer.kind==='sprite')entries.sort(([a],[b])=>(a==='shape'?0:a==='renderMode'?1:2)-(b==='shape'?0:b==='renderMode'?1:2));
  for(const [key,f] of entries){
+  if(timed&&layer.emission&&['count','life'].includes(key))continue;
+  if(timed&&layer.emission&&((layer.kind==='ripple'&&key==='frequency')||(layer.kind==='starlight'&&key==='randomness')))continue;
+  if(timed&&layer.emission?.alphaCurve&&['alphaStart','alphaEnd','fadeIn','fadeOut'].includes(key))continue;
   if(layer.kind==='sprite'&&!isSpriteFieldVisible(key,layer.params))continue;
   if(layer.kind==='sprite'&&layer.params.renderMode==='single'&&f.group==='이동 패턴')continue;
   let fieldHost=panel;
@@ -72,7 +80,12 @@ export function renderVisualEffectFields(host,{recipe,selectedLayerId,targetType
     el('div',{class:'two-fields'},button('입자 이미지 가져오기',()=>onImportImage?.(layer.id),{id:'effect-sprite-import',disabled:importing}),button('보관함에서 선택',()=>onLibraryImage?.(layer.id),{id:'effect-sprite-library',disabled:importing||!onLibraryImage})));
   }else{
    const scale=f.displayScale??1,number=f.type==='number',label=layer.kind==='sprite'&&layer.params.renderMode==='single'?({sizeStart:'장식 크기',alphaStart:'그림 투명도',rotation:'회전'})[key]||f.label:f.label;
-   fieldHost.append(field(label+(f.unit?' ('+f.unit+')':''),'effect-param-'+key,number?(layer.params[key]??f.value)*scale:layer.params[key]??f.value,v=>mutate(l=>l.params[key]=number?v/scale:v),{type:f.type,min:number?f.min*scale:f.min,max:number?f.max*scale:f.max,step:number?f.step*scale:f.step,options:f.options}));
+   const control=field(label+(f.unit?' ('+f.unit+')':''),'effect-param-'+key,number?(layer.params[key]??f.value)*scale:layer.params[key]??f.value,v=>mutate(l=>l.params[key]=number?v/scale:v),{type:f.type,min:number?f.min*scale:f.min,max:number?f.max*scale:f.max,step:number?f.step*scale:f.step,options:f.options});
+   const base=key.replace(/(?:Start|End)$/,'');
+   if(key.endsWith('Start')&&definition.fields[base+'End']&&!(layer.kind==='sprite'&&layer.params.renderMode==='single')){
+    const row=el('div',{class:'particle-range','data-range':base},control,el('span',{'aria-hidden':'true'},'~'));fieldHost.append(row);
+   }else if(key.endsWith('End')&&fieldHost.querySelector('[data-range="'+base+'"]'))fieldHost.querySelector('[data-range="'+base+'"]').append(control);
+   else fieldHost.append(control);
   }
  }
 

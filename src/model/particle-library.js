@@ -36,9 +36,12 @@ export function parseParticleLibrary(text){
 }
 export const serializeParticleLibrary=library=>JSON.stringify(parseParticleLibrary(JSON.stringify(library)),null,2);
 export function createParticleEntry(name,recipe,assets={}){return checkedEntry({id:'particle-'+newId(),name,recipe:clone(recipe),assets});}
-export function instantiateParticle(value){
- const entry=checkedEntry(value),map=new Map(Object.keys(entry.assets).map(id=>[id,newId()])),assets={};
- for(const [id,asset] of Object.entries(entry.assets)){const next=map.get(id);assets[next]={...clone(asset),id:next};}
+export function instantiateParticle(value,existingAssets={}){
+ const entry=checkedEntry(value),map=new Map(),assets={};
+ for(const [id,asset] of Object.entries(entry.assets)){
+  const same=[...Object.values(existingAssets),...Object.values(assets)].find(other=>other.mime===asset.mime&&other.width===asset.width&&other.height===asset.height&&other.dataUrl===asset.dataUrl);
+  const next=same?.id??newId();map.set(id,next);if(!same)assets[next]={...clone(asset),id:next};
+ }
  const recipe=clone(entry.recipe);for(const layer of recipe.layers){layer.id=newId();if(layer.params?.assetId)layer.params.assetId=map.get(layer.params.assetId);}
  return {recipe,assets};
 }
