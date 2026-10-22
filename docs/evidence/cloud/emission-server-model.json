@@ -1,0 +1,13 @@
+{
+  "status": "PASS",
+  "checkedAt": "2026-10-22T23:17:20.902Z",
+  "checks": [
+    "card accepts emission timing, burst, curves and draw order",
+    "shared effect accepts the same complete schedule",
+    "invalid lifetime range is still rejected",
+    "burst outside duration is still rejected",
+    "downloaded production model matches the tested local bundle"
+  ],
+  "matchesLocal": true,
+  "deployedModelSha256": "a9edf55d530500bf873f9bfd5371dde8df1f249c7c41e948ecff94abaf081af1"
+}

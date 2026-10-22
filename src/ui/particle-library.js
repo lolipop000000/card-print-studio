@@ -79,7 +79,7 @@ export function createParticleLibraryControls(ctx,{workspace}={}){
    childEditor=openVisualEffectsEditor(child,{cardId:card.id,elementId:kind==='frame'?null:element.id},{initialName:entry.builtin?entry.name+' 조합':entry.name,applyLabel:'파티클 보관함에 저장',onApply:async value=>{if(!active)throw Error('보관함을 다시 열어 저장하세요.');const saved=await save(value.name,value.recipe,value.assets,entry.builtin?null:entry.id);if(active){selected=saved.id;render();}}});
   }
   function apply(entry,mode){
-   const copy=instantiateParticle(entry),project=ctx.store.getProject(),card=ctx.target();if(!card)throw Error('먼저 사용할 카드를 선택하세요.');
+   const project=ctx.store.getProject(),copy=instantiateParticle(entry,project.assets),card=ctx.target();if(!card)throw Error('먼저 사용할 카드를 선택하세요.');
    const chosen=mode==='selected'?card.elements.find(item=>item.id===ctx.state.selectedElementId):mode==='name'?card.elements.find(item=>item.binding?.field==='name'):null;
    if(['selected','name'].includes(mode)&&!chosen)throw Error(mode==='selected'?'효과를 붙일 글자나 그림을 먼저 선택하세요.':'이 카드에 제목 요소가 없어요.');
    if(chosen&&!['text','image','effect'].includes(chosen.type))throw Error('글자·그림·독립 장식을 선택하세요.');

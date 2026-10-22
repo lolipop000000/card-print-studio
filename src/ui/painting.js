@@ -8,7 +8,12 @@ import {PAINT_BLEND_MODES,DEFAULT_PAINT_BLEND_MODE,normalizePaintBlendMode,paint
 import {BRUSH_PRESETS,brushPresetOptions} from '../painting/brush-presets.js';
 import {screenToPixel,zoomAt} from '../painting/viewport.js';
 import {mountTouchViewport} from './touch-viewport.js';
-const TOOLS=[['brush','✎','브러시','B'],['eraser','▱','지우개','E'],['select','▧','사각 선택','M'],['pan','✥','화면 이동','H'],['fill','▰','채우기','G'],['gradient','◩','그라데이션','D'],['eyedropper','⌖','스포이트','I'],['line','╱','직선','L'],['rect','□','사각형','R'],['ellipse','○','타원','O']];
+const TOOLS=[['brush','✎','브러시','B'],['eraser','▱','지우개','E'],['select','▧','사각 선택','M'],['pan','✥','화면 이동','H'],['fill',null,'페인트통 채우기','G'],['gradient','◩','그라데이션','D'],['eyedropper','⌖','스포이트','I'],['line','╱','직선','L'],['rect','□','사각형','R'],['ellipse','○','타원','O']];
+function paintBucketIcon(){
+ const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+ for(const [key,value] of Object.entries({viewBox:'0 0 24 24',width:25,height:25,fill:'none',stroke:'currentColor','stroke-width':1.7,'stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true',focusable:'false'}))svg.setAttribute(key,value);
+ const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d','m7 4 9 9-6 6a2 2 0 0 1-3 0l-4-4a2 2 0 0 1 0-3l6-6M3.5 12.5h12M7 4 5 2m14 12s-2.5 3-2.5 4.5a2.5 2.5 0 0 0 5 0C21.5 17 19 14 19 14Z');svg.append(path);return svg;
+}
 export async function openPaintingEditor(root,store,cardId){
  const p=store.getProject(),card=p.cards.find(c=>c.id===cardId);if(!card)throw Error('그림을 그릴 카드를 선택하세요.');
  const asset=p.assets[card.artAssetId],source=asset?.paintingId?p.paintings[asset.paintingId]:asset;let session;
@@ -48,7 +53,7 @@ export async function openPaintingEditor(root,store,cardId){
  const applyButton=button('카드에 적용',apply,{id:'paint-apply',class:'primary'});
  const undoButton=button('↶',undo,{id:'paint-undo','aria-label':'그림 실행 취소'}),redoButton=button('↷',redo,{id:'paint-redo','aria-label':'그림 다시 실행'});
  const top=el('header',{class:'paint-top'},el('div',{},el('strong',{},'그림 작업실'),el('small',{},card.name)),el('div',{class:'paint-top-actions'},undoButton,redoButton,button('캔버스 크기',resizeDialog,{id:'paint-resize'}),button('투명 PNG',()=>exportPng(false),{id:'paint-export-transparent'}),button('흰 배경 PNG',()=>exportPng(true),{id:'paint-export-white'}),applyButton,button('닫기',close,{id:'paint-close'})));
- for(const [tool,icon,name,shortcut] of TOOLS)toolBar.append(button(icon,()=>setTool(tool),{id:'tool-'+tool,title:name+' · '+shortcut,'aria-label':name,class:'paint-tool','data-tool':tool}),el('small',{},shortcut));
+ for(const [tool,icon,name,shortcut] of TOOLS)toolBar.append(button(tool==='fill'?paintBucketIcon():icon,()=>setTool(tool),{id:'tool-'+tool,title:name+' · '+shortcut,'aria-label':name,class:'paint-tool','data-tool':tool}),el('small',{},shortcut));
  const zoomInput=el('input',{id:'paint-zoom',type:'number',min:12.5,max:1600,step:12.5,'aria-label':'그림 배율',onchange:e=>setZoom(Number(e.target.value)/100)});
  const bottom=el('footer',{class:'paint-bottom'},status,el('span',{id:'paint-coords'},'B 브러시 · E 지우개 · M 선택 · Space 이동'),zoomInput,el('span',{},'%'),button('전체 맞춤',fit,{id:'paint-fit'}),button('100%',()=>setZoom(1),{id:'paint-100'}));
  dialog.append(top,el('div',{class:'paint-grid'},toolBar,viewport,panel),message,bottom);document.body.append(dialog);dialog.showModal();
@@ -67,7 +72,7 @@ export async function openPaintingEditor(root,store,cardId){
   if(rect){Object.assign(selectionBox.style,{left:rect.x+'px',top:rect.y+'px',width:rect.w+'px',height:rect.h+'px',borderWidth:1/view.scale+'px'});
    for(const h of selectionBox.children){h.style.width=8/view.scale+'px';h.style.height=8/view.scale+'px';h.style.borderWidth=1/view.scale+'px';}
   }
-  viewport.style.cursor=space||tools.getOptions().tool==='pan'?'grab':tools.getOptions().tool==='select'?'crosshair':'none';renderState();
+  viewport.style.cursor=space||tools.getOptions().tool==='pan'?'grab':['brush','eraser'].includes(tools.getOptions().tool)?'none':'crosshair';renderState();
  }
  function requestRender(){if(!frame)frame=requestAnimationFrame(()=>{frame=0;renderViewport();});}
  function renderAll(){renderViewport();renderPanel();}

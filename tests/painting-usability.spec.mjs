@@ -42,6 +42,20 @@ async function downloadPixels(page,selector){
  return page.evaluate(async data=>{const image=new Image();image.src=data;await image.decode();const c=document.createElement('canvas');c.width=image.width;c.height=image.height;c.getContext('2d').drawImage(image,0,0);return [...c.getContext('2d').getImageData(256,256,1,1).data];},'data:image/png;base64,'+Buffer.concat(chunks).toString('base64'));
 }
 
+test('fill and other point tools keep the mouse visible, and the fill button uses a bucket icon',async()=>{
+ const {browser,page,errors}=await openMemoryPainter();try{
+  await fixture(page,[{id:'paint',name:'채색',color:'#ffffff'}]);
+  const box=await page.locator('#paint-canvas').boundingBox();
+  for(const tool of ['fill','gradient','eyedropper','line','rect','ellipse']){
+   await page.locator('#tool-'+tool).click();await page.mouse.move(box.x+20,box.y+20);
+   assert.equal(await page.locator('#paint-canvas').evaluate(n=>getComputedStyle(n).cursor),'crosshair',tool+' must have a visible native pointer');
+  }
+  assert.equal(await page.locator('#tool-fill svg').count(),1);
+  await page.locator('#tool-brush').click();await page.mouse.move(box.x+30,box.y+30);
+  assert.equal(await page.locator('#paint-viewport').evaluate(n=>getComputedStyle(n).cursor),'none');assert.equal(await page.locator('.paint-cursor').isVisible(),true);assert.deepEqual(errors,[]);
+ }finally{await browser.close();}
+});
+
 test('brush, eraser and line honor fractional and canvas-wide pixel sizes without corrupting undo',async()=>{
  const {browser,page,errors}=await openMemoryPainter();try{
   const result=await page.evaluate(async()=>{

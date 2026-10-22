@@ -52,7 +52,7 @@ function drawCard(ctx,project,target,assets,dpi,{timeSec=getEffectFrameSec(proje
  };
  effectCache.prepare(project,target,assets);
  const timeOptions={timeSec,frozenTimeSec,playbackTarget},effectTime=(e,skillId=null,textRangeId=null,keywordId=null)=>effectPlaybackTime(timeOptions,{elementId:e?.id??null,skillId,textRangeId,keywordId});
- const visibleElements=target.elements;
+ const visibleElements=target.elements,foreground=[];
  const attributes=cardAttributes(target);
  const textTypes=['text','rank','dice','keywords','attribute'],maskDpi=Math.min(dpi,150),work={x:-12,y:-12,w:w+24,h:h+24};
  const active=recipe=>recipe?.layers.some(l=>l.enabled&&l.opacity>0);
@@ -107,15 +107,16 @@ function drawCard(ctx,project,target,assets,dpi,{timeSec=getEffectFrameSec(proje
  });};
  const effects=(e,rect,recipe,source,{context=ctx,protection=protectionFor(e?.id),skillId,runId,textRangeId,keywordId}={})=>{
   const frozen=playbackTarget&&!isEffectPlaybackTarget(playbackTarget,{elementId:e?.id??null,skillId,textRangeId,keywordId});
-  const outputCacheKey=frozen?'frozen-effect:'+JSON.stringify([e?.id,skillId,textRangeId,keywordId,runId,dpi,effectTime(e,skillId,textRangeId,keywordId),rect,recipe,source?.key]):null,geometry=[];
-  const report=renderVisualEffects(context,{rect,recipe,source,dpi,timeSec:effectTime(e,skillId,textRangeId,keywordId),minFontPt:s.minFontPt,cache:effectCache,outputCacheKey,assets,target:keywordId?'text':e?.type||'frame',textProtection:protection,textProtectionKey:protection?.cacheKey,cardRect:{x:0,y:0,w,h},onGeometry:g=>geometry.push({elementId:e?.id??null,...(skillId?{skillId}:{}),...(textRangeId?{textRangeId}:{}),...(keywordId?{keywordId}:{}),...(runId?{runId}:{}),rect:{...g.rect},sizeHeightMm:g.sizeHeightMm})});
+  const outputCacheKey=frozen?'frozen-effect:'+JSON.stringify([e?.id,skillId,textRangeId,keywordId,runId,dpi,effectTime(e,skillId,textRangeId,keywordId),rect,recipe,source?.key]):null,geometry=[],effectForeground=[];
+  const report=renderVisualEffects(context,{rect,recipe,source,dpi,timeSec:effectTime(e,skillId,textRangeId,keywordId),minFontPt:s.minFontPt,cache:effectCache,outputCacheKey,assets,target:keywordId?'text':e?.type||'frame',textProtection:protection,textProtectionKey:protection?.cacheKey,cardRect:{x:0,y:0,w,h},onForeground:entry=>effectForeground.push(entry),onGeometry:g=>geometry.push({elementId:e?.id??null,...(skillId?{skillId}:{}),...(textRangeId?{textRangeId}:{}),...(keywordId?{keywordId}:{}),...(runId?{runId}:{}),rect:{...g.rect},sizeHeightMm:g.sizeHeightMm})});
+  if(context===ctx)foreground.push(...effectForeground);
   const effectGeometry=[];
   const emitGeometry=entry=>{effectGeometry.push(entry);if(typeof onEffectGeometry==='function')onEffectGeometry({...entry,rect:{...entry.rect}});};
   for(const entry of geometry)emitGeometry(entry);
   for(const entry of report.nestedNameGeometry||[])emitGeometry(entry);
   const reportedProblems=[...report.problems.map(problem=>({...problem,...(skillId?{skillId}:{})})),...(report.nestedNameProblems||[])];
   for(const problem of reportedProblems)issue(problem.code,problem.message,e,problem.severity,problem.skillId);
-  return {...report,reportedProblems,effectGeometry};
+  return {...report,reportedProblems,effectGeometry,effectForeground};
  };
  const drawFrame=g=>{g.strokeStyle='#b6c2b8';g.lineWidth=.28;g.beginPath();g.roundRect(1,1,w-2,h-2,2);g.stroke();};
  if(active(target.visualEffects))effects(null,{x:1,y:1,w:w-2,h:h-2},target.visualEffects,{key:'frame',draw:drawFrame});else drawFrame(ctx);
@@ -162,15 +163,15 @@ function drawCard(ctx,project,target,assets,dpi,{timeSec=getEffectFrameSec(proje
    }
    const draw=(g,plainMask=false)=>{
     if(plainMask)return drawRawText(g,e,{plainMask:true});
-    const layout=drawRawText(g,e,{skipNameEffects:true}),nestedNameProblems=[],nestedNameGeometry=[];
+    const layout=drawRawText(g,e,{skipNameEffects:true}),nestedNameProblems=[],nestedNameGeometry=[],nestedNameForeground=[];
     for(const run of info.runs)if(active(run.style.visualEffects)){
      const source={key:e.id+':name:'+run.id+':'+info.key,draw:surface=>drawRichTextNameRun(surface,info.layout,run,r,style,assets)};
      const report=effects(e,run.rect,run.style.visualEffects,source,{context:g,protection:nameProtectionFor(e,run),skillId:run.skillId,runId:run.id,textRangeId:run.textRangeId,keywordId:run.keywordId});
-     nestedNameProblems.push(...report.reportedProblems);nestedNameGeometry.push(...report.effectGeometry);
+     nestedNameProblems.push(...report.reportedProblems);nestedNameGeometry.push(...report.effectGeometry);if(g!==ctx)nestedNameForeground.push(...report.effectForeground);
     }
     // readSource caches the composed pixels and this result together. Keep
     // nested diagnostics and transform geometry with those pixels for warm previews.
-    return nestedNameProblems.length||nestedNameGeometry.length?{...layout,...(nestedNameProblems.length?{nestedNameProblems}:{}),...(nestedNameGeometry.length?{nestedNameGeometry}: {})}:layout;
+    return nestedNameProblems.length||nestedNameGeometry.length||nestedNameForeground.length?{...layout,...(nestedNameProblems.length?{nestedNameProblems}:{}),...(nestedNameGeometry.length?{nestedNameGeometry}: {}),...(nestedNameForeground.length?{nestedNameForeground}:{})}:layout;
    };
    if(reference.missing.length)issue('missing-skill-reference','참조한 스킬이 삭제되었어요. 표시된 이름은 유지되며 스킬 참조를 다시 고를 수 있어요.',e,'warning');
    const movingNames=info.runs.filter(run=>run.style.visualEffects?.layers.some(layer=>layer.enabled&&layer.opacity>0&&layer.motion?.enabled));
@@ -184,5 +185,6 @@ function drawCard(ctx,project,target,assets,dpi,{timeSec=getEffectFrameSec(proje
   }
   ctx.restore();
  }
+ for(const entry of foreground){ctx.save();ctx.globalAlpha*=entry.opacity;ctx.globalCompositeOperation=entry.blendMode;paintSurface(ctx,entry.surface);ctx.restore();}
  return {problems};
 }

@@ -9,7 +9,7 @@ const ROOT=fileURLToPath(new URL('../',import.meta.url));
 const core=['offline','updates'];
 const profiles={
  quick:core,
- effects:[...core,'preview-settings','mobile-layout','visual-effects-card','visual-effects-history','effect-selected-playback','starlight'],
+ effects:[...core,'preview-settings','mobile-layout','visual-effects-card','visual-effects-history','effect-selected-playback','effect-playback-cache','effects-gpu','starlight','particle-emission-render','particle-emission-ui','particle-emitter-ui','painting-usability','visual-effects-print'],
  print:[...core,'native-print-app','browser-print','visual-effects-print','printing-tolerant','sprite-customization-print'],
  full:null
 };

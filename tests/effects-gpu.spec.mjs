@@ -119,6 +119,20 @@ test('ripple contours and partial-alpha filter interpolation return the actual G
  });assert.ok(result.contourError<=1,JSON.stringify(result));assert.ok(result.mixError<=1,JSON.stringify(result));assert.equal(result.ripple,1);assert.equal(result.mix,1);
 });
 
+test('GPU contours retain per-ring displacement beyond the former twelve-ring limit',async()=>{
+ const result=await session.page.evaluate(()=>{
+  const a=allGpuApi,width=41,height=29,scale=5,distance=new Float32Array(width*height),stroke=.35;
+  for(let y=0;y<height;y++)for(let x=0;x<width;x++)distance[y*width+x]=Math.hypot(x-20,y-14)/scale-1.2;
+  const rings=Array.from({length:35},(_,i)=>({radius:.3+i*.06,alpha:.2,x:(i%5-2)*.4,y:(i%3-1)*.6}));
+  const before=a.getEffectAccelerationStatus(),pixels=a.gpuContour({width,height,distance,scale},rings,'#79d9ff',stroke);let error=0;
+  for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+   let alpha=0;for(const ring of rings){const sx=Math.floor(x-ring.x*scale+.5),sy=Math.floor(y-ring.y*scale+.5);if(sx<0||sy<0||sx>=width||sy>=height)continue;const d=distance[sy*width+sx];if(d<0||!Number.isFinite(d))continue;const coverage=Math.max(0,Math.min(1,(stroke*.5+.5/scale-Math.abs(d-ring.radius))*scale))*ring.alpha;alpha=1-(1-alpha)*(1-coverage);}
+   error=Math.max(error,Math.abs(pixels[(y*width+x)*4+3]-Math.round(alpha*255)));
+  }
+  return {error,gpu:a.getEffectAccelerationStatus().gpuRenders-before.gpuRenders};
+ });assert.ok(result.error<=1,JSON.stringify(result));assert.equal(result.gpu,1);
+});
+
 test('a GPU filter followed by a failed composite finishes on CPU and reports mixed work',async()=>{
  const page=await session.context.newPage();try{
   await page.addScriptTag({content:bundle.outputFiles[0].text});

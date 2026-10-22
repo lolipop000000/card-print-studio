@@ -38,7 +38,7 @@ function lightStamp(ctx,side,notch,glow,extent,rayColor,coreColor){
 }
 
 /** Four diffraction spikes, a hot core and deterministic lifetime/twinkle fades. */
-export function drawStarlight(ctx,layer,{time=1.2,height=1,point,random,include}){
+export function drawStarlight(ctx,layer,{time=1.2,height=1,point,random,include,lifetimes=null}){
  const p=layer.params??{},count=Math.floor(number(p.count,12,0,160)),size=number(p.size,.12,0,2);
  if(!count||!size||ctx.globalAlpha<=0)return false;
  const h=number(height,1,.01,1e6),t=number(time,1.2,-1e9,1e9);
@@ -50,25 +50,27 @@ export function drawStarlight(ctx,layer,{time=1.2,height=1,point,random,include}
  const seeded=(index,salt)=>number(random?.(index,'starlight:'+salt),.5,0,1);
  // One stable resolution covers the largest possible star in this recipe.
  // Per-star or per-frame buckets would evict each other at high print scales.
- const footprint=h*size*1.25*Math.max(1,stretch)*extent*scale*2.5;
+ const footprint=h*size*1.25*Math.max(1,stretch)*extent*scale*2.5*Math.max(1,...(layer.emission?.sizeCurve??[]).map(p=>p.value));
  const side=Math.min(2048,2**Math.ceil(Math.log2(Math.max(256,footprint))));
  let drawn=false,stamp;
- for(let index=0;index<count;index++){
-  const age=moving?t/life+seeded(index,'phase'):0,cycle=Math.floor(age),phase=age-cycle;
+ const states=lifetimes??Array.from({length:count},(_,index)=>{const age=moving?t/life+seeded(index,'phase'):0;return {index,cycle:Math.floor(age),phase:age-Math.floor(age),sizeScale:1};});
+ for(const state of states){
+  const {index,cycle,phase}=state;
   const envelope=moving?Math.sin(Math.PI*phase)**2:1;
   const pulse=moving?.5+.5*Math.cos(TAU*(t*twinkle+seeded(index,'twinkle'))):1;
-  const alpha=envelope*(.65+.35*pulse);
+  const alpha=state.alpha??envelope*(.65+.35*pulse);
   if(alpha<1/4096)continue;
-  const anchor=point?.(index,0,'starlight');
+  const anchor=point?.(index,lifetimes?cycle:0,'starlight');
   if(!anchor||!Number.isFinite(anchor.x)||!Number.isFinite(anchor.y))continue;
   let x=anchor.x,y=anchor.y;
-  if(randomness>0&&moving&&cycle!==0){
+  if(!lifetimes&&randomness>0&&moving&&cycle!==0){
    const next=point(index,cycle,'starlight');
    if(next&&Number.isFinite(next.x)&&Number.isFinite(next.y)){
     x+=(next.x-x)*randomness;y+=(next.y-y)*randomness;
    }
   }
-  const radius=h*size*(.75+.5*seeded(index,'size'))*(.5+.5*Math.sqrt(envelope))*(.9+.1*pulse);
+  const radius=h*size*(.75+.5*seeded(index,'size'))*(.5+.5*Math.sqrt(envelope))*(.9+.1*pulse)*state.sizeScale;
+  if(radius<=0)continue;
   stamp??=lightStamp(ctx,side,notch,glow,extent,rayColor,coreColor);if(!stamp)continue;
   ctx.save();
   try{

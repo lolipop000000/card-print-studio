@@ -92,18 +92,20 @@ function vortex(ctx,r,p){
 }
 
 /** Draw stateless particles in the caller's millimetre coordinate system. */
-export function drawParticleGenerator(ctx,layer,{time=1.2,height,point,random,include}){
+export function drawParticleGenerator(ctx,layer,{time=1.2,height,point,random,include,lifetimes=null}){
  if(!Object.hasOwn(defaults,layer.kind))return false;const base=defaults[layer.kind];
  const p={...base,...layer.params},h=Math.max(.01,height),count=Math.floor(number(p.count,base.count,1,80)),life=number(p.life,base.life,.2,6),size=h*number(p.size,base.size,.005,.3),travel=h*number(p.travel,base.travel,0,2),spread=number(p.spread,base.spread,0,2),direction=number(p.direction,base.direction,-180,180)*Math.PI/180,fade=number(p.fade,base.fade,.2,4),spin=number(p.spin,base.spin??0,-3,3),t=Number.isFinite(time)?time:1.2;
  p.ink=darken(p.color);
  const particles=[];
- for(let index=0;index<count;index++){
-  const u=t/life+random(index,'phase'),cycle=Math.floor(u),phase=u-cycle;
+ const states=lifetimes??Array.from({length:count},(_,index)=>{const u=t/life+random(index,'phase');return {index,cycle:Math.floor(u),phase:u-Math.floor(u),sizeScale:1};});
+ for(const state of states){
+  const {index,cycle,phase}=state;
   // The smooth entrance also masks the new seed/position at a life boundary.
-  const alpha=smooth(phase/.12)*smooth((1-phase)/.2)*Math.pow(1-phase,fade);
+  const alpha=state.alpha??smooth(phase/.12)*smooth((1-phase)/.2)*Math.pow(1-phase,fade);
   if(alpha<.00001)continue;
   const e=point(index,cycle);if(!e)continue;
-  const salt=cycle+':',r=size*(.78+.44*random(index,salt+'size')),heading=direction+(random(index,salt+'direction')-.5)*spread*(layer.kind==='rain'?.35:1.4),dx=Math.cos(heading),dy=Math.sin(heading),distance=travel*phase*(.75+.5*random(index,salt+'travel'));
+  const salt=cycle+':',r=size*(.78+.44*random(index,salt+'size'))*state.sizeScale,heading=direction+(random(index,salt+'direction')-.5)*spread*(layer.kind==='rain'?.35:1.4),dx=Math.cos(heading),dy=Math.sin(heading),distance=travel*phase*(.75+.5*random(index,salt+'travel'));
+  if(r<=0)continue;
   const sway=Math.sin(phase*TAU+random(index,salt+'sway')*TAU)*h*spread*.055*phase;
   let x=e.x+dx*distance-dy*sway,y=e.y+dy*distance+dx*sway,angle=random(index,salt+'rotation')*TAU+t*spin*TAU;
   if(layer.kind==='vortex'){
@@ -112,7 +114,7 @@ export function drawParticleGenerator(ctx,layer,{time=1.2,height,point,random,in
   }
   particles.push({index,phase,alpha,r,x,y,angle,heading,dx,dy,tumble:t*spin*TAU+random(index,salt+'tumble')*TAU});
  }
- particles.sort((a,b)=>b.phase-a.phase);
+ if(!lifetimes)particles.sort((a,b)=>b.phase-a.phase);
  ctx.save();
  try{
   ctx.lineCap='round';ctx.lineJoin='round';ctx.setLineDash([]);ctx.lineDashOffset=0;ctx.shadowBlur=0;

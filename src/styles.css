@@ -309,3 +309,22 @@
  .card-area>.canvas-scroll{grid-column:1/-1;grid-row:1}.card-area>.card-warnings{grid-column:1/-1;grid-row:2}
  .card-area>.card-effect-transport{grid-column:1;grid-row:3}.card-area>.canvas-footer{grid-column:2;grid-row:3;border-left:1px solid var(--line)}
 }
+:root{--particle-chart:var(--accent,#628a74)}
+.effect-layer-fields #effect-emission-section{margin:16px 0;padding:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+#effect-emission-section>summary{font-size:12px;font-weight:700;cursor:pointer}
+.particle-range{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:7px;align-items:end;min-width:0}
+.particle-range>span{padding-bottom:10px;color:var(--muted)}
+.particle-range input,.particle-curve-point input{width:100%;min-width:0}
+.particle-curve{margin-top:15px;padding-top:8px;border-top:1px solid var(--line)}
+.particle-curve-graph{display:block;width:100%;height:auto;background:var(--paper);border:1px solid var(--line);border-radius:8px;margin:10px 0;touch-action:none}
+.particle-curve-graph polyline{fill:none;stroke:var(--particle-chart);stroke-width:2;pointer-events:stroke}
+.particle-curve-graph circle{fill:var(--paper);stroke:var(--particle-chart);stroke-width:2;cursor:grab;touch-action:none}
+.particle-curve-graph circle:focus{stroke-width:4;outline:none}
+.particle-curve-point{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:6px;align-items:end}
+.particle-curve-point button{margin-bottom:1px}
+.particle-burst-chart{margin:14px 12px 8px}
+.particle-burst-timeline{height:36px;position:relative;background:var(--accent-soft);border:1px solid var(--line);border-radius:6px;touch-action:none}
+.particle-burst-timeline button{position:absolute;top:3px;transform:translateX(-50%);height:28px;min-width:25px;padding:2px;cursor:grab;touch-action:none;background:var(--paper);border-color:var(--particle-chart)}
+.particle-time-labels,.particle-burst-heading{display:flex;justify-content:space-between;align-items:center;font-size:10px;margin-top:5px}
+.particle-burst-row{padding:9px;margin:10px 0;border:1px solid var(--line);border-radius:8px;min-width:0}
+.particle-burst-heading button{font-size:10px;padding:4px 8px}

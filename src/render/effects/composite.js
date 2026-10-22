@@ -19,7 +19,7 @@ export function createEffectCache(){
   memo(key,create){if(entries.has(key))return entries.get(key);const value=create();entries.set(key,value);if(entries.size>48)entries.delete(entries.keys().next().value);return value;},
   memoOutput(key,create){
    if(outputs.has(key)){const entry=outputs.get(key);outputs.delete(key);outputs.set(key,entry);return entry.value;}
-   const value=create(),canvas=value.surface.canvas,bytes=canvas.width*canvas.height*4;
+   const value=create(),canvas=value.surface.canvas,bytes=canvas.width*canvas.height*4+(value.foreground??[]).reduce((sum,entry)=>sum+entry.surface.canvas.width*entry.surface.canvas.height*4,0);
    // Temporary masks can churn every frame. Keep finished frozen pixels in a
    // separate LRU, bounded by their retained RGBA memory rather than mask count.
    if(bytes<=outputLimit){
@@ -121,35 +121,37 @@ function obscuresText(surface,protection,base=null){
  return total>0&&covered/total>.2;
 }
 export function renderVisualEffects(ctx,options){
- const {cache=createEffectCache(),outputCacheKey=null,textProtection=null,textProtectionKey=null,onGeometry=null}=options;
+ const {cache=createEffectCache(),outputCacheKey=null,textProtection=null,textProtectionKey=null,onGeometry=null,onForeground=null}=options;
  const compose=()=>{
-  const geometry=[],result=composeVisualEffects(ctx,{...options,cache,onGeometry:entry=>geometry.push(entry)});
+  const geometry=[],result=composeVisualEffects(ctx,{...options,cache,deferForeground:!!onForeground,onGeometry:entry=>geometry.push(entry)});
   return {...result,geometry};
  };
  let result;
  if(outputCacheKey&&cache.memoOutput&&(!textProtection||textProtectionKey!==null)){
   // A mask may be regenerated after temporary-cache eviction. Its semantic key
   // stays stable while its pixels do, unlike the recreated surface identity.
-  result=cache.memoOutput(JSON.stringify([outputCacheKey,textProtectionKey]),compose);
+  result=cache.memoOutput(JSON.stringify([outputCacheKey,textProtectionKey,!!onForeground]),compose);
  }else if(outputCacheKey){
-  const entries=cache.memo(outputCacheKey,()=>new Map());
+  const entries=cache.memo(outputCacheKey+':foreground:'+!!onForeground,()=>new Map());
   result=entries.get(textProtection);
   if(!result){result=compose();entries.set(textProtection,result);if(entries.size>2)entries.delete(entries.keys().next().value);}
  }else result=compose();
  // Reuse the original composed surface, without a second raster transfer.
  // Extra padded blits would resample edges differently at fractional DPI.
  paintSurface(ctx,result.surface);
+ for(const entry of result.foreground??[])onForeground?.(entry);
  for(const entry of result.geometry)onGeometry?.({...entry,rect:{...entry.rect}});
  return result.report;
 }
-function composeVisualEffects(ctx,{rect,recipe,target,source,dpi,timeSec=1.2,minFontPt=7,cache,textProtection=null,cardRect=null,assets=null,onGeometry=null}){
+function composeVisualEffects(ctx,{rect,recipe,target,source,dpi,timeSec=1.2,minFontPt=7,cache,textProtection=null,cardRect=null,assets=null,onGeometry=null,deferForeground=false}){
  recipe=upgradeVisualEffects(recipe,target);
  const scale=dpi/25.4,w=cardRect?.w??ctx.canvas.width/scale,h=cardRect?.h??ctx.canvas.height/scale,work={x:-12,y:-12,w:w+24,h:h+24};
  const layers=recipe.layers.filter(l=>l.enabled&&l.opacity>0),warp=layers.find(l=>l.kind==='textWarp'),problems=[];
+ const warpsSource=warp&&Boolean(warp.params.arc||warp.params.wave||warp.params.skewDeg||warp.params.scaleX!==1||warp.params.scaleY!==1);
  const sourcesAt=resolution=>{
   const raw=readSource(source,work,resolution,cache);if(!warp)return raw;
   const params=warp.params,time=warp.motion.enabled?timeSec*warp.motion.speed:0;
-  if(!params.arc&&!params.wave&&!params.skewDeg&&params.scaleX===1&&params.scaleY===1)return {...raw,verticalScale:1};
+  if(!warpsSource)return {...raw,verticalScale:1};
   const create=()=>({...warpTextSources(raw.source,raw.plainMask,{rect,params,timeSec:time,dpi:resolution}),result:raw.result});
   return warp.motion.enabled&&params.wave?create():cache.memo('warp:'+source.key+':'+resolution+':'+JSON.stringify(params)+':'+JSON.stringify(work),create);
  };
@@ -165,6 +167,7 @@ function composeVisualEffects(ctx,{rect,recipe,target,source,dpi,timeSec=1.2,min
  });
  const solid=cache.memo(shapeKey+':solid:'+dpi,()=>shapeSurface(shape,work,dpi));
  let geometry=original.boundsMm??null,acc=original.source;
+ const foreground=deferForeground?(result.nestedNameForeground??[]).map(entry=>({...entry,surface:warpsSource?warpTextSources(entry.surface,entry.surface,{rect,params:warp.params,timeSec:warp.motion.enabled?timeSec*warp.motion.speed:0,dpi}).source:entry.surface})):[];
  if(warp&&result.fontPt*(original.verticalScale??warp.params.scaleY)<minFontPt-.001)problems.push({code:'effect-font-minimum',message:'글자 세로 압축 후 '+(result.fontPt*(original.verticalScale??warp.params.scaleY)).toFixed(2)+'pt로 최소 '+minFontPt+'pt보다 작습니다. 원래 '+result.fontPt+'pt × 세로 '+(original.verticalScale??warp.params.scaleY)+'배입니다.'});
  if(!source&&!layers.some(l=>VISUAL_EFFECT_CATALOG[l.kind]?.generative))problems.push({code:'empty-effect',severity:'warning',message:'불꽃이나 연기 등 모양을 만드는 효과를 추가하세요.'});
  // A warped neighboring title produces a new mask at each animation time.
@@ -186,9 +189,15 @@ function composeVisualEffects(ctx,{rect,recipe,target,source,dpi,timeSec=1.2,min
   if(VISUAL_EFFECT_CATALOG[layer.kind]?.generative){
    if(layer.kind==='sprite'&&layer.params.shape==='image'&&!assets?.get(layer.params.assetId))problems.push({code:'effect-image-missing',severity:'warning',message:'이미지·도형 입자 '+(recipe.layers.indexOf(layer)+1)+'번 레이어에 그릴 이미지가 없습니다. ‘입자 이미지’에서 그림을 가져오거나 도형 모양을 선택하세요.'});
    let generated=makeSurface(work,dpi);
-   geometry=unionBounds(geometry,drawGenerator(generated.ctx,{...layer,opacity:1},{rect:generatorRect,seed:recipe.seed,timeSec,shape,sizeHeightMm,assets}));
+   const generatedBounds=drawGenerator(generated.ctx,{...layer,opacity:1},{rect:generatorRect,seed:recipe.seed,timeSec,shape,sizeHeightMm,assets});
+   geometry=unionBounds(geometry,generatedBounds);if(!generatedBounds)continue;
    if(['flame','ember','lightning','particle','aura'].includes(layer.kind))generated=bloom(generated,solid,sizeHeightMm);
    if(layer.protectText!==false)generated=protectContribution(generated,protectionSurface);else if(obscuresText(generated,protectionSurface))warning=true;
+   if(deferForeground&&layer.placement==='front'&&layer.protectText===false){
+    // Keep only the generated pixels for the final card pass. Repainting the
+    // complete source here would incorrectly bring its image/glyphs to the top.
+    foreground.push({surface:generated,opacity:layer.opacity,blendMode:normalizeBlendMode(layer.blendMode)});continue;
+   }
    const next=makeSurface(work,dpi);next.ctx.save();next.ctx.globalAlpha=layer.opacity;
    // Placement determines draw order; the selected mode combines the second
    // draw with the first, just like two layers in their displayed stack order.
@@ -197,6 +206,7 @@ function composeVisualEffects(ctx,{rect,recipe,target,source,dpi,timeSec=1.2,min
    else {next.ctx.globalAlpha=1;paintSurface(next.ctx,acc);next.ctx.globalAlpha=layer.opacity;next.ctx.globalCompositeOperation=mode;paintSurface(next.ctx,generated);}
    next.ctx.restore();acc=next;
   }else{
+   for(const entry of foreground)entry.surface=mixFilter(entry.surface,applyEffectFilter(entry.surface,layer,{rect,timeSec,seed:recipe.seed}),layer,shape,null,cache,shapeKey,null);
    const filtered=applyEffectFilter(acc,layer,{rect,timeSec,seed:recipe.seed});
    const next=mixFilter(acc,filtered,layer,shape,protectionSurface,cache,shapeKey,['gradient','sweep'].includes(layer.kind)?colorExemption:null);
    // Diagnose only the visible contribution after blending, opacity and scope.
@@ -207,8 +217,10 @@ function composeVisualEffects(ctx,{rect,recipe,target,source,dpi,timeSec=1.2,min
  if(warning)problems.push({code:'effect-over-text',severity:'warning',message:'이펙트가 다른 글자를 덮습니다. 해당 레이어의 ‘글자 위에도 그리기’를 끄면 보호돼요.'});
  if(frame){
   const out=makeSurface(work,dpi);paintSurface(out.ctx,acc);out.ctx.globalCompositeOperation='destination-in';paintSurface(out.ctx,frameMask(work,dpi,w,h,frame));out.ctx.globalCompositeOperation='source-over';acc=out;geometry=null;
+  for(const entry of foreground){const clipped=makeSurface(work,dpi);paintSurface(clipped.ctx,entry.surface);clipped.ctx.globalCompositeOperation='destination-in';paintSurface(clipped.ctx,frameMask(work,dpi,w,h,frame));entry.surface=clipped;}
  }
- const analysis=makeSurface(work,Math.min(120,dpi),{readback:true});paintSurface(analysis.ctx,acc);let bounds=alphaBounds(analysis);
+ const analysis=makeSurface(work,Math.min(120,dpi),{readback:true});paintSurface(analysis.ctx,acc);for(const entry of foreground)paintSurface(analysis.ctx,entry.surface);let bounds=alphaBounds(analysis);
  if(geometry&&(geometry.x<work.x||geometry.y<work.y||geometry.x+geometry.w>work.x+work.w||geometry.y+geometry.h>work.y+work.h))bounds=unionBounds(bounds,geometry);
- return {surface:acc,report:{boundsMm:bounds,problems,hasVisibleContent:!!bounds,...result}};
+ const {nestedNameForeground:unusedForeground,...reportResult}=result;
+ return {surface:acc,foreground,report:{boundsMm:bounds,problems,hasVisibleContent:!!bounds,...reportResult}};
 }
