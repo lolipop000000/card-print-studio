@@ -3,6 +3,7 @@ import {valueLabel} from './problem-details.js';
 import {BLEND_MODES,DEFAULT_BLEND_MODE} from './blend-modes.js';
 import {SPRITE_CONTROL_FIELDS,spriteControlDefaults,validateSpriteControls} from './sprite-controls.js';
 import {textRangeTarget,textRangeOwners} from './text-ranges.js';
+import {PARTICLE_MOTION_FIELDS} from './particle-motion.js';
 
 const numeric=(label,value,min,max,step=.05,unit='')=>({type:'number',label,value,min,max,step,unit});
 const color=(label,value)=>({type:'color',label,value});
@@ -78,6 +79,8 @@ export const VISUAL_EFFECT_CATALOG={
  vortex:{name:"소용돌이 입자",hint:"입자들이 나선 궤적을 따라 퍼지며 사라져요.",placement:'behind',animated:true,generative:true,fields:particleFields({"color":"#5466bb","color2":"#b7a1dd","count":28,"size":0.025,"travel":0.4,"spread":0.65,"life":3.5,"direction":-90,"fade":1.1,"spin":0.65})},
  textWarp:{name:'글자 형태 왜곡',placement:'source',animated:false,textOnly:true,fields:{arc:numeric('아치',0,-1,1),wave:numeric('물결 높이',0,0,1),wavelength:numeric('물결 간격',.5,.1,2),skewDeg:numeric('기울임',0,-45,45,1,'°'),scaleX:numeric('가로 배율',1,.25,3),scaleY:numeric('세로 배율',1,.25,3)}}
 };
+// Optional fields keep earlier projects byte-for-byte compatible until edited.
+for(const definition of Object.values(VISUAL_EFFECT_CATALOG))if(definition.generative)Object.assign(definition.fields,PARTICLE_MOTION_FIELDS);
 export const VISUAL_EFFECT_PRESETS={
  fourPointStarlight:{name:'4각 별빛 반짝임',category:'빛·움직임',layers:[{kind:'starlight',placement:'front',emit:{face:'area',openOnly:false},params:{color:'#86c9ff',coreColor:'#ffffff',count:12,size:.1,stretch:1.5,glow:.85,twinkle:1,spin:.04,randomness:0}}]},
  radiantBloom:{name:'눈부신 빛',category:'빛·움직임',layers:[{kind:'gradient',scope:'inside',params:{color:'#fffbea',color2:'#ffbb68'}},{kind:'outline',scope:'outside',opacity:.9,params:{color:'#79502b',width:.14}},{kind:'bloom',params:{threshold:.35,knee:.5,radius:1.5,strength:1.7,color:'#ffe6b0'}}]},

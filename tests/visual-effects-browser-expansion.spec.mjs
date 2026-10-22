@@ -1,3 +1,4 @@
+import {addVisualLayer} from './helpers/effects.mjs';
 import {VISUAL_EFFECT_PRESETS} from '../src/model/visual-effects.js';
 const presetCount=Object.keys(VISUAL_EFFECT_PRESETS).length;
 import test from 'node:test';
@@ -5,7 +6,7 @@ import assert from 'node:assert/strict';
 import {openApp} from './helpers/browser.mjs';
 import {saveProject} from './helpers/flows.mjs';
 async function begin(capture=false){const result=await openApp();result.page.setDefaultTimeout(5000);const original=capture?await saveProject(result.page,'expansion-before.json'):null;await result.page.locator('#card-text-effects').click();return {...result,original};}
-const add=async(page,kind)=>{await page.locator('#effect-layer-kind').selectOption(kind);await page.locator('#effect-layer-add').click();};
+const add=async(page,kind)=>{await addVisualLayer(page,kind);};
 
 test('preset search and categories expose actual rendered samples and apply a chosen material to named text',async()=>{
  const {browser,page,pageErrors,httpRequests}=await begin();try{

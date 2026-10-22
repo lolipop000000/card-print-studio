@@ -4,16 +4,19 @@ import {VISUAL_EFFECT_CATALOG} from '../model/visual-effects.js';
 import {makeVisualEffectLayerForTarget} from '../model/effect-emission.js';
 import {BLEND_MODES,DEFAULT_BLEND_MODE} from '../model/blend-modes.js';
 import {isSpriteFieldVisible,SPRITE_CONTROL_HINT,SPRITE_SHEET_HINT} from '../model/sprite-controls.js';
+import {PARTICLE_IMAGES,particleImageData} from '../render/particle-images.js';
 const placements=[['behind','대상 뒤'],['front','대상 앞']];
 const scopes=[['all','지금까지 쌓은 전체'],['inside','원본 모양 안쪽'],['outside','원본 모양 바깥']];
-export function renderVisualEffectFields(host,{recipe,selectedLayerId,targetType,onChange,onSelect,assetOptions=[],onImportImage,onLibraryImage,importing=false}){
+export function renderVisualEffectFields(host,{recipe,selectedLayerId,targetType,onChange,onSelect,assetOptions=[],onImportImage,onLibraryImage,onBuiltinImage,importing=false}){
  const layer=recipe.layers.find(l=>l.id===selectedLayerId),index=recipe.layers.indexOf(layer),definition=layer&&VISUAL_EFFECT_CATALOG[layer.kind];
  const advancedOpen=host.querySelector('#effect-advanced')?.open||false;
  const spriteGroupState=new Map([...host.querySelectorAll('[data-sprite-group]')].map(group=>[group.dataset.spriteGroup,group.open]));
- const merged=new Set(['particle','rune','petal','leaf','snowflake','crystal','confetti']);
- const kinds=Object.entries(VISUAL_EFFECT_CATALOG).filter(([kind,d])=>!merged.has(kind)&&(!d.textOnly||targetType==='text'));
+ const emitterValue=host.querySelector('#effect-emitter-preset')?.value??'sprite';
+ const kinds=Object.entries(VISUAL_EFFECT_CATALOG).filter(([,d])=>!d.generative&&(!d.textOnly||targetType==='text'));
  const group=d=>d.generative?'입자·자연':d.textOnly||['waveDistort','displacement','heatHaze','glitch','pixelate','erode'].includes(d.kind)?'형태·왜곡':'빛·색·질감';
- const picker=el('select',{id:'effect-layer-kind','aria-label':'추가할 효과'},['입자·자연','빛·색·질감','형태·왜곡'].map(label=>el('optgroup',{label},kinds.filter(([kind,d])=>group({...d,kind})===label).map(([kind,d])=>el('option',{value:kind,disabled:d.textOnly&&recipe.layers.some(l=>l.kind===kind)},d.name)))));
+ const picker=el('select',{id:'effect-layer-kind','aria-label':'추가할 효과'},['빛·색·질감','형태·왜곡'].map(label=>el('optgroup',{label},kinds.filter(([kind,d])=>group({...d,kind})===label).map(([kind,d])=>el('option',{value:kind,disabled:d.textOnly&&recipe.layers.some(l=>l.kind===kind)},d.name)))));
+ const emitter=el('select',{id:'effect-emitter-preset','aria-label':'파티클 시작 프리셋'},Object.entries(VISUAL_EFFECT_CATALOG).filter(([,d])=>d.generative).map(([kind,d])=>el('option',{value:kind},d.name)));
+ emitter.value=emitterValue;
 
  picker.value='outline';
  const list=el('div',{id:'effect-layer-list',class:'effect-layer-list'},el('div',{id:'effect-original',class:'effect-original'},el('strong',{},'원본'),el('small',{},'위에서 아래로 적용')));
@@ -30,7 +33,7 @@ export function renderVisualEffectFields(host,{recipe,selectedLayerId,targetType
   const frame=recipe.frame||{scope:'border',bandMm:4},change=fn=>onChange(r=>{r.frame??={scope:'border',bandMm:4};fn(r.frame);});
   header.push(field('프레임 효과 범위','effect-frame-scope',frame.scope,v=>change(f=>f.scope=v),{options:[['border','테두리'],['borderBleed','테두리 + 안쪽 번짐'],['full','배경 전체']]}),field('테두리 띠 두께 (mm)','effect-frame-band',frame.bandMm,v=>change(f=>f.bandMm=v),{type:'number',min:2,max:10,step:.5}));
  }
- host.replaceChildren(...header,el('div',{class:'effect-add-row'},picker,button('+ 추가',add,{id:'effect-layer-add',disabled:recipe.layers.length>=12})),list);
+ host.replaceChildren(...header,el('div',{class:'effect-add-row particle-add-row'},emitter,button('✦ 파티클 추가',()=>onChange(r=>{const next=makeVisualEffectLayerForTarget(emitter.value,targetType);r.layers.push(next);return next.id;}),{id:'effect-particle-add',disabled:recipe.layers.length>=12})),el('div',{class:'effect-add-row'},picker,button('+ 효과 추가',add,{id:'effect-layer-add',disabled:recipe.layers.length>=12})),list);
  if(!layer){host.append(el('p',{id:'effect-empty',class:'empty-note'},'효과를 추가하거나 왼쪽 프리셋으로 시작하세요.'));return;}
  const mutate=change=>onChange(r=>change(r.layers.find(l=>l.id===layer.id)));
  const canMove=delta=>layer.kind!=='textWarp'&&index+delta>=0&&index+delta<recipe.layers.length&&recipe.layers[index+delta].kind!=='textWarp';
@@ -41,23 +44,25 @@ export function renderVisualEffectFields(host,{recipe,selectedLayerId,targetType
   button('복제',()=>onChange(r=>{const l=clone(layer);l.id=newId();r.layers.splice(index+1,0,l);return l.id;}),{id:'effect-layer-duplicate',disabled:layer.kind==='textWarp'||recipe.layers.length>=12}),
   button('삭제',()=>onChange(r=>r.layers.splice(index,1)),{id:'effect-layer-delete',class:'danger'}),
   button('초기화',()=>onChange(r=>r.layers[index]=makeVisualEffectLayerForTarget(layer.kind,targetType,{id:layer.id})),{id:'effect-layer-reset'}));
- const panel=el('section',{class:'effect-layer-fields'},el('h3',{},definition.name),actions);
+ const panel=el('section',{class:'effect-layer-fields'},el('h3',{},(definition.generative?'파티클 이미터 · ':'')+definition.name),actions);
  if(layer.kind==='textWarp')panel.append(el('p',{class:'hint'},'글자 모양을 먼저 바꿔요. 뒤에 붙인 불꽃과 연기도 변형된 글자를 따라갑니다.'));
  else if(definition.generative)panel.append(field('앞뒤 배치','effect-placement',layer.placement,v=>mutate(l=>l.placement=v),{options:placements}));
  else panel.append(field('필터 적용 범위','effect-scope',layer.scope,v=>mutate(l=>l.scope=v),{options:scopes}));
  if(layer.kind!=='textWarp')panel.append(field('혼합 모드','effect-layer-blend-mode',layer.blendMode??DEFAULT_BLEND_MODE,v=>mutate(l=>l.blendMode=v),{options:BLEND_MODES}),
   el('p',{id:'effect-blend-hint',class:'hint'},definition.generative?'대상 뒤: 이펙트 → 지금까지의 결과, 대상 앞: 지금까지의 결과 → 이펙트 순으로 혼합해요. 메뉴의 ‘현재 레이어’는 두 번째로 겹치는 쪽이에요.':'일반은 필터 결과로 바꾸고, 다른 모드는 지금까지의 결과 위에 필터 결과를 혼합해요. 불투명도와 적용 범위는 그다음 조절해요.'));
  if(definition.hint)panel.append(el('p',{id:'effect-layer-hint',class:'hint'},definition.hint));
- if(layer.kind==='sprite')panel.append(el('p',{id:'effect-sprite-controls-hint',class:'hint'},SPRITE_CONTROL_HINT));
+ if(layer.kind==='sprite')panel.append(el('p',{id:'effect-sprite-controls-hint',class:'hint'},SPRITE_CONTROL_HINT),el('div',{class:'particle-image-gallery','aria-label':'기본 입자 이미지'},...PARTICLE_IMAGES.map(([key,name])=>button([el('img',{src:particleImageData(key),alt:'',width:40,height:40}),el('span',{},name)],()=>onBuiltinImage?.(layer.id,key),{'data-particle-image':key,disabled:importing||!onBuiltinImage,title:name}))));
  if(layer.kind!=='textWarp')panel.append(el('label',{class:'check'},el('input',{id:'effect-over-text',type:'checkbox',checked:layer.protectText===false,onchange:event=>mutate(l=>l.protectText=!event.target.checked)}),'글자 위에도 그리기'));
- const groups=new Map(),groupIds={'이미지 자르기':'crop','크기·회전 중심':'transform','여러 컷 재생':'sheet'};
+ const groups=new Map(),groupIds={'이미지 자르기':'crop','크기·회전 중심':'transform','여러 컷 재생':'sheet','이동 패턴':'path'};
  const entries=Object.entries(definition.fields);if(layer.kind==='sprite')entries.sort(([a],[b])=>(a==='shape'?0:a==='renderMode'?1:2)-(b==='shape'?0:b==='renderMode'?1:2));
  for(const [key,f] of entries){
   if(layer.kind==='sprite'&&!isSpriteFieldVisible(key,layer.params))continue;
+  if(layer.kind==='sprite'&&layer.params.renderMode==='single'&&f.group==='이동 패턴')continue;
   let fieldHost=panel;
   if(f.group){
    if(!groups.has(f.group)){
-    const group=el('details',{id:'effect-sprite-'+groupIds[f.group],'data-sprite-group':f.group,open:spriteGroupState.get(f.group)??false},el('summary',{},f.group));
+    const group=el('details',{id:'effect-sprite-'+groupIds[f.group],'data-sprite-group':f.group,open:spriteGroupState.get(f.group)??f.group==='이동 패턴'},el('summary',{},f.group));
+    if(f.group==='이동 패턴')group.append(el('p',{class:'hint'},'기존 움직임에 경로를 더해요. 거리와 진폭은 대상 높이의 비율이에요.'));
     if(f.group==='여러 컷 재생')group.append(el('p',{class:'hint'},SPRITE_SHEET_HINT));
     groups.set(f.group,group);panel.append(group);
    }fieldHost=groups.get(f.group);

@@ -1,0 +1,12 @@
+{
+  "status": "PASS",
+  "checkedAt": "2026-10-22T14:17:08.914Z",
+  "checks": [
+    "saved card accepts particle movement",
+    "shared effect accepts particle movement",
+    "out-of-range movement remains rejected",
+    "deployed model matches tested local source"
+  ],
+  "deployedModelSha256": "1f6f5bb99e2c0dab7a273bfc6ea80cefba17c2e76de0ca5a35bc5243df64d132",
+  "matchesLocal": true
+}

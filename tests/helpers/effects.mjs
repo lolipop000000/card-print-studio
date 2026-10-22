@@ -21,3 +21,11 @@ export async function renderEffectFixture(page,recipe,options={}){
  },{recipe,options});
  result.hash=createHash('sha256').update(Buffer.from(result.png.split(',')[1],'base64')).digest('hex');return result;
 }
+import {VISUAL_EFFECT_CATALOG} from '../../src/model/visual-effects.js';
+
+/** Exercise the visible particle or postprocessing entry point as appropriate. */
+export async function addVisualLayer(page,kind){
+ const particle=VISUAL_EFFECT_CATALOG[kind]?.generative;
+ await page.locator(particle?'#effect-emitter-preset':'#effect-layer-kind').selectOption(kind);
+ await page.locator(particle?'#effect-particle-add':'#effect-layer-add').click();
+}

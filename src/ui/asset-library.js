@@ -8,6 +8,7 @@ import {openImageCropper} from './image-crop.js';
 import {createCloudLibraryStorage} from '../cloud/shared-assets.js';
 import {mountLibraryHub} from './cloud-panel.js';
 import {MOBILE_QUERY} from './mobile-layout.js';
+import {createParticleLibraryControls} from './particle-library.js';
 
 const MAX_BATCH_PIXELS=32_000_000,MAX_IMAGE_FILES=64;
 const cleanName=value=>Array.from(String(value||'그림').normalize('NFC').replace(/[\x00-\x1f\x7f]/g,' ').replace(/\.(png|jpe?g|webp)$/i,'').trim()||'그림').slice(0,120).join('');
@@ -16,6 +17,7 @@ const canceled=()=>Object.assign(Error('에셋 작업이 취소되었어요.'),{
 const bytes=asset=>Uint8Array.from(atob(asset.dataUrl.split(',')[1]),character=>character.charCodeAt(0));
 
 export function createAssetLibraryControls(ctx,{workspace}={}){
+ const particles=createParticleLibraryControls(ctx,{workspace});
  const localStorage=createAssetLibraryStorage({workspace}),storageListeners=new Set();let cloudStorage=null,cloudOwner=null,loadedIdentity=null;
  const notifyStorage=()=>{for(const fn of storageListeners)fn();};const stopLocalStorage=localStorage.subscribe(notifyStorage);
  function chosenStorage(){
@@ -78,7 +80,7 @@ export function createAssetLibraryControls(ctx,{workspace}={}){
  }
  function finish(value=null){
   const current=session;if(!current)return;session=null;prompt?.dispatchEvent(new Event('cancel',{cancelable:true}));prompt=null;cropDialog?.dispatchEvent(new Event('cancel',{cancelable:true}));cropDialog=null;
-  current.hub?.destroy();if(current.dialog.open)current.dialog.close();current.dialog.remove();current.resolve(value);if(current.previousFocus?.isConnected)current.previousFocus.focus({preventScroll:true});if(!disposed)ctx.refresh?.();
+  current.particles?.destroy();current.hub?.destroy();if(current.dialog.open)current.dialog.close();current.dialog.remove();session=current.parent?.dialog.isConnected?current.parent:null;current.resolve(value);if(session)render();if(current.previousFocus?.isConnected)current.previousFocus.focus({preventScroll:true});if(!disposed)ctx.refresh?.();
  }
  function renderList(){
   const current=session;if(!current)return;const query=current.search.value.normalize('NFC').toLocaleLowerCase(),entries=library.entries.filter(entry=>entry.name.normalize('NFC').toLocaleLowerCase().includes(query));
@@ -106,9 +108,10 @@ export function createAssetLibraryControls(ctx,{workspace}={}){
  }
  function render(){if(!session)return;renderList();renderDetails();session.feedback.textContent=lastError||'';refreshStatus();}
  function open({pick=false,title,account=false}={}){
-  if(disposed)return Promise.resolve(null);if(session){session.dialog.focus();return Promise.resolve(null);}
-  let resolve;const result=new Promise(done=>resolve=done),dialog=el('dialog',{id:'asset-library-dialog',class:'asset-library-dialog','aria-labelledby':'asset-library-title',tabIndex:-1});
-  const current={dialog,resolve,pick,previousFocus:document.activeElement};session=current;dialog.dataset.imageDetail='false';
+  if(disposed)return Promise.resolve(null);const parent=pick&&session?.particles?.isEditing()?session:null;if(session&&!parent){session.dialog.focus();return Promise.resolve(null);}
+  const titleId=parent?'asset-picker-title':'asset-library-title';
+  let resolve;const result=new Promise(done=>resolve=done),dialog=el('dialog',{id:parent?'asset-picker-dialog':'asset-library-dialog',class:'asset-library-dialog','aria-labelledby':titleId,tabIndex:-1});
+  const current={dialog,resolve,pick,parent,previousFocus:document.activeElement};session=current;dialog.dataset.imageDetail='false';
   const toolbarButton=(label,run,id,attrs={})=>button(label,ui(run),{id,'data-asset-action':'',...attrs});
   current.feedback=el('p',{id:'asset-library-feedback',class:'asset-feedback',role:'alert'});current.status=el('p',{id:'asset-library-status',class:'asset-storage-status',role:'status'});current.storageNote=el('p',{class:'hint'});current.count=el('small');current.list=el('div',{class:'asset-list'});current.details=el('section',{class:'asset-details','aria-label':'선택한 그림'});
   let composing=false;current.search=el('input',{id:'asset-search',type:'search',placeholder:'그림 이름 검색','aria-label':'그림 이름 검색',oncompositionstart:()=>{composing=true;},oncompositionend:()=>{composing=false;renderList();},oninput:event=>{if(!composing&&!event.isComposing)renderList();}});
@@ -123,7 +126,7 @@ export function createAssetLibraryControls(ctx,{workspace}={}){
   }});
   current.resume=toolbarButton('기억한 폴더 다시 연결',async()=>{if(!workspace?.resume)throw Error('연결할 저장 폴더가 없어요.');const connected=await workspace.resume();guard(current);if(connected)current.feedback.textContent='폴더를 연결했어요. 현재 목록은 유지돼요. 다시 불러오기 또는 저장 재시도를 선택하세요.';},'asset-resume');
   current.connect=toolbarButton('저장 폴더 선택',async()=>{if(!workspace?.connect)throw Error('이 브라우저에서는 폴더 연결을 지원하지 않아요. 보관함 JSON으로 공유하세요.');const connected=await workspace.connect();guard(current);current.feedback.textContent=connected?'폴더를 연결했어요. 다시 불러오기를 눌러 이 폴더의 보관함을 확인하세요.':'폴더 선택을 취소했어요. 현재 보관함을 유지해요.';},'asset-connect');
-  const header=el('header',{class:'asset-library-top'},el('div',{},el('h2',{id:'asset-library-title'},title||(pick?'에셋에서 그림 선택':'에셋 보관함')),el('p',{class:'hint'},pick?'사용할 그림을 선택하거나 원본을 잘라 보관하세요.':'내 그림과 공유 자료를 한곳에서 찾아요.')),button('닫기',()=>finish(),{id:'asset-library-close'}));
+  const header=el('header',{class:'asset-library-top'},el('div',{},el('h2',{id:titleId},title||(pick?'에셋에서 그림 선택':'에셋 보관함')),el('p',{class:'hint'},pick?'사용할 그림을 선택하거나 원본을 잘라 보관하세요.':'내 그림과 공유 자료를 한곳에서 찾아요.')),button('닫기',()=>finish(),{id:'asset-library-close'}));
   const images=el('section',{id:'library-images',class:'library-images','aria-label':'이미지 보관함'});
   images.append(
    el('div',{class:'asset-library-toolbar'},toolbarButton('그림 가져오기',()=>files.click(),'asset-import',{'data-needs-loaded':'true',class:'primary'}),toolbarButton('보관함 JSON 가져오기',()=>json.click(),'asset-import-json',{'data-needs-loaded':'true'}),toolbarButton('보관함 JSON 내보내기',()=>{guard(current);download(serializeAssetLibrary(library),'asset-library.json','application/json');},'asset-export-json',{'data-needs-loaded':'true'})),
@@ -135,8 +138,13 @@ export function createAssetLibraryControls(ctx,{workspace}={}){
   const toolbar=images.querySelector('.asset-library-toolbar'),tools=el('details',{id:'asset-library-tools',class:'asset-library-tools',open:!matchMedia(MOBILE_QUERY).matches},el('summary',{},'관리'));
   const toolBody=el('div',{class:'asset-library-tools-body'},el('div',{class:'asset-action-row'},...Array.from(toolbar.children).slice(1)),images.querySelector('.asset-storage'));
   tools.append(toolBody);toolbar.append(tools);images.prepend(images.querySelector('.asset-search-row'));
-  dialog.append(header,images,files,json);if(!pick&&ctx.cloudAccount)current.hub=mountLibraryHub(ctx,{dialog,images,header,onClose:()=>finish(),initialAccount:account});
+  dialog.append(header,images,files,json);
+  if(!pick){
+   current.particles=particles.mount({onClose:()=>finish()});dialog.append(current.particles.node);
+   if(ctx.cloudAccount)current.hub=mountLibraryHub(ctx,{dialog,images,particles:current.particles.node,onParticlesOpen:()=>current.particles.activate(),header,onClose:()=>finish(),initialAccount:account});
+   else{const choose=key=>{images.hidden=key!=='images';current.particles.node.hidden=key!=='particles';if(key==='particles')current.particles.activate();for(const control of tabs.children)control.setAttribute('aria-selected',String(control.dataset.tab===key));};const tabs=el('nav',{class:'library-location-tabs',role:'tablist'},...['images','particles'].map(key=>button(key==='images'?'이미지':'파티클',()=>choose(key),{id:'library-tab-'+key,role:'tab','data-tab':key,'aria-selected':key==='images'})));header.after(tabs);}
+  }
   dialog.addEventListener('cancel',event=>{event.preventDefault();if(session===current)finish();});dialog.addEventListener('close',()=>{if(session===current)finish();});document.body.append(dialog);render();dialog.showModal();if(!loaded||loadedIdentity!==storage.identity())void perform(()=>ensureLoaded(current)).catch(()=>{});return result;
  }
- return {button:trigger,open,addAssets,getLocalLibrary:()=>localStorage.load(),getLibrary:async()=>{await ensureLoaded();return structuredClone(library);},reload:()=>perform(()=>loadLibrary()),destroy(){if(disposed)return;disposed=true;finish();unsubscribe();unsubscribeWorkspace?.();storage.destroy();trigger.remove();}};
+ return {button:trigger,open,addAssets,saveParticle:particles.save,getLocalLibrary:()=>localStorage.load(),getLibrary:async()=>{await ensureLoaded();return structuredClone(library);},reload:()=>perform(()=>loadLibrary()),destroy(){if(disposed)return;disposed=true;while(session)finish();particles.destroy();unsubscribe();unsubscribeWorkspace?.();storage.destroy();trigger.remove();}};
 }

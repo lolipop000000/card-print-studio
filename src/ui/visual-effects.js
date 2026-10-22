@@ -21,6 +21,7 @@ import {resolveSkillEffect} from '../model/skill-references.js';
 import {openImageCropper} from './image-crop.js';
 import {packSpriteSheet} from '../model/sprite-sheet.js';
 import {createPreviewSettings} from './preview-settings.js';
+import {createBuiltinParticleAsset,PARTICLE_IMAGES} from '../render/particle-images.js';
 
 function targetLabel(card,e,index){
  const b=e.binding;
@@ -34,7 +35,7 @@ function targetLabel(card,e,index){
  }
  return ({text:'자유 글자',image:'그림',effect:'독립 장식'})[e.type]+' '+(e.content?.slice(0,20)||index+1);
 }
-export function openVisualEffectsEditor(ctx,initialTarget){
+export function openVisualEffectsEditor(ctx,initialTarget,{onApply,applyLabel='편집한 대상에 적용',initialName=''}={}){
  if(document.getElementById('effect-editor'))return ctx.closeVisualEffects;
  const p=ctx.store.getProject(),documentId=ctx.store.getDocumentId(),card=initialTarget.back?p.back:p.cards.find(c=>c.id===initialTarget.cardId);
  const targets=[...(!initialTarget.back?[['','카드 프레임']]:[]),...card.elements.filter(e=>['text','image','effect'].includes(e.type)).map((e,i)=>[e.id,targetLabel(card,e,i)])];
@@ -62,7 +63,7 @@ export function openVisualEffectsEditor(ctx,initialTarget){
  const initialFrame=getEffectFrameSec(p),drafts=new Map(),past=[],future=[];
  const stagedAssets=new Map(),stagedImages=new Map(),assetNames=new Map(),previewAssets=new Map(ctx.assets);let pendingImage=null,pendingImports=0;
  const imageFile=el('input',{id:'effect-sprite-file',type:'file',hidden:true,accept:'image/png,image/jpeg,image/webp',onchange:importSpriteImage});
- let target={...initialTarget},targetType,currentKey,textColor,textStyle,recipe,selected,savedId=null,presetName='',draftFrame=initialFrame,disposed=false,confirming=false,confirmation=null,previewProject,previewTarget,comparisonProject,comparisonTarget,comparing=false,unsubscribe,timer,librarySearch='',libraryCategory='all',libraryComposing=false,transform,previewView,lastDpi=0,renderGeometry=null;
+ let target={...initialTarget},targetType,currentKey,textColor,textStyle,recipe,selected,savedId=null,presetName='',draftFrame=initialFrame,disposed=false,confirming=false,saving=false,confirmation=null,previewProject,previewTarget,comparisonProject,comparisonTarget,comparing=false,unsubscribe,timer,librarySearch='',libraryCategory='all',libraryComposing=false,transform,previewView,lastDpi=0,renderGeometry=null;
  const cache=createEffectCache(),dialog=el('dialog',{id:'effect-editor',class:'effect-dialog','aria-labelledby':'effect-title'});
  const library=el('aside',{class:'effect-library'}),fields=el('aside',{class:'effect-controls'}),canvas=el('canvas',{id:'effect-preview','aria-label':'선택한 대상과 카드의 이펙트 미리보기'});
  const feedback=el('p',{id:'effect-feedback',class:'effect-feedback',role:'status',hidden:true});
@@ -194,6 +195,12 @@ export function openVisualEffectsEditor(ctx,initialTarget){
   }catch(error){if(!disposed)message(error.message);}
   finally{pendingImports--;if(!disposed){updateImportControls();updateTransport();}}
  }
+ async function chooseBuiltinImage(layerId,key){
+  if(pendingImports||disposed)return;const destination={key:currentKey,layerId,documentId};pendingImports++;updateImportControls();
+  try{const asset=createBuiltinParticleAsset(key);stageSpriteImage(destination,asset,await decodeImage(asset.dataUrl),PARTICLE_IMAGES.find(([id])=>id===key)[1]);}
+  catch(error){if(!disposed)message(error.message);}
+  finally{pendingImports--;if(!disposed){updateImportControls();updateTransport();}}
+ }
  async function processSpriteImage(layerId,grid=false){
   if(pendingImports||disposed)return;
   const layer=recipe.layers.find(l=>l.id===layerId&&l.kind==='sprite'),asset=stagedAssets.get(layer?.params.assetId)||ctx.store.getProject().assets[layer?.params.assetId];if(!asset)return;
@@ -272,7 +279,7 @@ export function openVisualEffectsEditor(ctx,initialTarget){
  }
  function scheduleDraw(){clearTimeout(timer);status.dataset.busy='true';status.textContent='계산 중…';timer=setTimeout(draw,150);}
  function renderFields(){
-  preserveFocus(()=>{renderVisualEffectFields(fields,{recipe,selectedLayerId:selected,targetType,importing:pendingImports>0,assetOptions:Object.values({...ctx.store.getProject().assets,...Object.fromEntries(stagedAssets)}).map((a,i)=>[a.id,(assetNames.get(a.id)||'저장 그림 '+(i+1))+' · '+a.width+'×'+a.height]),onImportImage:chooseSpriteImage,onLibraryImage:ctx.openAssetLibrary?chooseSpriteLibraryImage:undefined,onSelect:id=>{selected=id;renderFields();transform?.refresh();},onChange:change=>{
+  preserveFocus(()=>{renderVisualEffectFields(fields,{recipe,selectedLayerId:selected,targetType,importing:pendingImports>0,assetOptions:Object.values({...ctx.store.getProject().assets,...Object.fromEntries(stagedAssets)}).map((a,i)=>[a.id,(assetNames.get(a.id)||'저장 그림 '+(i+1))+' · '+a.width+'×'+a.height]),onImportImage:chooseSpriteImage,onLibraryImage:ctx.openAssetLibrary?chooseSpriteLibraryImage:undefined,onBuiltinImage:chooseBuiltinImage,onSelect:id=>{selected=id;renderFields();transform?.refresh();},onChange:change=>{
    const next=clone(recipe),id=change(next),errors=validateVisualEffects(next,targetType);
    if(errors.length){message(errors[0].message);renderFields();return;}
    editDraft(()=>{recipe=next;if(typeof id==='string'&&next.layers.some(l=>l.id===id))selected=id;if(!recipe.layers.some(l=>l.id===selected))selected=recipe.layers[0]?.id;});
@@ -336,6 +343,12 @@ export function openVisualEffectsEditor(ctx,initialTarget){
     !(p.visualEffectPresets||[]).length?el('p',{class:'hint'},'조합에 이름을 붙여 다른 글자에도 써보세요.'):null,
     field('이펙트 이름','effect-preset-name',name,()=>{},{maxLength:120}),
     button('새 이펙트로 저장',()=>savePreset(false),{id:'effect-save-preset',class:'wide',disabled:pendingImports>0}),
+    ctx.assetLibrary?.saveParticle?button('파티클 보관함에 저장',async()=>{
+     if(pendingImports)return;const control=dialog.querySelector('#effect-save-library');control.disabled=true;
+     const savedRecipe=clone(recipe);if(targetType==='frame')savedRecipe.frame??={scope:'border',bandMm:4};
+     try{await ctx.assetLibrary.saveParticle(document.getElementById('effect-preset-name').value,savedRecipe,{...ctx.store.getProject().assets,...Object.fromEntries(stagedAssets)});if(!disposed)message('파티클 보관함에 저장했어요. 다른 덱에서도 사용할 수 있어요.');}
+     catch(error){if(!disposed)message(error.message);}finally{if(!disposed)control.disabled=false;}
+    },{id:'effect-save-library',class:'wide',disabled:pendingImports>0}):null,
     ctx.cloudAccount?.canWrite()?button('에셋으로 공유',()=>ctx.shareAsset('effect_template',savedId),{id:'effect-share',class:'wide',disabled:pendingImports>0||!savedId}):null,
     el('div',{class:'two-fields'},button('저장본 수정',()=>savePreset(true),{id:'effect-update-preset',disabled:pendingImports>0||!savedId}),button('저장본 삭제',()=>{if(storeEdit('내 이펙트 삭제',p=>removeVisualEffectPreset(p,savedId))){savedId=null;renderLibrary();}},{id:'effect-delete-preset',disabled:!savedId,class:'danger'})),
     el('p',{class:'hint'},'저장본을 바꿔도 이미 카드에 적용한 조합은 유지돼요.')].filter(node=>node!==null));
@@ -348,7 +361,7 @@ export function openVisualEffectsEditor(ctx,initialTarget){
   if(dialog.open)dialog.close();dialog.remove();ctx.onEffectsClosed?.();
  }
  async function close({force=false}={}){
-  if(disposed)return true;if(confirming&&!force)return false;transform?.cancel();
+  if(disposed)return true;if((confirming||saving)&&!force)return false;transform?.cancel();
   if(!force&&dirty()){
    confirming=true;timeline.pause();updateTransport();
    const choice=await openDialog({onOpen:node=>confirmation=node,title:'적용 전 변경을 버릴까요?',message:'편집한 대상들의 이펙트와 인쇄 장면을 버려요. 내 이펙트에 저장한 조합은 남습니다.',choices:[{id:'cancel',label:'계속 편집'},{id:'discard',label:'변경 버리기'}]});
@@ -363,9 +376,16 @@ export function openVisualEffectsEditor(ctx,initialTarget){
   button('인쇄 장면',()=>{timeline.pause();timeline.seek(draftFrame);updateTransport();},{id:'effect-print-frame'}),frameLabel)));
  dialog.append(imageFile,
   el('header',{class:'effect-top'},el('div',{},el('h2',{id:'effect-title'},'이펙트 만들기'),el('p',{class:'hint'},'선택한 그림이나 글자에 효과를 조합해 보세요. 스킬 이름만 따로 꾸밀 수도 있어요.')),
-   el('div',{class:'effect-top-actions'},undoButton,redoButton,button('닫기',()=>close(),{id:'effect-close'}),button('편집한 대상에 적용',()=>{
+   el('div',{class:'effect-top-actions'},undoButton,redoButton,button('닫기',()=>close(),{id:'effect-close'}),button(applyLabel,async()=>{
     if(pendingImports)return message('입자 그림을 읽고 있어요. 이미지가 준비되면 적용할 수 있어요.');
-    remember();if(storeEdit('이펙트 적용',p=>{commitAssets(p,[...drafts.values()].map(d=>d.recipe));applyDrafts(p);p.print.effectFrameSec=draftFrame;}))cleanup();
+    if(saving)return;remember();if(onApply){const captured=clone(ctx.store.getProject());commitAssets(captured,[recipe]);
+     const value={name:document.getElementById('effect-preset-name').value,recipe:clone(recipe),assets:captured.assets};
+     saving=true;timeline.pause();message('파티클을 보관함에 저장하고 있어요.');dialog.inert=true;dialog.setAttribute('aria-busy','true');
+     const controls=[...dialog.querySelectorAll('button,input,select,textarea')].map(node=>[node,node.disabled]);for(const [node] of controls)node.disabled=true;
+     try{await onApply(value);if(!disposed)cleanup();}
+     catch(error){if(!disposed){saving=false;dialog.inert=false;dialog.removeAttribute('aria-busy');for(const [node,disabled] of controls)if(node.isConnected)node.disabled=disabled;message(error.message);updateHistoryControls();}}return;
+    }
+    if(storeEdit('이펙트 적용',p=>{commitAssets(p,[...drafts.values()].map(d=>d.recipe));applyDrafts(p);p.print.effectFrameSec=draftFrame;}))cleanup();
    },{id:'effect-apply',class:'primary'}))),
   el('div',{class:'effect-target-bar'},targetPicker,status),
   el('div',{class:'effect-grid'},library,el('main',{class:'effect-center'},el('div',{class:'effect-preview-tools'},zoom,focus,compare,el('span',{class:'effect-zoom-hint'},'Ctrl+휠 확대·축소')),el('div',{class:'effect-preview-scroll'},canvas),transport),fields),feedback);
@@ -382,7 +402,7 @@ export function openVisualEffectsEditor(ctx,initialTarget){
  });
  dialog.addEventListener('keydown',historyKey);dialog.addEventListener('input',updateHistoryControls);
  dialog.addEventListener('cancel',event=>{if(event.target!==dialog)return;event.preventDefault();if(!transform.cancel())close();});dialog.addEventListener('close',cleanup);
- activate(initialValue);document.body.append(dialog);prepare();renderLibrary();renderFields();draw();updateTransport();dialog.showModal();
+ activate(initialValue);presetName=initialName;document.body.append(dialog);prepare();renderLibrary();renderFields();draw();updateTransport();dialog.showModal();
  previewView=mountEffectPreview({canvas,viewport:canvas.parentElement,select:zoom.querySelector('select'),widthMm:p.settings.cardWidthMm,heightMm:p.settings.cardHeightMm,getDpi:()=>settings.get().dpi,canZoom:()=>!disposed&&!confirming&&!transform?.isDragging(),onChange:scheduleDraw,onLayout:()=>transform?.refresh()});
  document.addEventListener('visibilitychange',visibility);document.addEventListener('pointerup',releaseComparison);window.addEventListener('blur',releaseComparison);
  ctx.refreshVisualEffects=draw;unsubscribe=ctx.store.subscribe(()=>{if(!disposed)renderLibrary();});return close;

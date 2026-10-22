@@ -7,7 +7,7 @@ const normalized=value=>String(value??'').normalize('NFC').toLocaleLowerCase();
 const kinds=[['all','모든 종류'],['work','덱'],['image','이미지'],['keyword','키워드'],['effect_template','이펙트'],['card_template','카드 서식']];
 
 /** Cloud collections share the image library's modal and account lifecycle. */
-export function mountLibraryHub(ctx,{dialog,images,header,onClose,initialAccount=false}){
+export function mountLibraryHub(ctx,{dialog,images,particles,onParticlesOpen,header,onClose,initialAccount=false}){
  const {cloudClient:client,cloudSession:session,cloudAccount:account}=ctx;
  const available=client.availability.available;let owner=account.getProfile()?.id;
  const accountHome=account.node.parentNode,accountNext=account.node.nextSibling;
@@ -51,7 +51,7 @@ export function mountLibraryHub(ctx,{dialog,images,header,onClose,initialAccount
   if(selected&&!list.querySelector('.cloud-row[data-selected="true"]')){selected=null;panel.dataset.detail='false';}
  }
  function render(){
-  if(!active())return;importer.hidden=!canWrite()||tab!=='mine';importer.disabled=busy;kind.disabled=busy;if(tab==='images')return;
+  if(!active())return;importer.hidden=!canWrite()||tab!=='mine';importer.disabled=busy;kind.disabled=busy;if(['images','particles'].includes(tab))return;
   list.replaceChildren();const trash=tab==='trash';
   if(kind.value==='all'||kind.value==='work'){
    const rows=tab==='public'?[...feed.values()].filter(item=>item.kind==='work').sort((a,b)=>String(b.updated_at).localeCompare(String(a.updated_at))):own.filter(item=>trash?!!item.deleted_at:!item.deleted_at);
@@ -78,13 +78,14 @@ export function mountLibraryHub(ctx,{dialog,images,header,onClose,initialAccount
   decorateRows();
  }
  function selectTab(next){
-  if(closed||next!=='images'&&!available)return;viewState.set(tab,{query:search.value,kind:kind.value});tab=next;selected=null;panel.dataset.detail='false';
-  const previous=viewState.get(tab);search.value=previous?.query??'';kind.value=previous?.kind??'all';images.hidden=tab!=='images';panel.hidden=tab==='images';dialog.dataset.libraryTab=tab;
+  if(closed||!['images','particles'].includes(next)&&!available)return;viewState.set(tab,{query:search.value,kind:kind.value});tab=next;selected=null;panel.dataset.detail='false';
+  const previous=viewState.get(tab);search.value=previous?.query??'';kind.value=previous?.kind??'all';images.hidden=tab!=='images';if(particles)particles.hidden=tab!=='particles';panel.hidden=['images','particles'].includes(tab);dialog.dataset.libraryTab=tab;
   for(const control of tabs.children){const chosen=control.dataset.tab===tab;control.setAttribute('aria-selected',String(chosen));control.tabIndex=chosen?0:-1;}
-  render();if(tab!=='images'&&!loaded&&!loading)void load();
+  render();if(tab==='particles')onParticlesOpen?.();if(!['images','particles'].includes(tab)&&!loaded&&!loading)void load();
  }
- for(const [key,label] of [['images','이미지'],['mine','내 자료'],['public','공개 자료'],['trash','휴지통']]){
-  const control=button(label,()=>selectTab(key),{id:key==='images'?'library-tab-images':'cloud-tab-'+key,role:'tab','data-tab':key,'aria-controls':key==='images'?images.id:panel.id,'aria-selected':String(key==='images'),tabIndex:key==='images'?0:-1,disabled:key!=='images'&&!available});
+ for(const [key,label] of [['images','이미지'],...(particles?[['particles','파티클']]:[]),['mine','내 자료'],['public','공개 자료'],['trash','휴지통']]){
+  const local=['images','particles'].includes(key);
+  const control=button(label,()=>selectTab(key),{id:local?'library-tab-'+key:'cloud-tab-'+key,role:'tab','data-tab':key,'aria-controls':key==='images'?images.id:key==='particles'?particles.id:panel.id,'aria-selected':String(key==='images'),tabIndex:key==='images'?0:-1,disabled:!local&&!available});
   control.addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const entries=[...tabs.children].filter(node=>!node.disabled),index=entries.indexOf(control),next=event.key==='Home'?0:event.key==='End'?entries.length-1:(index+(event.key==='ArrowRight'?1:-1)+entries.length)%entries.length;selectTab(entries[next].dataset.tab);entries[next].focus();});tabs.append(control);
  }
  async function load(){
@@ -107,7 +108,7 @@ export function mountLibraryHub(ctx,{dialog,images,header,onClose,initialAccount
    if(item?.owner===owner){assets.set(id,{...item,visibility:'private'});void client.select('shared_assets',{eq:{id},single:true}).then(value=>{if(!active()||assetEvents.get(id)!==serial)return;if(value)assets.set(id,value);else assets.delete(id);render();}).catch(error=>{if(active())feedback.textContent=error.message;});}else assets.delete(id);
   }else{feed.set(id,event.row);if(event.row.kind==='asset')assets.set(id,{...assets.get(id),id,owner:event.row.owner,kind:event.row.asset_kind??assets.get(id)?.kind,title:event.row.title,nickname:event.row.nickname,version:event.row.version,updated_at:event.row.updated_at,visibility:'public',deleted_at:null});}
  }
- const stopFeed=available?client.subscribeFeed(event=>{if(!active())return;loading?.events.push(event);applyEvent(event);render();},{onReady:()=>{if(active()&&(loaded||tab!=='images'||accountSection.open))void load();}}):()=>{};
+  const stopFeed=available?client.subscribeFeed(event=>{if(!active())return;loading?.events.push(event);applyEvent(event);render();},{onReady:()=>{if(active()&&(loaded||!['images','particles'].includes(tab)||accountSection.open))void load();}}):()=>{};
  const stopAuth=client.onAuthChange?.(auth=>{if(!active())return;const next=auth?.user.id??null;if(owner===undefined)owner=next;else if(next!==owner)close();});
  accountSection.addEventListener('toggle',()=>{if(active()&&accountSection.open&&!loaded&&!loading)void load();});
  ctx.closeCloudPanel=close;usage.textContent=available?'계정을 열거나 자료 위치를 선택하면 사용량을 불러와요.':client.availability.reason==='file'?'웹 주소에서 열면 로그인과 공유를 사용할 수 있어요.':'클라우드 연결 설정을 확인해 주세요.';dialog.dataset.libraryTab='images';if(initialAccount)queueMicrotask(()=>{if(active()&&!loading)void load();});

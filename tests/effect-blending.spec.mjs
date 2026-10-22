@@ -1,3 +1,4 @@
+import {addVisualLayer} from './helpers/effects.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -219,7 +220,7 @@ const waitPreview=page=>page.waitForFunction(()=>document.querySelector('#effect
 
 test('effect UI selects 26 modes and restores mode changes through undo redo preset apply and save reopen',async()=>{
  const {browser,page,pageErrors,httpRequests}=await openBlend({app:true});try{
-  await page.locator('#card-frame-effects').click();await page.locator('#effect-start-preset').selectOption('flame');await page.locator('#effect-layer-kind').selectOption('gradient');await page.locator('#effect-layer-add').click();
+  await page.locator('#card-frame-effects').click();await page.locator('#effect-start-preset').selectOption('flame');await addVisualLayer(page,'gradient');
   assert.equal(await page.locator('#effect-layer-blend-mode').count(),1,'Each color effect exposes its blend selector');
   assert.equal(await page.locator('#effect-layer-blend-mode option').count(),26);assert.equal(await page.locator('#effect-layer-blend-mode').inputValue(),'source-over');
   await waitPreview(page);const original=await page.locator('#effect-preview').evaluate(canvas=>canvas.toDataURL());
@@ -238,8 +239,8 @@ test('effect UI selects 26 modes and restores mode changes through undo redo pre
 test('text warp UI omits color blending while a following color filter exposes the shared selector',async()=>{
  const {browser,page,pageErrors}=await openBlend({app:true});try{
   await page.locator('#card-frame-effects').click();const title=await page.locator('#effect-target option').evaluateAll(options=>options.find(option=>option.textContent.startsWith('카드 이름'))?.value);assert.ok(title);await page.locator('#effect-target').selectOption(title);
-  await page.locator('#effect-layer-kind').selectOption('textWarp');await page.locator('#effect-layer-add').click();assert.equal(await page.locator('#effect-layer-blend-mode').count(),0);
-  await page.locator('#effect-layer-kind').selectOption('gradient');await page.locator('#effect-layer-add').click();assert.equal(await page.locator('#effect-layer-blend-mode').count(),1);assert.deepEqual(pageErrors,[]);
+  await addVisualLayer(page,'textWarp');assert.equal(await page.locator('#effect-layer-blend-mode').count(),0);
+  await addVisualLayer(page,'gradient');assert.equal(await page.locator('#effect-layer-blend-mode').count(),1);assert.deepEqual(pageErrors,[]);
  }finally{await browser.close();}
 });
 

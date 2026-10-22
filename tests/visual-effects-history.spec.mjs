@@ -1,3 +1,4 @@
+import {addVisualLayer} from './helpers/effects.mjs';
 import {openPreviewOptions} from './helpers/flows.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -6,7 +7,7 @@ import {openApp,qa} from './helpers/browser.mjs';
 import {saveProject} from './helpers/flows.mjs';
 const fill=async(page,id,value)=>{await page.locator(id).fill(String(value));await page.locator(id).press('Tab');};
 const kinds=page=>page.locator('#effect-layer-list [data-kind]').evaluateAll(nodes=>nodes.map(n=>n.dataset.kind));
-const add=async(page,kind)=>{await page.locator('#effect-layer-kind').selectOption(kind);await page.locator('#effect-layer-add').click();};
+const add=async(page,kind)=>{await addVisualLayer(page,kind);};
 const undo=page=>page.locator('#effect-undo').click();
 const redo=page=>page.locator('#effect-redo').click();
 

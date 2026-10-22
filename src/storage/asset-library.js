@@ -1,4 +1,5 @@
 import {createAssetLibrary,parseAssetLibrary,serializeAssetLibrary} from '../model/asset-library.js';
+const defaultCodec={create:createAssetLibrary,parse:parseAssetLibrary,serialize:serializeAssetLibrary};
 
 const CACHE_LOCATION='브라우저 임시 보관함';
 const CACHE_FORMAT='card-print-studio-asset-library-cache';
@@ -28,7 +29,8 @@ export function createAssetLibraryPersistence({indexedDB=globalThis.indexedDB}={
  return {get:key=>run('readonly',key),set:(key,text)=>run('readwrite',key,text)};
 }
 
-export function createAssetLibraryStorage({workspace,indexedDB=globalThis.indexedDB,persistence=createAssetLibraryPersistence({indexedDB}),key='shared-library:v1'}={}){
+export function createAssetLibraryStorage({workspace,indexedDB=globalThis.indexedDB,persistence=createAssetLibraryPersistence({indexedDB}),key='shared-library:v1',codec}={}){
+ const createAssetLibrary=codec?.create??defaultCodec.create,parseAssetLibrary=codec?.parse??defaultCodec.parse,serializeAssetLibrary=codec?.serialize??defaultCodec.serialize;
  let state={mode:'temporary',location:CACHE_LOCATION,message:'브라우저에 임시 보관해요. 폴더를 연결하면 에셋 보관함을 별도로 저장할 수 있어요.',pending:false};
  let queue=Promise.resolve(),disposed=false,epoch=0,baseline=null,recovery=null,recoveryBlock=null,cacheChecked=false,cacheUnknown=false;
  const listeners=new Set(),getState=()=>({...state});

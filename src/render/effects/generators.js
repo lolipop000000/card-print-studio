@@ -1,5 +1,6 @@
 import {drawParticleGenerator} from './particle-generators.js';
 import {drawSpriteEmitter} from './sprite-emitter.js';
+import {particlePathOffset} from '../../model/particle-motion.js';
 import {drawStarlight} from './starlight.js';
 import {effectRandom,fract} from './random.js';
 import {unionBounds} from './masks.js';
@@ -89,14 +90,20 @@ export function drawGenerator(ctx,layer,{rect,seed,timeSec=1.2,shape,edgePoints,
  const height=Math.max(.01,sizeHeightMm??shape?.boundsMm?.h??r.h),cx=r.x+r.w/2,cy=r.y+r.h/2;
  const angle=(layer.rotationDeg??0)*Math.PI/180,cos=Math.cos(angle),sin=Math.sin(angle),direction=(p.direction??-90)*Math.PI/180,dx=Math.cos(direction),dy=Math.sin(direction),sx=-dy,sy=dx;
  const random=(index,salt)=>effectRandom(seed,layer.id,index,salt);
- const point=(index,cycle=0,salt='emit')=>{
+ const originPoint=(index,cycle=0,salt='emit')=>{
   const u=random(index,cycle+':'+salt);
   if(!setup.points)return {x:r.x+u*r.w,y:setup.bottom?r.y+r.h:r.y+random(index,cycle+':y')*r.h,nx:0,ny:-1,open:true};
   return setup.points[Math.min(setup.points.length-1,Math.floor(u*setup.points.length))];
  };
- let bounds=null;
- const include=(x,y,radius=0)=>{const ax=x-cx,ay=y-cy,px=cx+ax*cos-ay*sin,py=cy+ax*sin+ay*cos;bounds=unionBounds(bounds,{x:px-radius,y:py-radius,w:radius*2,h:radius*2});};
- ctx.save();ctx.translate(cx,cy);ctx.rotate(angle);ctx.translate(-cx,-cy);ctx.globalAlpha*=layer.opacity??1;
+ const point=p.motionPattern&&p.motionPattern!=='natural'?(index,cycle=0,salt='emit')=>{
+  const e=originPoint(index,cycle,salt),phase=fract(t/(p.life??2)+random(index,'path-phase'));
+  const offset=particlePathOffset(p,{phase,index,count:p.count??24});return {...e,x:e.x+offset.x*height,y:e.y+offset.y*height};
+ }:originPoint;
+ // Contour fields move as a whole; particle generators sample displaced origins.
+ const fieldOffset=['ripple','aura'].includes(layer.kind)?particlePathOffset(p,{phase:fract(t/(p.life??2)),index:0,count:1}):{x:0,y:0};
+ const offsetX=fieldOffset.x*height,offsetY=fieldOffset.y*height;let bounds=null;
+ const include=(x,y,radius=0)=>{const ax=x+offsetX-cx,ay=y+offsetY-cy,px=cx+ax*cos-ay*sin,py=cy+ax*sin+ay*cos;bounds=unionBounds(bounds,{x:px-radius,y:py-radius,w:radius*2,h:radius*2});};
+ ctx.save();ctx.translate(cx,cy);ctx.rotate(angle);ctx.translate(-cx+offsetX,-cy+offsetY);ctx.globalAlpha*=layer.opacity??1;
  if(layer.kind==='flame'){
   const fire=[],size=height*(p.size??p.width??.1),rise=height*(p.height??.68),count=p.count??110;
   for(let j=0;j<count;j++){

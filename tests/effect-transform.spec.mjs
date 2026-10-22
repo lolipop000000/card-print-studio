@@ -1,3 +1,4 @@
+import {addVisualLayer} from './helpers/effects.mjs';
 import {openPreviewOptions} from './helpers/flows.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -85,7 +86,7 @@ test('Escape, pointer cancellation and lost capture restore the complete draft w
 test('filters explain why mouse transforms are disabled and comparison hides handles',async()=>{
  const {browser,page,errors}=await openPrivateApp();try{
   await openTarget(page,fixture('outline'));assert.equal(await page.locator('#effect-transform-toggle').isDisabled(),true);assert.match(await page.locator('#effect-transform-hint').innerText(),/필터|발생 영역/);
-  await page.locator('#effect-layer-kind').selectOption('flame');await page.locator('#effect-layer-add').click();await page.locator('#effect-transform-toggle').click();assert.equal(await page.locator('#effect-transform-overlay').isVisible(),true);
+  await addVisualLayer(page,'flame');await page.locator('#effect-transform-toggle').click();assert.equal(await page.locator('#effect-transform-overlay').isVisible(),true);
   const compare=await page.locator('#effect-compare').boundingBox();await page.mouse.move(compare.x+compare.width/2,compare.y+compare.height/2);await page.mouse.down();assert.equal(await page.locator('#effect-transform-overlay').isVisible(),false);await page.mouse.up();assert.equal(await page.locator('#effect-transform-overlay').isVisible(),true);assert.deepEqual(errors,[]);
  }finally{await browser.close();}
 });

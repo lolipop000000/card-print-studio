@@ -1,3 +1,4 @@
+import {addVisualLayer} from './helpers/effects.mjs';
 import {openPreviewOptions} from './helpers/flows.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -7,7 +8,7 @@ import {saveProject,openPainter,drawStroke} from './helpers/flows.mjs';
 const fill=async(page,id,value)=>{const input=page.locator(id);if(await input.getAttribute('type')==='range')await input.evaluate((n,v)=>{n.value=String(v);n.dispatchEvent(new Event('input',{bubbles:true}));},value);else{await input.fill(String(value));await input.press('Tab');}};
 async function layer(page,kind){await page.locator('#effect-layer-list [data-kind="'+kind+'"] .effect-layer-select').first().click();}
 async function chooseElement(page,p,match){const e=p.cards[0].elements.find(match),b=await page.locator('#card-canvas').boundingBox();await page.mouse.click(b.x+(e.rect.x+e.rect.w/2)/p.settings.cardWidthMm*b.width,b.y+(e.rect.y+e.rect.h/2)/p.settings.cardHeightMm*b.height);}
-async function addLayer(page,kind){await page.locator('#effect-layer-kind').selectOption(kind);await page.locator('#effect-layer-add').click();}
+async function addLayer(page,kind){await addVisualLayer(page,kind);}
 test('composer combines real effects, saves independent recipes and preserves editable painting originals',async()=>{
  const {browser,page,pageErrors,httpRequests}=await openApp();page.setDefaultTimeout(5000);try{
   await openPainter(page);await drawStroke(page);await page.locator('#paint-apply').click();await page.locator('#painting-editor').waitFor({state:'detached'});
