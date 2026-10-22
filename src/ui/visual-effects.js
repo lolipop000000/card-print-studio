@@ -12,7 +12,7 @@ import {getEffectAccelerationStatus} from '../render/effects/gpu-runtime.js';
 import {createEffectTimeline,syncEffectTimeInput} from './effect-timeline.js';
 import {renderVisualEffectFields} from './visual-effect-fields.js';
 import {mountEffectTransform} from './effect-transform.js';
-import {mountEffectPreview} from './effect-preview.js';
+import {mountEffectPreview,effectPreviewDpi} from './effect-preview.js';
 import {readTargetTextStyle,writeTargetTextStyle} from '../model/text-style.js';
 import {textStyleFields} from './text-style-fields.js';
 import {syncSkillElements} from '../render/templates.js';
@@ -20,7 +20,7 @@ import {getTextRanges,textFieldForElement} from '../model/text-ranges.js';
 import {resolveSkillEffect} from '../model/skill-references.js';
 import {openImageCropper} from './image-crop.js';
 import {packSpriteSheet} from '../model/sprite-sheet.js';
-import {openEffectVideo} from './effect-video.js';
+import {createPreviewSettings} from './preview-settings.js';
 
 function targetLabel(card,e,index){
  const b=e.binding;
@@ -64,17 +64,16 @@ export function openVisualEffectsEditor(ctx,initialTarget){
  const imageFile=el('input',{id:'effect-sprite-file',type:'file',hidden:true,accept:'image/png,image/jpeg,image/webp',onchange:importSpriteImage});
  let target={...initialTarget},targetType,currentKey,textColor,textStyle,recipe,selected,savedId=null,presetName='',draftFrame=initialFrame,disposed=false,confirming=false,confirmation=null,previewProject,previewTarget,comparisonProject,comparisonTarget,comparing=false,unsubscribe,timer,librarySearch='',libraryCategory='all',libraryComposing=false,transform,previewView,lastDpi=0,renderGeometry=null;
  const cache=createEffectCache(),dialog=el('dialog',{id:'effect-editor',class:'effect-dialog','aria-labelledby':'effect-title'});
- let closeVideo=null;
  const library=el('aside',{class:'effect-library'}),fields=el('aside',{class:'effect-controls'}),canvas=el('canvas',{id:'effect-preview','aria-label':'선택한 대상과 카드의 이펙트 미리보기'});
  const feedback=el('p',{id:'effect-feedback',class:'effect-feedback',role:'status',hidden:true});
  const status=el('span',{id:'effect-preview-status',role:'status','data-busy':'false'},'미리보기');
- const quality=el('input',{id:'effect-print-quality',type:'checkbox',onchange:()=>scheduleDraw()});
+ const settings=createPreviewSettings('effect',value=>{timeline.setPlaybackOptions(value);cache.clear();scheduleDraw();updateTransport();});
  const selectedPlayback=el('input',{id:'effect-selected-playback',type:'checkbox',checked:true,onchange:()=>{cache.clear();draw();}});
  const sampleCache=new Map(),sampleObserver=new IntersectionObserver(entries=>{for(const entry of entries)if(entry.isIntersecting){sampleObserver.unobserve(entry.target);paintSample(entry.target);}},{root:library,rootMargin:'100px'});
  const time=el('input',{id:'effect-time',type:'range',min:0,max:6,step:.01,value:initialFrame,'aria-label':'미리보기 시간 (초)',oninput:event=>{timeline.pause();timeline.seek(Number(event.target.value));updateTransport();}});
  const timeLabel=el('output',{htmlFor:'effect-time'}),frameLabel=el('span',{id:'effect-frame-label'});
  const play=button('재생',()=>{timeline.isPlaying()?timeline.pause():timeline.play();updateTransport();},{id:'effect-play','aria-pressed':false});
- const timeline=createEffectTimeline({initialSec:initialFrame,reducedMotion:matchMedia('(prefers-reduced-motion: reduce)').matches,onFrame:()=>{draw();updateTransport();},onStateChange:playing=>{if(!playing&&!disposed)scheduleDraw();}});
+ const timeline=createEffectTimeline({...settings.get(),initialSec:initialFrame,reducedMotion:matchMedia('(prefers-reduced-motion: reduce)').matches,onFrame:()=>{draw();updateTransport();},onStateChange:playing=>{if(!playing&&!disposed)scheduleDraw();updateTransport();}});
  const targetPicker=field('효과를 붙일 대상','effect-target',initialValue,value=>switchTarget(value),{options:targets});
  const undoButton=button('↶ 실행 취소',()=>moveHistory(false),{id:'effect-undo',disabled:true,onpointerdown:event=>{if(pendingControl())event.preventDefault();},title:'Ctrl+Z / ⌘Z'});
  const redoButton=button('↷ 다시 실행',()=>moveHistory(true),{id:'effect-redo',disabled:true,onpointerdown:event=>{if(pendingControl())event.preventDefault();},title:'Ctrl+Shift+Z / Ctrl+Y / ⌘⇧Z'});
@@ -225,7 +224,7 @@ export function openVisualEffectsEditor(ctx,initialTarget){
  function dirty(){remember();return pendingImports>0||draftFrame!==initialFrame||[...drafts.values()].some(d=>recipeChanged(d)||d.color!==d.originalColor||styleChanged(d));}
  function message(text){feedback.textContent=text;feedback.hidden=!text;}
  function updateTransport(){
-  syncEffectTimeInput(time,timeline.getTime());timeLabel.textContent=timeline.getTime().toFixed(2)+'초';play.textContent=timeline.isPlaying()?'일시정지':'재생';play.setAttribute('aria-pressed',timeline.isPlaying());
+  syncEffectTimeInput(time,timeline.getTime(),settings.get().durationSec);timeLabel.textContent=timeline.getTime().toFixed(2)+'초';play.textContent=timeline.isPlaying()?'일시정지':'재생';play.setAttribute('aria-pressed',timeline.isPlaying());
   frameLabel.textContent='인쇄 '+draftFrame.toFixed(2)+'초';dialog.dataset.effectDirty=String(dirty());updateHistoryControls();
  }
  function matchesKeyword(element){
@@ -248,7 +247,7 @@ export function openVisualEffectsEditor(ctx,initialTarget){
  }
  function draw(){
   clearTimeout(timer);if(disposed||!previewTarget)return;
-  const started=performance.now(),accelerationBefore=getBloomAccelerationStatus(),effectsBefore=getEffectAccelerationStatus(),active=timeline.isPlaying()||transform?.isDragging(),dpi=previewView?.dpi({active})||(quality.checked?300:200);
+  const started=performance.now(),accelerationBefore=getBloomAccelerationStatus(),effectsBefore=getEffectAccelerationStatus(),active=timeline.isPlaying()||transform?.isDragging(),dpi=previewView?.dpi({active})||effectPreviewDpi({widthMm:p.settings.cardWidthMm,heightMm:p.settings.cardHeightMm,dpi:settings.get().dpi});
   if(dpi!==lastDpi){cache.clear();lastDpi=dpi;}
   const report=renderCard(canvas.getContext('2d',{willReadFrequently:false}),comparing?comparisonProject:previewProject,comparing?comparisonTarget:previewTarget,previewAssets,dpi,{timeSec:timeline.getTime(),playbackTarget:selectedPlayback.checked?target:null,frozenTimeSec:draftFrame,effectCache:cache,onEffectGeometry:entry=>{
    if(comparing)return;
@@ -261,7 +260,7 @@ export function openVisualEffectsEditor(ctx,initialTarget){
     if(entry.skillId===target.skillId&&(!renderGeometry||entry.elementId===title?.id))renderGeometry=entry;
    }else if(!entry.skillId&&!entry.textRangeId&&entry.elementId===(target.elementId||null))renderGeometry=entry;
   }});
-  previewView?.afterDraw(dpi,{active,durationMs:performance.now()-started});transform?.refresh();
+  previewView?.afterDraw(dpi,{active,durationMs:performance.now()-started});settings.updateActual(dpi);transform?.refresh();
   const problems=ctx.state.ignoreOutputWarnings?[]:report.problems.filter(p=>target.skillId?p.skillId===target.skillId:p.elementId===target.elementId||!target.elementId&&!p.elementId);
   message(problems.slice(0,2).map(p=>(p.severity==='warning'?'안내: ':'인쇄 확인: ')+p.message).join(' '));
   const acceleration=getBloomAccelerationStatus(),gpu=acceleration.gpuRenders>accelerationBefore.gpuRenders,cpu=acceleration.cpuRenders>accelerationBefore.cpuRenders;
@@ -269,7 +268,7 @@ export function openVisualEffectsEditor(ctx,initialTarget){
   status.dataset.bloomBackend=gpu?(cpu?'mixed':'gpu'):(cpu?'cpu':'idle');
   status.dataset.effectBackend=effectsGpu?(effectsCpu?'mixed':'gpu'):(effectsCpu?'cpu':'idle');
   status.title=(cpu&&acceleration.reason||effectsCpu&&effects.reason)?'GPU 가속을 사용할 수 없는 작업은 기본 방식으로 처리해요.':'';
-  status.dataset.busy=String(pendingImports>0);status.textContent=pendingImports?'입자 그림 읽는 중…':(quality.checked?'인쇄 품질 확인 · ':'미리보기 · ')+dpi+'dpi'+' · '+Math.round(performance.now()-started)+'ms'+(gpu?' · 블룸 GPU'+(cpu?' + CPU':''):cpu?' · 블룸 CPU':'')+(effectsGpu?' · 이펙트 GPU'+(effectsCpu?' + CPU':''):effectsCpu?' · 이펙트 CPU':'');
+  status.dataset.busy=String(pendingImports>0);status.textContent=pendingImports?'입자 그림 읽는 중…':'미리보기 · '+dpi+'dpi'+' · '+Math.round(performance.now()-started)+'ms'+(gpu?' · 블룸 GPU'+(cpu?' + CPU':''):cpu?' · 블룸 CPU':'')+(effectsGpu?' · 이펙트 GPU'+(effectsCpu?' + CPU':''):effectsCpu?' · 이펙트 CPU':'');
  }
  function scheduleDraw(){clearTimeout(timer);status.dataset.busy='true';status.textContent='계산 중…';timer=setTimeout(draw,150);}
  function renderFields(){
@@ -344,7 +343,7 @@ export function openVisualEffectsEditor(ctx,initialTarget){
   for(const sample of library.querySelectorAll('[data-sample-key]')){if(sampleCache.has(sample.dataset.sampleKey))paintSample(sample);else sampleObserver.observe(sample);}
  }
  function cleanup(){
-  if(disposed)return;disposed=true;closeVideo?.();previewView?.destroy();transform?.destroy();past.length=0;future.length=0;clearTimeout(timer);timeline.destroy();cache.clear();sampleObserver.disconnect();sampleCache.clear();stagedAssets.clear();stagedImages.clear();assetNames.clear();previewAssets.clear();unsubscribe?.();if(ctx.refreshVisualEffects===draw)ctx.refreshVisualEffects=null;document.removeEventListener('visibilitychange',visibility);document.removeEventListener('pointerup',releaseComparison);window.removeEventListener('blur',releaseComparison);
+  if(disposed)return;disposed=true;settings.destroy();previewView?.destroy();transform?.destroy();past.length=0;future.length=0;clearTimeout(timer);timeline.destroy();cache.clear();sampleObserver.disconnect();sampleCache.clear();stagedAssets.clear();stagedImages.clear();assetNames.clear();previewAssets.clear();unsubscribe?.();if(ctx.refreshVisualEffects===draw)ctx.refreshVisualEffects=null;document.removeEventListener('visibilitychange',visibility);document.removeEventListener('pointerup',releaseComparison);window.removeEventListener('blur',releaseComparison);
   confirmation?.dispatchEvent(new Event('cancel',{cancelable:true}));confirmation=null;
   if(dialog.open)dialog.close();dialog.remove();ctx.onEffectsClosed?.();
  }
@@ -359,16 +358,16 @@ export function openVisualEffectsEditor(ctx,initialTarget){
  }
  function visibility(){timeline.setActive(!document.hidden&&dialog.open);updateTransport();}
  const transport=el('div',{class:'effect-transport'},play,el('label',{class:'check'},selectedPlayback,'선택 대상만 재생'),time,timeLabel,
-  button('고화질 6초 보기',()=>{pendingControl()?.blur();timeline.pause();releaseComparison();prepare();updateTransport();closeVideo?.();closeVideo=openEffectVideo({project:previewProject,target:previewTarget,assets:previewAssets,startTimeSec:timeline.getTime(),playbackTarget:selectedPlayback.checked?target:null,frozenTimeSec:draftFrame,onClose:()=>{closeVideo=null;}});},{id:'effect-prerender'}),
+  el('details',{id:'effect-preview-options',class:'preview-options'},el('summary',{},'설정'),el('div',{class:'preview-options-body'},settings.node,
   button('장면 고정',()=>{timeline.pause();editDraft(()=>draftFrame=Math.round(timeline.getTime()*100)/100);timeline.seek(draftFrame);updateTransport();},{id:'effect-freeze',title:'현재 장면을 인쇄 프레임으로'}),
-  button('인쇄 장면',()=>{timeline.pause();timeline.seek(draftFrame);updateTransport();},{id:'effect-print-frame'}),frameLabel);
+  button('인쇄 장면',()=>{timeline.pause();timeline.seek(draftFrame);updateTransport();},{id:'effect-print-frame'}),frameLabel)));
  dialog.append(imageFile,
   el('header',{class:'effect-top'},el('div',{},el('h2',{id:'effect-title'},'이펙트 만들기'),el('p',{class:'hint'},'선택한 그림이나 글자에 효과를 조합해 보세요. 스킬 이름만 따로 꾸밀 수도 있어요.')),
    el('div',{class:'effect-top-actions'},undoButton,redoButton,button('닫기',()=>close(),{id:'effect-close'}),button('편집한 대상에 적용',()=>{
     if(pendingImports)return message('입자 그림을 읽고 있어요. 이미지가 준비되면 적용할 수 있어요.');
     remember();if(storeEdit('이펙트 적용',p=>{commitAssets(p,[...drafts.values()].map(d=>d.recipe));applyDrafts(p);p.print.effectFrameSec=draftFrame;}))cleanup();
    },{id:'effect-apply',class:'primary'}))),
-  el('div',{class:'effect-target-bar'},targetPicker,el('label',{class:'check'},quality,'인쇄 품질로 보기'),status),
+  el('div',{class:'effect-target-bar'},targetPicker,status),
   el('div',{class:'effect-grid'},library,el('main',{class:'effect-center'},el('div',{class:'effect-preview-tools'},zoom,focus,compare,el('span',{class:'effect-zoom-hint'},'Ctrl+휠 확대·축소')),el('div',{class:'effect-preview-scroll'},canvas),transport),fields),feedback);
  transform=mountEffectTransform({canvas,viewport:canvas.parentElement,toolbar:dialog.querySelector('.effect-preview-tools'),scope:dialog,
   getState:()=>({layer:recipe?.layers.find(l=>l.id===selected),...renderGeometry,image:previewAssets.get(recipe?.layers.find(l=>l.id===selected)?.params.assetId),timeSec:timeline.getTime(),cardWidthMm:p.settings.cardWidthMm,cardHeightMm:p.settings.cardHeightMm,hidden:comparing||confirming}),
@@ -384,7 +383,7 @@ export function openVisualEffectsEditor(ctx,initialTarget){
  dialog.addEventListener('keydown',historyKey);dialog.addEventListener('input',updateHistoryControls);
  dialog.addEventListener('cancel',event=>{if(event.target!==dialog)return;event.preventDefault();if(!transform.cancel())close();});dialog.addEventListener('close',cleanup);
  activate(initialValue);document.body.append(dialog);prepare();renderLibrary();renderFields();draw();updateTransport();dialog.showModal();
- previewView=mountEffectPreview({canvas,viewport:canvas.parentElement,select:zoom.querySelector('select'),widthMm:p.settings.cardWidthMm,heightMm:p.settings.cardHeightMm,getPrintQuality:()=>quality.checked,canZoom:()=>!disposed&&!confirming&&!transform?.isDragging(),onChange:scheduleDraw,onLayout:()=>transform?.refresh()});
+ previewView=mountEffectPreview({canvas,viewport:canvas.parentElement,select:zoom.querySelector('select'),widthMm:p.settings.cardWidthMm,heightMm:p.settings.cardHeightMm,getDpi:()=>settings.get().dpi,canZoom:()=>!disposed&&!confirming&&!transform?.isDragging(),onChange:scheduleDraw,onLayout:()=>transform?.refresh()});
  document.addEventListener('visibilitychange',visibility);document.addEventListener('pointerup',releaseComparison);window.addEventListener('blur',releaseComparison);
  ctx.refreshVisualEffects=draw;unsubscribe=ctx.store.subscribe(()=>{if(!disposed)renderLibrary();});return close;
 }

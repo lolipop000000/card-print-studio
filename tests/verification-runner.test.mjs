@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp, mkdir, readFile, writeFile, rm} from 'node:fs/promises';
+import {mkdtemp, mkdir, readFile, writeFile, rm, readdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
@@ -30,9 +30,14 @@ test('verification profiles select existing checks once and reject missing or un
  const files=['tests/model.test.mjs','tests/offline.spec.mjs','tests/updates.spec.mjs','tests/effect-video.spec.mjs','tests/unused.spec.mjs'];
  assert.deepEqual(selectTests(files,'quick'),files.slice(0,3).sort());
  assert.deepEqual(selectTests(files,'full'),[...files].sort());
- assert.throws(()=>selectTests(files,'effects'),/effect-video-ui/);
+ assert.throws(()=>selectTests(files,'effects'),/preview-settings/);
  assert.throws(()=>selectTests(files.filter(f=>!f.includes('offline')),'quick'),/offline/);
  assert.throws(()=>selectTests(files,'typo'),/검사 종류/);
+});
+
+test('effects profile covers the replacement duration and DPI controls using existing test files',async()=>{
+ const {selectTests}=await api(),files=(await readdir(new URL('.',import.meta.url))).map(name=>'tests/'+name),selected=selectTests(files,'effects');
+ assert.ok(selected.includes('tests/preview-settings.spec.mjs'));assert.ok(selected.includes('tests/mobile-layout.spec.mjs'));assert.ok(!selected.includes('tests/effect-video-ui.spec.mjs'));
 });
 
 test('a green report requires completed tests with no failures, skips, cancellations or todo',async()=>{

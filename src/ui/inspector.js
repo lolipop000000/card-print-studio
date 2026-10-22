@@ -14,6 +14,7 @@ import {renderElementAlignmentControls} from './element-alignment.js';
 import {renderObjectList} from './object-list.js';
 import {rangeTextField,textRangeControls} from './text-ranges.js';
 import {editText,remapTextRanges} from '../model/text-ranges.js';
+import {organizeMobileInspector} from './mobile-layout.js';
 function group(title,...children){return el('section',{class:'inspector-group'},el('h3',{},title),children);}
 function attributeControls(card,editCard){
  const selectedAttributes=cardAttributes(card),item=card.kind==='item',label=item?'아이템에 부여한 속성':'몬스터 속성';
@@ -163,6 +164,7 @@ export function renderInspector(host,ctx){
  settings.open=settingsOpen;settings.append(table);host.append(settings);
  const attributes=host.querySelector('#attributes');if(attributes)attributes.open=attributesOpen;
  for(const node of host.querySelectorAll('details[data-text-style]'))node.open=openTextStyles.has(node.dataset.textStyle);
+ organizeMobileInspector(host);
  });
  host.scrollTop=scroll;
 }

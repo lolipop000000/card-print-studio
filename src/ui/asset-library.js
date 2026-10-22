@@ -7,6 +7,7 @@ import {openDialog} from './dialogs.js';
 import {openImageCropper} from './image-crop.js';
 import {createCloudLibraryStorage} from '../cloud/shared-assets.js';
 import {mountLibraryHub} from './cloud-panel.js';
+import {MOBILE_QUERY} from './mobile-layout.js';
 
 const MAX_BATCH_PIXELS=32_000_000,MAX_IMAGE_FILES=64;
 const cleanName=value=>Array.from(String(value||'그림').normalize('NFC').replace(/[\x00-\x1f\x7f]/g,' ').replace(/\.(png|jpe?g|webp)$/i,'').trim()||'그림').slice(0,120).join('');
@@ -81,7 +82,7 @@ export function createAssetLibraryControls(ctx,{workspace}={}){
  }
  function renderList(){
   const current=session;if(!current)return;const query=current.search.value.normalize('NFC').toLocaleLowerCase(),entries=library.entries.filter(entry=>entry.name.normalize('NFC').toLocaleLowerCase().includes(query));
-  current.list.replaceChildren(...entries.map(entry=>button(el('span',{},el('span',{class:'asset-thumbnail'},el('img',{src:entry.asset.dataUrl,alt:'',loading:'lazy'})),el('strong',{},entry.name),el('small',{},entry.asset.width+' × '+entry.asset.height+' px')),()=>{selected=entry.id;current.listScroll=current.list.scrollTop;current.dialogScroll=current.dialog.scrollTop;current.dialog.dataset.imageDetail='true';render();if(matchMedia('(max-width:620px)').matches){current.dialog.scrollTop=0;current.details.querySelector('#asset-back')?.focus({preventScroll:true});}else [...current.list.querySelectorAll('[data-entry-id]')].find(node=>node.dataset.entryId===entry.id)?.focus({preventScroll:true});},{class:'asset-entry'+(entry.id===selected?' selected':''),'data-asset-id':entry.asset.id,'data-entry-id':entry.id,'data-asset-action':'','aria-pressed':String(entry.id===selected)})));
+  current.list.replaceChildren(...entries.map(entry=>button(el('span',{},el('span',{class:'asset-thumbnail'},el('img',{src:entry.asset.dataUrl,alt:'',loading:'lazy'})),el('strong',{},entry.name),el('small',{},entry.asset.width+' × '+entry.asset.height+' px')),()=>{selected=entry.id;current.listScroll=current.list.scrollTop;current.dialogScroll=current.dialog.scrollTop;current.dialog.dataset.imageDetail='true';render();if(matchMedia(MOBILE_QUERY).matches){current.dialog.scrollTop=0;current.details.querySelector('#asset-back')?.focus({preventScroll:true});}else [...current.list.querySelectorAll('[data-entry-id]')].find(node=>node.dataset.entryId===entry.id)?.focus({preventScroll:true});},{class:'asset-entry'+(entry.id===selected?' selected':''),'data-asset-id':entry.asset.id,'data-entry-id':entry.id,'data-asset-action':'','aria-pressed':String(entry.id===selected)})));
   if(!entries.length)current.list.append(el('p',{class:'empty-note'},library.entries.length?'검색한 그림이 없어요.':'그림을 가져오거나 원본을 잘라 보관하세요.'));current.count.textContent=library.entries.length+'개';refreshStatus();
  }
  function renderDetails(){
@@ -131,6 +132,9 @@ export function createAssetLibraryControls(ctx,{workspace}={}){
     return loadLibrary({discardPending:true},current);
    },'asset-reload'),toolbarButton('저장 재시도',async()=>{await ensureLoaded(current);return persist(current);},'asset-retry'))),
    el('div',{class:'asset-library-grid'},el('section',{class:'asset-browser'},el('div',{class:'asset-search-row'},current.search,current.count),current.list),current.details),current.feedback);
+  const toolbar=images.querySelector('.asset-library-toolbar'),tools=el('details',{id:'asset-library-tools',class:'asset-library-tools',open:!matchMedia(MOBILE_QUERY).matches},el('summary',{},'관리'));
+  const toolBody=el('div',{class:'asset-library-tools-body'},el('div',{class:'asset-action-row'},...Array.from(toolbar.children).slice(1)),images.querySelector('.asset-storage'));
+  tools.append(toolBody);toolbar.append(tools);images.prepend(images.querySelector('.asset-search-row'));
   dialog.append(header,images,files,json);if(!pick&&ctx.cloudAccount)current.hub=mountLibraryHub(ctx,{dialog,images,header,onClose:()=>finish(),initialAccount:account});
   dialog.addEventListener('cancel',event=>{event.preventDefault();if(session===current)finish();});dialog.addEventListener('close',()=>{if(session===current)finish();});document.body.append(dialog);render();dialog.showModal();if(!loaded||loadedIdentity!==storage.identity())void perform(()=>ensureLoaded(current)).catch(()=>{});return result;
  }

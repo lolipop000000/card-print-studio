@@ -1,3 +1,4 @@
+import {setPreviewDpi} from './helpers/flows.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -58,7 +59,7 @@ test('image preset saves its resource, survives cancel, applies without replacin
   const saved=await saveProject(page,'sprite-preset-saved.json');assert.equal(saved.cards[0].artAssetId,before.cards[0].artAssetId);assert.ok(saved.assets[id]);assert.deepEqual(saved.cards[0],before.cards[0]);
   await page.locator('#card-frame-effects').click();await page.locator('[data-effect-preset]').click();assert.equal(await page.locator('#effect-param-assetId').inputValue(),id);
   await page.locator('#effect-placement').selectOption('front');await fill(page,'#effect-param-sizeEnd',0);await add(page,'bloom');await fill(page,'#effect-param-threshold',.25);
-  await page.locator('#effect-print-quality').check();await page.waitForFunction(()=>document.getElementById('effect-preview-status')?.dataset.busy==='false');
+  await setPreviewDpi(page,300);await page.waitForFunction(()=>document.getElementById('effect-preview-status')?.dataset.busy==='false');
   assert.equal(await page.locator('#effect-preview-status').getAttribute('data-bloom-backend'),'gpu','Actual offline editor uses GPU bloom');
   assert.match(await page.locator('#effect-preview-status').innerText(),/블룸 GPU/);
   await page.screenshot({path:path.join(qa,'sprite-bloom-editor.png'),fullPage:true});await page.locator('#effect-apply').click();

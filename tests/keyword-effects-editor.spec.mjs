@@ -1,3 +1,4 @@
+import {setPreviewDpi} from './helpers/flows.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {openApp,qa} from './helpers/browser.mjs';
@@ -22,7 +23,7 @@ test('unused keywords have a visible effect sample and preview, comparison and c
   await page.locator('#effect-close').click();await page.getByRole('button',{name:'변경 버리기',exact:true}).click();await page.locator('#keyword-close').click();
   assert.deepEqual(await saveProject(page,'keyword-editor-cancelled.json'),before);
   await page.locator('#keyword-manager').click();await page.locator('#keyword-effects').click();await page.locator('#effect-layer-kind').selectOption('heatHaze');await page.locator('#effect-layer-add').click();
-  await page.locator('#effect-print-quality').check();await page.waitForFunction(()=>document.getElementById('effect-preview-status')?.dataset.busy==='false');
+  await setPreviewDpi(page,300);await page.waitForFunction(()=>document.getElementById('effect-preview-status')?.dataset.busy==='false');
   assert.equal(await page.locator('#effect-preview-status').getAttribute('data-effect-backend'),'gpu');
   await page.screenshot({path:qa+'/keyword-heat-editor.png',fullPage:true});await page.locator('#effect-apply').click();await page.locator('#keyword-close').click();
   const applied=await saveProject(page,'keyword-editor-applied.json');assert.equal(applied.keywords[0].visualEffects.layers[0].kind,'heatHaze');assert.deepEqual(applied.cards,before.cards);

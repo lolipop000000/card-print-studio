@@ -8,31 +8,30 @@ import {setElementSelection,selectedElements,pointerElements,selectionBounds,gro
 import {createEffectPreviewQuality} from './effect-preview.js';
 import {CSS_MM,wheelZoomFactor,captureViewAnchor,restoreViewAnchor} from './view-zoom.js';
 import {mountTouchViewport} from './touch-viewport.js';
-import {openEffectVideo} from './effect-video.js';
+import {createPreviewSettings} from './preview-settings.js';
 export function mountCardCanvas(host,ctx){
  const stage=el('div',{class:'card-stage',tabIndex:0,role:'group','aria-label':'카드 요소 선택 영역'}),canvas=el('canvas',{id:'card-canvas'}),members=el('div',{class:'selection-members'}),selection=el('div',{id:'selection-box',hidden:true}),marquee=el('div',{id:'selection-marquee',hidden:true});stage.append(canvas,members,selection,marquee);host.append(stage);
  const area=host.closest('.canvas-scroll')||host;
- let gesture=null,preview=null,report={problems:[]},projectRef=ctx.store.getProject(),lastRatio=window.devicePixelRatio||1,closeVideo=null;
- const effectCache=createEffectCache(),quality=createEffectPreviewQuality(),timeline=createEffectTimeline({initialSec:getEffectFrameSec(projectRef),onFrame:()=>{drawCanvas();updateTransport();},onStateChange:()=>{drawCanvas();updateTransport();}});
+ let gesture=null,preview=null,report={problems:[]},projectRef=ctx.store.getProject(),lastRatio=window.devicePixelRatio||1;
+ const settings=createPreviewSettings('card',value=>{timeline.setPlaybackOptions(value);effectCache.clear();drawCanvas();updateTransport();});
+ document.getElementById('card-preview-settings')?.append(settings.node);
+ const effectCache=createEffectCache(),quality=createEffectPreviewQuality(),timeline=createEffectTimeline({...settings.get(),initialSec:getEffectFrameSec(projectRef),onFrame:()=>{drawCanvas();updateTransport();},onStateChange:()=>{drawCanvas();updateTransport();}});
  const transport=document.getElementById('card-effect-play'),timeInput=document.getElementById('card-effect-time');
  function updateTransport(){
   transport.textContent=timeline.isPlaying()?'일시정지':'재생';transport.setAttribute('aria-pressed',timeline.isPlaying());
-  syncEffectTimeInput(timeInput,timeline.getTime());document.getElementById('card-effect-seconds').textContent=timeline.getTime().toFixed(2)+'초';
+  syncEffectTimeInput(timeInput,timeline.getTime(),settings.get().durationSec);document.getElementById('card-effect-seconds').textContent=timeline.getTime().toFixed(2)+'초';
   document.getElementById('card-effect-print-frame').textContent='인쇄 장면 '+getEffectFrameSec(ctx.store.getProject()).toFixed(2)+'초 보기';
  }
  function drawCanvas(){
   const p=ctx.store.getProject(),target=preview||ctx.target();if(!target)return;
   const width=stage.getBoundingClientRect().width;lastRatio=window.devicePixelRatio||1;
-  const active=timeline.isPlaying(),dpi=quality.dpi({widthMm:p.settings.cardWidthMm,heightMm:p.settings.cardHeightMm,displayWidth:width,pixelRatio:lastRatio,active}),started=performance.now();
+  const active=timeline.isPlaying(),manualDpi=settings.get().dpi,dpi=quality.dpi({widthMm:p.settings.cardWidthMm,heightMm:p.settings.cardHeightMm,displayWidth:width,pixelRatio:lastRatio,active,dpi:manualDpi}),started=performance.now();
   report=renderCard(canvas.getContext('2d',{willReadFrequently:false}),p,target,ctx.assets,dpi,{timeSec:timeline.getTime(),effectCache});
-  quality.record(performance.now()-started,dpi,{active});canvas.dataset.previewDpi=String(dpi);canvas.dataset.previewActive=String(active);canvas.style.imageRendering=!active&&canvas.width+.5<width*lastRatio?'pixelated':'auto';
+  quality.record(performance.now()-started,dpi,{active,manual:manualDpi!==null});settings.updateActual(dpi);canvas.dataset.previewDpi=String(dpi);canvas.dataset.previewActive=String(active);canvas.style.imageRendering=!active&&canvas.width+.5<width*lastRatio?'pixelated':'auto';
  }
  function setActive(value){timeline.setActive(value&&area.clientWidth>0&&!document.hidden);updateTransport();}
  function visibility(){setActive(ctx.state.mode==='card'&&!ctx.state.paintOpen&&!ctx.state.effectOpen&&area.clientWidth>0&&!document.querySelector('dialog[open]'));}
  transport.addEventListener('click',()=>{timeline.isPlaying()?timeline.pause():timeline.play();updateTransport();});
- const videoButton=document.getElementById('card-effect-prerender');
- const showVideo=()=>{const target=ctx.target();if(!target)return;timeline.pause();updateTransport();closeVideo?.();closeVideo=openEffectVideo({project:ctx.store.getProject(),target,assets:ctx.assets,startTimeSec:timeline.getTime(),onClose:()=>{closeVideo=null;}});};
- videoButton.addEventListener('click',showVideo);
  timeInput.addEventListener('input',()=>{timeline.pause();timeline.seek(Number(timeInput.value));updateTransport();});
  document.getElementById('card-effect-freeze').addEventListener('click',()=>{timeline.pause();const frame=Math.round(timeline.getTime()*100)/100;ctx.edit('인쇄 장면 지정',p=>p.print.effectFrameSec=frame);timeline.seek(frame);updateTransport();});
  document.getElementById('card-effect-print-frame').addEventListener('click',()=>{timeline.pause();timeline.seek(getEffectFrameSec(ctx.store.getProject()));updateTransport();});
@@ -129,5 +128,5 @@ export function mountCardCanvas(host,ctx){
  const down=event=>{if([canvas,stage,host,area].includes(event.target))begin(event,null);};
  const touchView=mountTouchViewport({viewport:area,onStart:()=>{cancelGesture();return ctx.state.mode==='card'&&!document.querySelector('dialog[open]');},onChange:({factor,from,to})=>{setZoom(ctx.state.cardScale*factor,from);area.scrollLeft-=to.x-from.x;area.scrollTop-=to.y-from.y;}});
  area.addEventListener('pointerdown',down);area.addEventListener('wheel',wheel,{passive:false});window.addEventListener('resize',resized);stage.addEventListener('pointermove',move);stage.addEventListener('pointerup',end);stage.addEventListener('pointercancel',cancelGesture);
- return {refresh,setZoom,fit,setActive,cancelGesture,resetTime(){timeline.pause();effectCache.clear();timeline.seek(getEffectFrameSec(ctx.store.getProject()));updateTransport();},report:()=>report,destroy(){closeVideo?.();videoButton.removeEventListener('click',showVideo);touchView.destroy();if(gesture)release(gesture);timeline.destroy();effectCache.clear();dialogs.disconnect();document.removeEventListener('visibilitychange',visibility);area.removeEventListener('pointerdown',down);area.removeEventListener('wheel',wheel);window.removeEventListener('resize',resized);host.replaceChildren();}};
+ return {refresh,setZoom,fit,setActive,cancelGesture,resetTime(){timeline.pause();effectCache.clear();timeline.seek(getEffectFrameSec(ctx.store.getProject()));updateTransport();},report:()=>report,destroy(){settings.destroy();touchView.destroy();if(gesture)release(gesture);timeline.destroy();effectCache.clear();dialogs.disconnect();document.removeEventListener('visibilitychange',visibility);area.removeEventListener('pointerdown',down);area.removeEventListener('wheel',wheel);window.removeEventListener('resize',resized);host.replaceChildren();}};
 }

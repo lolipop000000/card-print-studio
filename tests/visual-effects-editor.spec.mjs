@@ -1,3 +1,4 @@
+import {openPreviewOptions} from './helpers/flows.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -14,7 +15,7 @@ test('composer combines real effects, saves independent recipes and preserves ed
   await page.locator('#card-frame-effects').click();await page.locator('#effect-start-preset').selectOption('flame');
   await page.locator('#effect-combine-preset').selectOption('smoke');await page.locator('#effect-merge-preset').click();await addLayer(page,'ember');
   await layer(page,'smoke');await fill(page,'#effect-param-color','#7953a6');await fill(page,'#effect-param-density','.7');await page.locator('#effect-advanced summary').click();await fill(page,'#effect-origin-x','.1');
-  await fill(page,'#effect-time','2.35');await page.locator('#effect-freeze').click();await fill(page,'#effect-preset-name','보라 연기 불꽃');await page.locator('#effect-save-preset').click();
+  await fill(page,'#effect-time','2.35');await openPreviewOptions(page);await page.locator('#effect-freeze').click();await fill(page,'#effect-preset-name','보라 연기 불꽃');await page.locator('#effect-save-preset').click();
   await page.locator('#effect-apply').click();await page.locator('#effect-editor').waitFor({state:'detached'});
   const applied=await saveProject(page,'effects-applied.json'),recipe=applied.cards[0].visualEffects;
   assert.deepEqual(recipe.layers.map(l=>l.kind).sort(),['ember','flame','smoke']);assert.equal(applied.print.effectFrameSec,2.35);
@@ -41,7 +42,7 @@ test('text warp and fire change shapes without rewriting skill text, and incompa
 });
 test('draft time and layers cancel safely through Escape, native close and repeated entry',async()=>{
  const {browser,page,pageErrors}=await openApp();page.setDefaultTimeout(5000);try{
-  const before=await saveProject(page,'effects-cancel-before.json');await page.locator('#card-frame-effects').click();await page.locator('#effect-start-preset').selectOption('burning');await fill(page,'#effect-time','4.2');await page.locator('#effect-freeze').click();
+  const before=await saveProject(page,'effects-cancel-before.json');await page.locator('#card-frame-effects').click();await page.locator('#effect-start-preset').selectOption('burning');await fill(page,'#effect-time','4.2');await openPreviewOptions(page);await page.locator('#effect-freeze').click();
   await page.keyboard.press('Escape');await page.getByRole('button',{name:'계속 편집',exact:true}).click();assert.equal(await page.locator('#effect-editor').isVisible(),true);
   await page.keyboard.press('Escape');await page.getByRole('button',{name:'변경 버리기',exact:true}).click();const after=await saveProject(page,'effects-cancel-after.json');assert.deepEqual(after,before);
   await page.locator('#card-frame-effects').click();assert.equal(await page.locator('#effect-layer-list [data-kind]').count(),0);assert.match(await page.locator('#effect-empty').innerText(),/추가/);
@@ -58,7 +59,7 @@ test('main preview playback stays local, pauses for A4 and does not rebuild the 
   await page.locator('#card-frame-effects').click();await page.locator('#effect-start-preset').selectOption('burning');await page.locator('#effect-apply').click();await saveProject(page,'effects-playback-base.json');
   const node=await page.locator('#card-name').elementHandle(),before=await page.locator('#card-effect-time').inputValue();await page.locator('#card-effect-play').click();await page.waitForFunction(v=>Math.abs(Number(document.getElementById('card-effect-time').value)-Number(v))>.8,before);
   assert.equal(await page.locator('#save-state').innerText(),'저장됨');assert.equal(await node.evaluate(n=>n.isConnected),true);
-  await page.locator('#card-effect-play').click();await fill(page,'#card-effect-time','2.35');await page.locator('#card-effect-freeze').click();assert.equal(await page.locator('#save-state').innerText(),'미저장');
+  await page.locator('#card-effect-play').click();await fill(page,'#card-effect-time','2.35');await openPreviewOptions(page,'card');await page.locator('#card-effect-freeze').click();assert.equal(await page.locator('#save-state').innerText(),'미저장');
   await page.locator('#card-effect-play').click();await page.locator('#paper-tab').click();assert.equal(await page.locator('#card-effect-play').getAttribute('aria-pressed'),'false');assert.equal(await page.locator('#print-effect-frame').inputValue(),'2.35');
   await page.setViewportSize({width:720,height:760});await page.locator('#card-tab').click();await page.locator('#card-frame-effects').click();assert.equal(await page.locator('#effect-apply').isVisible(),true);await page.locator('#effect-layer-list').evaluate(n=>n.scrollIntoView());await page.screenshot({path:path.join(qa,'visual-effects-editor-small.png'),fullPage:true});await page.keyboard.press('Escape');assert.deepEqual(pageErrors,[]);
  }finally{await browser.close();}
@@ -79,7 +80,7 @@ test('layer duplication ordering bounds and apply undo keep a whole recipe and p
   await page.locator('#effect-layer-up').click();await fill(page,'#effect-param-height','.95');await page.locator('#effect-layer-reset').click();assert.equal(await page.locator('#effect-param-height').inputValue(),'0.68');
   await page.locator('#effect-layer-list [data-kind="flame"] input').first().uncheck();assert.equal(await page.locator('#effect-reroll').count(),0);
   for(let i=0;i<10;i++)await addLayer(page,'outline');assert.equal(await page.locator('#effect-layer-add').isDisabled(),true);assert.equal(await page.locator('#effect-layer-duplicate').isDisabled(),true);
-  await fill(page,'#effect-time','3.25');await page.locator('#effect-freeze').click();await page.locator('#effect-apply').click();const applied=await saveProject(page,'effects-layer-after.json');
+  await fill(page,'#effect-time','3.25');await openPreviewOptions(page);await page.locator('#effect-freeze').click();await page.locator('#effect-apply').click();const applied=await saveProject(page,'effects-layer-after.json');
   assert.equal(applied.cards[0].visualEffects.layers.length,12);assert.equal(new Set(applied.cards[0].visualEffects.layers.map(l=>l.id)).size,12);assert.equal(applied.print.effectFrameSec,3.25);
   await page.locator('#undo').click();const undone=await saveProject(page,'effects-layer-undo.json');assert.deepEqual(undone,before);await page.locator('#redo').click();const redone=await saveProject(page,'effects-layer-redo.json');assert.deepEqual(redone,applied);
  }finally{await browser.close();}

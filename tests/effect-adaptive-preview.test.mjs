@@ -4,6 +4,11 @@ import * as preview from '../src/ui/effect-preview.js';
 import {createEffectTimeline} from '../src/ui/effect-timeline.js';
 
 const display={widthMm:63,heightMm:88,displayWidth:945,pixelRatio:2};
+test('manual quality stays sharp during playback and slow frames cannot override the chosen DPI',()=>{
+ const quality=preview.createEffectPreviewQuality();
+ for(let i=0;i<5;i++){assert.equal(quality.dpi({...display,active:true,dpi:300}),300);quality.record(800,300,{active:true,manual:true});}
+ assert.equal(quality.dpi({...display,dpi:600}),600);assert.equal(quality.dpi({...display,active:true,dpi:150}),150);
+});
 test('expensive playback lowers its own raster work and pausing restores the full display resolution',()=>{
  assert.equal(typeof preview.createEffectPreviewQuality,'function');
  const quality=preview.createEffectPreviewQuality(),sharp=quality.dpi(display),first=quality.dpi({...display,active:true});

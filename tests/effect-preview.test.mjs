@@ -2,6 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {effectPreviewDpi} from '../src/ui/effect-preview.js';
 
+test('manual DPI renders at the requested density while keeping oversized cards within a bounded surface',()=>{
+ assert.equal(effectPreviewDpi({widthMm:63,heightMm:88,displayWidth:315,dpi:600}),600);
+ assert.equal(effectPreviewDpi({widthMm:63,heightMm:88,displayWidth:2000,dpi:150}),150);
+ const dpi=effectPreviewDpi({widthMm:200,heightMm:280,dpi:600});assert.ok(dpi<600&&dpi>200);
+ assert.ok((224*dpi/25.4)*(304*dpi/25.4)<=16_000_000);
+});
+
 test('effect preview covers enlarged display pixels and high density screens',()=>{
  for(const [displayWidth,pixelRatio] of [[315,1],[945,1],[630,2]]){
   const dpi=effectPreviewDpi({widthMm:63,heightMm:88,displayWidth,pixelRatio});
