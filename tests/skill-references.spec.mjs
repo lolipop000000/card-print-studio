@@ -10,7 +10,7 @@ async function insert(page){const input=page.locator('#actives .skill-effect');a
 test('skill reference insertion rename editing save reload duplicate and undo stay readable',async()=>{
  const {browser,page,pageErrors,httpRequests}=await openApp();try{
  await skills(page);await insert(page);assert.equal(await page.locator('#actives .skill-effect').inputValue(),'다시 강타 발동');
- await fill(page,'#passives .skill-name','폭풍 강타🙂');assert.equal(await page.locator('#actives .skill-effect').inputValue(),'다시 폭풍 강타🙂 발동');
+ await fill(page,'#passives .skill-name','폭풍 강타🙂');await page.waitForFunction(()=>document.querySelector('#actives .skill-effect').value==='다시 폭풍 강타🙂 발동');
  const saved=await saveProject(page,'skill-references.json');assert.equal(saved.cards[0].actives[0].effect,'다시 강타 발동');assert.equal(saved.cards[0].actives[0].skillReferences[0].skillId,saved.cards[0].passives[0].id);
  const input=page.locator('#actives .skill-effect');await input.evaluate(el=>{el.focus();el.setSelectionRange(0,0);});await page.keyboard.insertText('즉시 ');
  let p=await saveProject(page,'skill-references-edited.json');assert.equal(p.cards[0].actives[0].effect,'즉시 다시 폭풍 강타🙂 발동');assert.deepEqual(p.cards[0].actives[0].skillReferences.map(r=>[r.start,r.end]),[[6,13]]);

@@ -14,7 +14,7 @@ function referenceState(owner,card,skill,text){
 }
 
 export function skillEffectField(card,skill,change,id,owner=card){
- const view=resolveSkillEffect(card,skill),state=referenceState(owner,card,skill,view.text);let editRange=null,composing=false,timer,lastValue=view.text;
+ let view=resolveSkillEffect(card,skill);const state=referenceState(owner,card,skill,view.text);let editRange=null,composing=false,timer,lastValue=view.text;
  const capture=event=>{editRange={start:input.selectionStart,end:input.selectionEnd,inputType:event?.inputType};};
  const remember=()=>{if(input.isConnected&&!composing)state.range={start:input.selectionStart,end:input.selectionEnd,direction:input.selectionDirection,text:input.value};};
  const commit=()=>{
@@ -22,13 +22,13 @@ export function skillEffectField(card,skill,change,id,owner=card){
   // Replacing a selected name with identical letters still unlinks that reference.
   const overlaps=editRange&&editRange.end>editRange.start&&view.skillReferences.some(ref=>ref.start<editRange.end&&ref.end>editRange.start);
   remember();if(input.value===lastValue&&!overlaps){editRange=null;return;}
-  lastValue=input.value;const edit=editRange;editRange=null;change((target,current)=>editSkillEffect(current,target,lastValue,edit));
+  lastValue=input.value;const edit=editRange;editRange=null;change((target,current)=>{editSkillEffect(current,target,lastValue,edit);view=resolveSkillEffect(current,target);});
  };
  const input=el('textarea',{id,value:view.text,rows:3,class:'skill-effect',
   onfocus:remember,onblur:remember,onselect:remember,onkeyup:remember,onpointerup:remember,
   onbeforeinput:event=>{if(!composing)capture(event);},
-  oncompositionstart:event=>{composing=true;clearTimeout(timer);capture(event);},
-  oncompositionend:event=>{composing=false;if(!event.data&&input.value===lastValue){editRange=null;remember();return;}timer=setTimeout(commit,0);},
+  oncompositionstart:event=>{composing=true;input.dataset.composing='true';clearTimeout(timer);capture(event);},
+  oncompositionend:event=>{composing=false;delete input.dataset.composing;if(!event.data&&input.value===lastValue){editRange=null;remember();return;}timer=setTimeout(commit,0);},
   oninput:event=>{if(!event.isComposing)commit();},onchange:commit});
  if(state.range)input.setSelectionRange(state.range.start,state.range.end,state.range.direction);
  return el('label',{class:'field',htmlFor:id},el('span',{},'효과 · 대미지'),input);

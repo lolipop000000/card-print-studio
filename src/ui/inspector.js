@@ -1,4 +1,4 @@
-import {el,button,field,preserveFocus,showMessage} from './dom.js';
+import {el,button,field,preserveFocus,replaceChildrenKeepingInput,showMessage} from './dom.js';
 import {selectedElements} from './element-selection.js';
 import {RANKS,ATTRIBUTES,cardAttributes,newId,clone} from '../model/types.js';
 import {finalHp} from '../model/project.js';
@@ -47,8 +47,12 @@ function boundTextControls(card,field,skillId,editCard,minFontPt,idPrefix,label)
    if(automatic)Object.assign(c,syncSkillElements(c,d.settings,d.keywords||[]));
   }),{idPrefix,minFontPt,includeColor:true})));
 }
+const inspectorScopes=new WeakMap();
 export function renderInspector(host,ctx){
  const settingsOpen=host.querySelector('.settings')?.open??false,attributesOpen=host.querySelector('#attributes')?.open??false,scroll=host.scrollTop,openTextStyles=new Set([...host.querySelectorAll('details[data-text-style][open]')].map(node=>node.dataset.textStyle));
+ const scope=ctx.store.getDocumentId()+':'+ctx.target()?.id+':'+!!ctx.state.back+':'+ctx.state.selectedElementIds?.join(','),liveHost=host;
+ const active=inspectorScopes.get(host)===scope?document.activeElement:null;
+ inspectorScopes.set(host,scope);host=host.cloneNode(false);
  preserveFocus(()=>{
  host.replaceChildren();const p=ctx.store.getProject(),card=ctx.card(),target=ctx.target();
  if(target){const objects=el('div',{class:'object-panel'});renderObjectList(objects,ctx);host.append(objects);}
@@ -164,7 +168,8 @@ export function renderInspector(host,ctx){
  settings.open=settingsOpen;settings.append(table);host.append(settings);
  const attributes=host.querySelector('#attributes');if(attributes)attributes.open=attributesOpen;
  for(const node of host.querySelectorAll('details[data-text-style]'))node.open=openTextStyles.has(node.dataset.textStyle);
- organizeMobileInspector(host);
+ organizeMobileInspector(host,liveHost);
+ replaceChildrenKeepingInput(liveHost,host,active);
  });
- host.scrollTop=scroll;
+ liveHost.scrollTop=scroll;
 }

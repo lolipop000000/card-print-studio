@@ -6,7 +6,7 @@ import {renderCard} from '../render/card.js';
 import {getEffectFrameSec} from '../model/visual-effects.js';
 import {effectPreviewDpi} from './effect-preview.js';
 import {CSS_MM,wheelZoomFactor,captureViewAnchor,restoreViewAnchor} from './view-zoom.js';
-export function mountPaperView(root,store){
+export function mountPaperView(root,store,{isActive=()=>!root.hidden}={}){
  let zoom=40,calibration=1,tick=0,destroyed=false,lastRatio=window.devicePixelRatio||1;
  const controls=el('div',{class:'print-controls'}),summary=el('div',{id:'paper-summary',class:'paper-summary'}),scroll=el('div',{class:'paper-scroll'});
  const zoomInput=el('input',{id:'paper-zoom',type:'number',min:10,max:200,step:.1,value:zoom,'aria-label':'용지 배율',onchange:e=>setZoom(Number(e.target.value)||40)});
@@ -50,10 +50,10 @@ export function mountPaperView(root,store){
  }
  function resized(){if(!root.hidden&&lastRatio!==(window.devicePixelRatio||1))refresh();}
  async function refresh({anchor=null,sheetIndex=0}={}){
-  if(destroyed)return;const own=++tick,p=store.getProject();settings();zoomInput.value=zoom;label.textContent=zoom+'%'+(calibration!==1?' · 화면 보정 적용':'');
+  if(destroyed)return;const own=++tick;if(!isActive())return;const p=store.getProject();settings();zoomInput.value=zoom;label.textContent=zoom+'%'+(calibration!==1?' · 화면 보정 적용':'');
   let plan;try{plan=planSheets(p);}catch(e){summary.textContent=e.message;scroll.replaceChildren();return;}
   summary.textContent=plan.columns+' × '+plan.rows+' 배치 · 한 면 '+plan.capacity+'장 · '+plan.pages.length+'페이지 · '+p.settings.cardWidthMm+' × '+p.settings.cardHeightMm+' mm · 고정 이펙트 '+getEffectFrameSec(p).toFixed(2)+'초 (PDF도 같은 장면)';
-  let assets;try{assets=await loadAssets(p);}catch(e){showMessage(e.message);return;}if(own!==tick||destroyed)return;
+  let assets;try{assets=await loadAssets(p);}catch(e){showMessage(e.message);return;}if(own!==tick||destroyed||!isActive())return;
   const scale=zoom/100*CSS_MM*calibration,cache=new Map(),fragment=document.createDocumentFragment();lastRatio=window.devicePixelRatio||1;
   const dpi=effectPreviewDpi({widthMm:p.settings.cardWidthMm,heightMm:p.settings.cardHeightMm,displayWidth:p.settings.cardWidthMm*scale,pixelRatio:lastRatio});
   for(const [index,page] of plan.pages.entries()){
