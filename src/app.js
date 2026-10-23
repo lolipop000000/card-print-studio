@@ -223,7 +223,7 @@ export function mountEditor(root,store,{cloudClient=createCloudClient()}={}){
  const message=el('div',{id:'message',hidden:true,role:'alert',class:'message'},el('span',{}),button('×',()=>message.hidden=true,{'aria-label':'메시지 닫기'}));
  root.append(top,el('div',{id:'library-account-home',hidden:true},cloudAccount.node),recovery.notice,el('div',{class:'workspace-grid'},sidebar,center,inspector),message,projectFile,artFile,cardFiles.input,cloudCardUpload.input);
  const cardCanvas=mountCardCanvas(canvasHost,ctx);ctx.cardCanvas=cardCanvas;ctx.paperRoot=paperRoot;
- const paperView=mountPaperView(paperRoot,store);ctx.onPaper=()=>{if(state.mode==='paper')paperView.refresh();};
+ const paperView=mountPaperView(paperRoot,store,{isActive:()=>state.mode==='paper'&&mobileWorkspace.isPreviewVisible()});ctx.onPaper=()=>{if(state.mode==='paper')paperView.refresh();};
  let phoneFitted=false;
  const mobileWorkspace=mountMobileWorkspace(root,{save,openLibrary:()=>{void ctx.openAssetLibrary();},onChange:()=>{refresh();if(mobileWorkspace.isPhone()&&mobileWorkspace.isPreviewVisible()&&!phoneFitted){cardCanvas.fit();phoneFitted=true;}}});
  const phoneFitFrame=requestAnimationFrame(()=>{if(mobileWorkspace.isPhone()&&mobileWorkspace.isPreviewVisible()){cardCanvas.fit();phoneFitted=true;}});
@@ -247,18 +247,31 @@ export function mountEditor(root,store,{cloudClient=createCloudClient()}={}){
   ctx.editTarget('요소 삭제',t=>{const bound=t.elements.some(e=>ids.has(e.id)&&(e.binding?.skillId||e.binding?.field?.startsWith('item.')));t.elements=t.elements.filter(e=>!ids.has(e.id));if(t.kind){t.template='custom';if(bound)t.autoSkillLayout=false;}});setElementSelection(state,[]);refresh();
  };
  ctx.reorderElement=delta=>ctx.editTarget('요소 순서',t=>{const i=t.elements.findIndex(e=>e.id===state.selectedElementId),j=i+delta;if(i<0||j<0||j>=t.elements.length)return;const e=t.elements.splice(i,1)[0];t.elements.splice(j,0,e);if(t.kind)t.template='custom';});
+ let textRefreshTimer;
+ function refreshHistory(){
+  document.getElementById('save-state').textContent=store.isDirty()?'미저장':'저장됨';
+  document.getElementById('undo').disabled=!store.canUndo();document.getElementById('redo').disabled=!store.canRedo();
+ }
  function refresh(){
+  clearTimeout(textRefreshTimer);
   const p=store.getProject();if(!p.cards.some(c=>c.id===state.activeCardId))state.activeCardId=p.cards[0]?.id;
   setElementSelection(state,state.selectedElementIds,ctx.target());
-  deckName.value=p.name;document.getElementById('save-state').textContent=store.isDirty()?'미저장':'저장됨';
-  document.getElementById('undo').disabled=!store.canUndo();document.getElementById('redo').disabled=!store.canRedo();
+  deckName.value=p.name;refreshHistory();
   for(const [node,active] of [[cardTab,state.mode==='card'],[paperTab,state.mode==='paper'],[frontTab,!state.back],[backTab,state.back]]){node.classList.toggle('active',active);node.setAttribute('aria-pressed',active);}
   cardArea.hidden=state.mode!=='card';paperRoot.hidden=state.mode!=='paper';
-  cardCanvas.setActive(state.mode==='card'&&mobileWorkspace.isPreviewVisible()&&!state.paintOpen&&!state.effectOpen&&!document.querySelector('dialog[open]'));
-  cardTemplates.refresh?.();cardLibrary.refresh();renderCards(cardList,ctx);ctx.renderInspector();cardCanvas.refresh();ctx.onPaper?.();
-  const tick=++generation;loadAssets(p).then(cache=>{if(tick!==generation)return;ctx.assets=cache;ctx.refreshVisualEffects?.();renderCards(cardList,ctx);cardCanvas.refresh();ctx.onPaper?.();}).catch(e=>showMessage(e.message));
+  const previewVisible=mobileWorkspace.isPreviewVisible(),cardsVisible=!mobileWorkspace.isPhone()||root.dataset.mobileView==='cards';
+  cardCanvas.setActive(state.mode==='card'&&previewVisible&&!state.paintOpen&&!state.effectOpen&&!document.querySelector('dialog[open]'));
+  cardTemplates.refresh?.();if(cardsVisible){cardLibrary.refresh();renderCards(cardList,ctx);}ctx.renderInspector();if(previewVisible){cardCanvas.refresh();ctx.onPaper?.();}
+  const tick=++generation;loadAssets(p).then(cache=>{if(tick!==generation)return;ctx.assets=cache;ctx.refreshVisualEffects?.();if(cardsVisible)renderCards(cardList,ctx);if(previewVisible){cardCanvas.refresh();ctx.onPaper?.();}}).catch(e=>showMessage(e.message));
  }
- const unsubscribe=store.subscribe(refresh);ctx.refresh=refresh;
+ const stopRefresh=store.subscribe(()=>{
+  const input=document.activeElement;
+  if(inspector.contains(input)&&input?.matches('textarea,input[type="text"],input:not([type])')){
+   // Data and history are already committed; repaint once after a typing burst.
+   ++generation;refreshHistory();clearTimeout(textRefreshTimer);textRefreshTimer=setTimeout(refresh,140);
+  }else refresh();
+ });
+ const unsubscribe=()=>{clearTimeout(textRefreshTimer);stopRefresh();};ctx.refresh=refresh;
  const key=event=>{
   if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='s'){event.preventDefault();if(document.querySelector('dialog[open]'))showMessage('편집 창을 닫은 뒤 저장을 눌러주세요.');else save();return;}
   if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='p'){event.preventDefault();if(document.querySelector('dialog[open]'))showMessage('편집 창을 닫은 뒤 바로 인쇄를 눌러주세요.');else ctx.onPrint();return;}

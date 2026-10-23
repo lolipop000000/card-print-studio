@@ -8,6 +8,7 @@ import {newId} from '../model/types.js';
 import {openDialog} from './dialogs.js';
 const reflow=project=>{project.cards=project.cards.map(c=>syncSkillElements(c,project.settings,project.keywords||[]));};
 const editorStates=new WeakMap();
+const inputBindings=new WeakMap();
 function keywordState(ctx,target,field,text){
  let states=editorStates.get(ctx.store);if(!states)editorStates.set(ctx.store,states=new Map());
  const key=(ctx.store.getDocumentId?.()||'')+':'+target.id+':'+field;
@@ -104,10 +105,11 @@ export function keywordControls(ctx,target,change,inputId,{field:textField='effe
  // completed field, keeping its selection separate from picker/button focus.
  queueMicrotask(()=>{
   const input=document.getElementById(inputId);if(!host.isConnected||!input)return;
+  inputBindings.get(input)?.abort();const binding=new AbortController();inputBindings.set(input,binding);const options={signal:binding.signal};
   state.composing=input.dataset.composing==='true';
-  for(const event of ['focus','blur','select','keyup','pointerup','input'])input.addEventListener(event,()=>remember(input));
-  input.addEventListener('compositionstart',()=>{state.composing=true;});
-  input.addEventListener('compositionend',()=>{state.composing=false;remember(input);});
+  for(const event of ['focus','blur','select','keyup','pointerup','input'])input.addEventListener(event,()=>remember(input),options);
+  input.addEventListener('compositionstart',()=>{state.composing=true;},options);
+  input.addEventListener('compositionend',()=>{state.composing=false;remember(input);},options);
   if(document.activeElement===input)remember(input);
   else if(state.range?.text===input.value)input.setSelectionRange(state.range.start,state.range.end,state.range.direction);
  });
